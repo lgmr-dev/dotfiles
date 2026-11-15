@@ -2643,7 +2643,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/blopker/codebook@v0.3.42",
+      "id": "pkg:github/blopker/codebook@v0.4.0",
       "asset": [
         {
           "target": "linux_x64_gnu",
@@ -2846,7 +2846,7 @@
     "languages": [],
     "categories": [],
     "source": {
-      "id": "pkg:npm/@agentclientprotocol/codex-acp@2.5.0"
+      "id": "pkg:npm/@agentclientprotocol/codex-acp@2.6.0"
     },
     "bin": {
       "codex-acp": "npm:codex-acp"
@@ -8813,7 +8813,7 @@
       "DAP"
     ],
     "source": {
-      "id": "pkg:github/microsoft/vscode-js-debug@v1.140.0",
+      "id": "pkg:github/microsoft/vscode-js-debug@v1.140.1",
       "asset": {
         "file": "js-debug-dap-{{version}}.tar.gz"
       },
@@ -8873,7 +8873,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:pypi/json-repair@0.64.8"
+      "id": "pkg:pypi/json-repair@0.64.9"
     },
     "bin": {
       "json_repair": "pypi:json_repair"
@@ -12069,7 +12069,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:npm/npm-groovy-lint@19.0.0"
+      "id": "pkg:npm/npm-groovy-lint@19.0.1"
     },
     "bin": {
       "npm-groovy-lint": "npm:npm-groovy-lint"
@@ -12414,7 +12414,7 @@
       "Runtime"
     ],
     "source": {
-      "id": "pkg:github/open-policy-agent/opa@v1.22.2",
+      "id": "pkg:github/open-policy-agent/opa@v1.22.3",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -13257,7 +13257,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:composer/laravel/pint@v1.32.1"
+      "id": "pkg:composer/laravel/pint@v1.32.2"
     },
     "bin": {
       "pint": "composer:pint"
@@ -13868,7 +13868,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:composer/vimeo/psalm@7.2.1"
+      "id": "pkg:composer/vimeo/psalm@7.3.0"
     },
     "bin": {
       "psalm": "composer:psalm",
@@ -15163,7 +15163,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/rshtml/rshtml-analyzer@v0.1.8",
+      "id": "pkg:github/rshtml/rshtml-analyzer@v0.1.9",
       "asset": [
         {
           "target": "linux_x64_gnu",
@@ -15220,7 +15220,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:pypi/rstcheck@6.3.0"
+      "id": "pkg:pypi/rstcheck@6.3.1"
     },
     "bin": {
       "rstcheck": "pypi:rstcheck"
@@ -15459,7 +15459,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/rvben/rumdl@v0.3.2",
+      "id": "pkg:github/rvben/rumdl@v0.3.3",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -15798,7 +15798,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:pypi/semgrep@1.184.0",
+      "id": "pkg:pypi/semgrep@1.185.0",
       "supported_platforms": [
         "unix"
       ]
@@ -16215,7 +16215,7 @@
       "Compiler"
     ],
     "source": {
-      "id": "pkg:github/shader-slang/slang@v2026.21",
+      "id": "pkg:github/shader-slang/slang@v2026.22",
       "asset": [
         {
           "target": "linux_x64_gnu",
@@ -16943,7 +16943,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:gem/sorbet@0.6.13646",
+      "id": "pkg:gem/sorbet@0.6.13650",
       "supported_platforms": [
         "unix"
       ]
@@ -18396,7 +18396,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:pypi/termux-language-server@0.1.15"
+      "id": "pkg:pypi/termux-language-server@0.1.16"
     },
     "bin": {
       "termux-language-server": "pypi:termux-language-server"
@@ -19186,7 +19186,7 @@
       "lspconfig": "tombi"
     },
     "source": {
-      "id": "pkg:github/tombi-toml/tombi@v1.11.1",
+      "id": "pkg:github/tombi-toml/tombi@v1.11.2",
       "asset": [
         {
           "target": "darwin_x64",

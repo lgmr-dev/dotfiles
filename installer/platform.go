@@ -18,6 +18,7 @@ import (
 type NativePlatform struct {
 	Context
 	Distro                     string
+	DistroRelease              string
 	Family                     string
 	Libc                       string
 	Homebrew                   *HomebrewLocation
@@ -52,7 +53,7 @@ func DiscoverPlatform() (NativePlatform, error) {
 	if err != nil {
 		return target, fmt.Errorf("read Linux distribution identity: %w", err)
 	}
-	target.Distro, target.Family, err = linuxDistribution(data)
+	target.Distro, target.DistroRelease, target.Family, err = linuxDistribution(data)
 	if err != nil {
 		return target, err
 	}
@@ -79,30 +80,35 @@ func readPlatformFile(path string) ([]byte, error) {
 }
 
 var distroID = regexp.MustCompile(`^[a-z0-9._-]+$`)
+var distroRelease = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
 
 // Read the exact distribution ID. ID_LIKE is not a support promise: derivatives
 // do not become supported merely because they use APT. Never source os-release.
 // https://www.freedesktop.org/software/systemd/man/latest/os-release.html
-func linuxDistribution(data []byte) (string, string, error) {
-	id := "linux"
+func linuxDistribution(data []byte) (string, string, string, error) {
+	id, release := "linux", ""
 	for _, line := range strings.Split(string(data), "\n") {
 		key, value, ok := strings.Cut(line, "=")
-		if !ok || key != "ID" {
+		if !ok || key != "ID" && key != "VERSION_ID" {
 			continue
 		}
 		if len(value) >= 2 && (value[0] == '\'' || value[0] == '"') && value[len(value)-1] == value[0] {
 			value = value[1 : len(value)-1]
 		}
-		if !distroID.MatchString(value) {
-			return "", "", errors.New("invalid distribution ID")
-		}
 		// The specification requires readers to use the last repeated key.
-		id = value
+		switch {
+		case key == "ID" && distroID.MatchString(value):
+			id = value
+		case key == "VERSION_ID" && distroRelease.MatchString(value):
+			release = value
+		default:
+			return "", "", "", errors.New("invalid distribution " + key)
+		}
 	}
 	if id != "ubuntu" && id != "debian" {
-		return id, "", fmt.Errorf("unsupported Linux distribution %q; this release supports Ubuntu and Debian only", id)
+		return id, "", "", fmt.Errorf("unsupported Linux distribution %q; this release supports Ubuntu and Debian only", id)
 	}
-	return id, "apt", nil
+	return id, release, "apt", nil
 }
 
 // Inspect the system shell's actual ELF loader; distro branding and a glibc

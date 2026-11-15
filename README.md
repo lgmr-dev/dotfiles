@@ -1101,7 +1101,8 @@ Useful standalone tools:
 - **tmux panes:** 50,000 history lines per pane. This is separate from the
   outer terminal's scrollback limit.
 - **Ghostty:** macOS/Linux, dark Rose Pine, 1 GiB lazy scrollback budget per
-  surface, copy-on-select, maximized startup. On macOS, ``Ctrl+Option+` `` toggles
+  surface, copy-on-select, maximized startup. Ubuntu 24.04 gets Ghostty 1.3.1,
+  because Ghostty 1.4 needs GTK 4.18. On macOS, ``Ctrl+Option+` `` toggles
   the global quick terminal. ``Cmd+` `` stays the macOS key for the next window
   of the app.
 - **Windows Terminal:** native Windows, dark Rose Pine, 32,767 history lines

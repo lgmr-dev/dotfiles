@@ -295,11 +295,12 @@ jobs:
           test -c /dev/uinput || sudo modprobe uinput
           go test -c -o "$RUNNER_TEMP/installer.test" .
           xvfb-run -a sh -c 'sudo --preserve-env=DISPLAY,XAUTHORITY,DOTFILES_TEST_NATIVE_KEYBOARD "$RUNNER_TEMP/installer.test" -test.v -test.count=1 -test.timeout=20m -test.run "^TestNativeMacKeyboardLifecycle$"'
-      - name: Load pinned Ghostty against the oldest supported Ubuntu libraries
+      - name: Load pinned Ghostty against the oldest supported Ubuntu and Debian libraries
         if: runner.os == 'Linux'
         env:
           DOTFILES_TEST_GHOSTTY_RELEASES: '1'
           GHOSTTY_OLDEST_UBUNTU_IMAGE: ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+          GHOSTTY_OLDEST_DEBIAN_IMAGE: debian:13-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
         run: go test -v -count=1 -timeout 20m -run '^TestNativeGhosttyLoadsOnOldestSupportedUbuntu$' .
 
       # Linux applications run under Ubuntu's stock AppArmor user-namespace

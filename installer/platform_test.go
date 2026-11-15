@@ -3,6 +3,7 @@ package installer
 import (
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -51,27 +52,29 @@ func TestLinuxSupportRejectsUnselectedDistributions(t *testing.T) {
 		"ID=linuxmint\nID_LIKE=\"ubuntu debian\"\n", "ID=unknown\nID_LIKE=debian\n",
 		"ID=ubuntu\nID=fedora\n", "NAME=Linux\n",
 	} {
-		if _, _, err := linuxDistribution([]byte(data)); err == nil {
+		if _, _, _, err := linuxDistribution([]byte(data)); err == nil {
 			t.Errorf("unsupported distribution accepted: %q", data)
 		}
 	}
 }
 
 func TestLinuxDistributionUsesExactSupportedIdentity(t *testing.T) {
-	for _, fixture := range []struct{ data, id, family string }{
-		{"ID=ubuntu\nID_LIKE=debian\n", "ubuntu", "apt"},
-		{"ID='debian'\n", "debian", "apt"},
-		{"ID=fedora\nID=ubuntu\n", "ubuntu", "apt"},
-		{"ID=ubuntu\nID_LIKE=\"fedora\"\n", "ubuntu", "apt"},
-		{"ID=debian\nNAME=\"$(do not execute)\"\n", "debian", "apt"},
+	for _, fixture := range []struct{ data, id, release, family string }{
+		{"ID=ubuntu\nID_LIKE=debian\n", "ubuntu", "", "apt"},
+		{"ID='debian'\n", "debian", "", "apt"},
+		{"ID=fedora\nID=ubuntu\n", "ubuntu", "", "apt"},
+		{"ID=ubuntu\nID_LIKE=\"fedora\"\n", "ubuntu", "", "apt"},
+		{"ID=debian\nNAME=\"$(do not execute)\"\n", "debian", "", "apt"},
+		{"ID=ubuntu\nVERSION_ID=\"24.04\"\n", "ubuntu", "24.04", "apt"},
+		{"VERSION_ID=12\nID=debian\nVERSION_ID=13\n", "debian", "13", "apt"},
 	} {
-		id, family, err := linuxDistribution([]byte(fixture.data))
-		if err != nil || id != fixture.id || family != fixture.family {
-			t.Fatal(fixture, id, family, err)
+		id, release, family, err := linuxDistribution([]byte(fixture.data))
+		if err != nil || id != fixture.id || release != fixture.release || family != fixture.family {
+			t.Fatal(fixture, id, release, family, err)
 		}
 	}
-	for _, invalid := range []string{"ID=\"ubuntu", "ID=ubuntu debian", "ID=$(uname)", "ID=", "ID_LIKE=\"debian;touch /tmp/file\""} {
-		if _, _, err := linuxDistribution([]byte(invalid)); err == nil {
+	for _, invalid := range []string{"ID=\"ubuntu", "ID=ubuntu debian", "ID=$(uname)", "ID=", "ID_LIKE=\"debian;touch /tmp/file\"", "ID=ubuntu\nVERSION_ID=24.04-lts\n", "ID=ubuntu\nVERSION_ID=\n"} {
+		if _, _, _, err := linuxDistribution([]byte(invalid)); err == nil {
 			t.Fatal("accepted malformed policy input", invalid)
 		}
 	}
@@ -98,6 +101,26 @@ func TestArchiveSelectionRequiresObservedLibc(t *testing.T) {
 	} {
 		if actual := interpreterLibc(fixture.interpreter); actual != fixture.libc {
 			t.Fatal("wrong libc for system ELF interpreter", fixture, actual)
+		}
+	}
+}
+
+func TestUbuntu2404KeepsTheLastGhosttyForItsGTK(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		selected := map[string]ArchivePin{}
+		for _, release := range []struct{ distro, version string }{{"ubuntu", "24.04"}, {"ubuntu", "26.04"}, {"debian", "13"}, {"debian", ""}} {
+			pins, err := DefaultArchivePins(NativePlatform{Context: Context{OS: "linux", Arch: arch}, Distro: release.distro, DistroRelease: release.version, Family: "apt", Libc: "glibc"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected[release.distro+" "+release.version] = pins["tool.ghostty"]
+		}
+		oldest, current := selected["ubuntu 24.04"], selected["ubuntu 26.04"]
+		if oldest.SHA256 == "" || oldest.Version == current.Version || !strings.Contains(oldest.URL, "_24.04.deb") {
+			t.Fatal("Ubuntu 24.04 must keep the Ghostty build for its GTK", arch, oldest, current)
+		}
+		if selected["debian 13"].SHA256 != current.SHA256 || selected["debian "].SHA256 != current.SHA256 {
+			t.Fatal("a release without its own pin must use the common Ghostty build", arch, selected)
 		}
 	}
 }

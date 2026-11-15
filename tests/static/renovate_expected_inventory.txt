@@ -24,6 +24,7 @@ gomod|installer/go.mod|go|golang.org/x/sys|1
 gomod|installer/go.mod|go|golang.org/x/term|1
 gomod|installer/go.mod|golang-version|go|1
 regex|.github/workflows/installer-engine.yml|docker|mcr.microsoft.com/dotnet/framework/runtime|1
+regex|.github/workflows/installer-engine.yml|docker|debian|1
 regex|.github/workflows/installer-engine.yml|docker|ubuntu|1
 regex|.github/workflows/installer-engine.yml|github-runners|macos|4
 regex|.github/workflows/installer-engine.yml|github-runners|ubuntu|10
@@ -67,7 +68,7 @@ regex|installer/archive-pins.json|github-releases|koalaman/shellcheck|4
 regex|installer/archive-pins.json|github-releases|lsd-rs/lsd|4
 regex|installer/archive-pins.json|github-releases|microsoft/terminal|1
 regex|installer/archive-pins.json|github-releases|microsoft/vscode|2
-regex|installer/archive-pins.json|github-releases|mkasberg/ghostty-ubuntu|2
+regex|installer/archive-pins.json|github-releases|mkasberg/ghostty-ubuntu|4
 regex|installer/archive-pins.json|github-releases|neovim/neovim|4
 regex|installer/archive-pins.json|github-releases|nikitabobko/AeroSpace|1
 regex|installer/archive-pins.json|github-releases|obsidianmd/obsidian-releases|3

@@ -64,13 +64,17 @@ keybind = global:ctrl+alt+grave_accent=toggle_quick_terminal
 # Linux. zsh, bash, fzf and Atuin move by word on these bytes.
 keybind = alt+arrow_left=esc:b
 keybind = alt+arrow_right=esc:f
-# Linux only: the Mac keyboard shortcuts (xremap) send these keys for Cmd+W and
-# Cmd+Option+arrows, so splits work as on the Mac. Ghostty on Linux has no key
-# to close one split, and GNOME takes its split keys Ctrl+Alt+arrows for
-# workspaces. On macOS these chords (Ctrl+Cmd+W, Ctrl+Cmd+Option+arrows) are
-# extra keys that nothing else uses.
+# Linux only: the Mac keyboard shortcuts (xremap) send these keys for Cmd+W,
+# Cmd+Option+arrows and Cmd+Up/Down, so splits and prompts work as on the Mac.
+# Ghostty on Linux has no key to close one split, GNOME takes its split keys
+# Ctrl+Alt+arrows for workspaces, and Ghostty 1.4 moves tabs on
+# Ctrl+Shift+PageUp/PageDown. On macOS these chords (Ctrl+Cmd+W,
+# Ctrl+Cmd+Option+arrows, Ctrl+Shift+PageUp/PageDown) are extra keys that
+# nothing else uses.
 keybind = ctrl+super+w=close_surface
 keybind = ctrl+super+alt+arrow_up=goto_split:up
 keybind = ctrl+super+alt+arrow_down=goto_split:down
 keybind = ctrl+super+alt+arrow_left=goto_split:left
 keybind = ctrl+super+alt+arrow_right=goto_split:right
+keybind = ctrl+shift+page_up=jump_to_prompt:-1
+keybind = ctrl+shift+page_down=jump_to_prompt:1

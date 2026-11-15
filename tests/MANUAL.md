@@ -483,10 +483,11 @@ in the evidence.
       installed on both sides, zsh plugins are installed in WSL, nvim starts,
       tmux starts, and clipboard from WSL -> Windows round-trips.
 - [ ] **Ghostty exact Debian package consumption**: on a supported Ubuntu
-      24.04/25.10 or Debian trixie amd64/arm64 host without Ghostty, run
+      24.04/26.04 or Debian 13 amd64/arm64 host without Ghostty, run
       `./install-deps.sh --all`. Confirm setup prints the pinned
-      `mkasberg/ghostty-ubuntu@1.3.1-0-ppa2` asset identity, `dpkg-query -W
-      -f='${Version}' ghostty` returns `1.3.1-0~ppa2`, and `ghostty --version`
+      `mkasberg/ghostty-ubuntu` asset identity: `1.3.1-0-ppa2` with the
+      `24.04` asset on Ubuntu 24.04, and `1.4.0-0-ppa2` with the `trixie`
+      asset on the other releases. Confirm that `ghostty --version`
       succeeds. This remains manual for distro/architecture pairs not exercised
       by the hosted Ubuntu container.
 - [ ] **WSL experimental GUI opt-in only**: if testing Linux Ghostty under WSLg /

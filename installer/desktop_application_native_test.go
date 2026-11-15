@@ -539,6 +539,10 @@ func desktopConsumePublished(t *testing.T, d *DesktopDriver, a *ArchiveDriver, i
 		if !strings.Contains(output, "font-family = Hack Nerd Font") || !strings.Contains(output, "theme = Rose Pine") {
 			t.Fatal("Ghostty did not consume managed configuration", output)
 		}
+		keys := run(cli, "+list-keybinds", "--plain")
+		if !strings.Contains(keys, "ctrl+shift+page_up=jump_to_prompt:-1") || !strings.Contains(keys, "ctrl+shift+page_down=jump_to_prompt:1") {
+			t.Fatal("Ghostty does not jump to prompts on the keys that the Mac keyboard shortcuts send for Cmd+Up/Down", keys)
+		}
 	case "vscode":
 		deadline := time.Now().Add(30 * time.Second)
 		for {

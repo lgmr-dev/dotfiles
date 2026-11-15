@@ -4,11 +4,14 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
 //go:embed archive-pins.json
 var archivePinData []byte
+
+var distributionReleasePin = regexp.MustCompile("^(ubuntu|debian)-" + distroReleaseNumber + "$")
 
 type ArchiveCatalog struct {
 	Schema    int                              `json:"schema"`
@@ -69,7 +72,11 @@ func DefaultArchivePins(target NativePlatform) (map[string]ArchivePin, error) {
 				platforms[platform] = pin
 			}
 			parts := strings.Split(platform, "/")
-			if len(parts) != 2 {
+			if len(parts) == 3 && parts[0] == "linux" && distributionReleasePin.MatchString(parts[2]) {
+				if _, ok := platforms[parts[0]+"/"+parts[1]]; !ok {
+					return nil, fmt.Errorf("archive %s on %s lacks its common platform pin", id, platform)
+				}
+			} else if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid archive platform %s", platform)
 			}
 			if err := (Context{OS: parts[0], Arch: parts[1]}).Validate(); err != nil {
@@ -79,7 +86,11 @@ func DefaultArchivePins(target NativePlatform) (map[string]ArchivePin, error) {
 				return nil, fmt.Errorf("archive %s on %s: %w", id, platform, err)
 			}
 		}
-		if pin, ok := platforms[target.OS+"/"+target.Arch]; ok && (pin.Libc == "" || pin.Libc == target.Libc) {
+		pin, ok := platforms[target.OS+"/"+target.Arch+"/"+target.Distro+"-"+target.DistroRelease]
+		if !ok {
+			pin, ok = platforms[target.OS+"/"+target.Arch]
+		}
+		if ok && (pin.Libc == "" || pin.Libc == target.Libc) {
 			result[id] = pin
 		}
 	}

@@ -1217,6 +1217,7 @@
         "linux": [
           "library.libadwaita-1-0",
           "library.libc6",
+          "library.libegl1",
           "library.libfontconfig1",
           "library.libfreetype6",
           "library.libglib2.0-0t64",
@@ -2475,6 +2476,21 @@
         "linux": {
           "provider": "apt",
           "package": "libc6"
+        }
+      }
+    },
+    {
+      "id": "library.libegl1",
+      "name": "libegl1 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libegl1"
         }
       }
     },

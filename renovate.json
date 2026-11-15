@@ -150,12 +150,13 @@
     },
     {
       "customType": "regex",
-      "description": "Pinned oldest supported Ubuntu image for the Ghostty library-compatibility check. Only digest updates apply: the tag must stay the oldest supported release.",
+      "description": "Pinned oldest supported Ubuntu and Debian images for the Ghostty library-compatibility check. Only digest updates apply: each tag must stay the oldest supported release.",
       "managerFilePatterns": [
         "/^\\.github/workflows/installer-engine\\.yml$/"
       ],
       "matchStrings": [
-        "GHOSTTY_OLDEST_UBUNTU_IMAGE:\\s*(?<depName>ubuntu):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+        "GHOSTTY_OLDEST_UBUNTU_IMAGE:\\s*(?<depName>ubuntu):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})",
+        "GHOSTTY_OLDEST_DEBIAN_IMAGE:\\s*(?<depName>debian):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
@@ -411,7 +412,8 @@
         "docker"
       ],
       "matchDepNames": [
-        "ubuntu"
+        "ubuntu",
+        "debian"
       ],
       "matchUpdateTypes": [
         "major",
@@ -454,6 +456,18 @@
         "xremap/xremap"
       ],
       "allowedVersions": "!/^v0\\.16\\.6$/",
+      "automerge": false
+    },
+    {
+      "description": "Ubuntu 24.04 keeps the last Ghostty build for its GTK 4.14. Ghostty 1.4 needs GTK 4.18.",
+      "matchFileNames": [
+        "installer/archive-pins.json"
+      ],
+      "matchDepNames": [
+        "mkasberg/ghostty-ubuntu"
+      ],
+      "matchCurrentValue": "/^1\\.3\\./",
+      "allowedVersions": "/^1\\.3\\./",
       "automerge": false
     }
   ],

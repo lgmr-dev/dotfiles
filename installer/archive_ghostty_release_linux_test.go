@@ -72,6 +72,10 @@ func TestNativeGhosttyLoadsOnOldestSupportedUbuntu(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	config, err := filepath.Abs(filepath.Join("..", "ghostty", "config"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	run := func(args ...string) (string, error) {
@@ -86,7 +90,7 @@ func TestNativeGhosttyLoadsOnOldestSupportedUbuntu(t *testing.T) {
 	for distro, image := range images {
 		containers[distro] = "dotfiles-ghostty-" + distro + "-" + strings.ToLower(rand.Text())
 		if output, err := run("run", "--detach", "--name", containers[distro],
-			"--volume", payloads["ubuntu"]+":/ubuntu:ro", "--volume", payloads["debian"]+":/debian:ro",
+			"--volume", payloads["ubuntu"]+":/ubuntu:ro", "--volume", payloads["debian"]+":/debian:ro", "--volume", config+":/ghostty-config:ro",
 			image, "sleep", "900"); err != nil {
 			t.Fatal(output, err)
 		}
@@ -95,15 +99,18 @@ func TestNativeGhosttyLoadsOnOldestSupportedUbuntu(t *testing.T) {
 			t.Fatal(image, "cannot install Ghostty's catalog libraries", output, err)
 		}
 	}
-	load := func(distro, payload string) (string, error) {
-		return run("exec", "--env", "LD_BIND_NOW=1", "--env", "HOME=/tmp", containers[distro], "/"+payload+"/usr/bin/ghostty", "--version")
+	runGhostty := func(distro, payload string, args ...string) (string, error) {
+		return run(append([]string{"exec", "--env", "LD_BIND_NOW=1", "--env", "HOME=/tmp", containers[distro], "/" + payload + "/usr/bin/ghostty"}, args...)...)
 	}
 	for distro, pin := range selected {
-		if output, err := load(distro, distro); err != nil || !strings.Contains(output, pin.Version) {
+		if output, err := runGhostty(distro, distro, "--version"); err != nil || !strings.Contains(output, pin.Version) {
 			t.Fatal("pinned Ghostty does not load against the libraries of its oldest release", distro, output, err)
 		}
+		if output, err := runGhostty(distro, distro, "+validate-config", "--config-file=/ghostty-config"); err != nil || strings.TrimSpace(output) != "" {
+			t.Fatal("pinned Ghostty rejects the managed configuration", distro, output, err)
+		}
 	}
-	if output, err := load("ubuntu", "debian"); err == nil || !strings.Contains(output, "undefined symbol: ") {
+	if output, err := runGhostty("ubuntu", "debian", "--version"); err == nil || !regexp.MustCompile(`undefined symbol: (gtk|gdk|gsk|adw)_`).MatchString(output) {
 		t.Fatal("the common Ghostty build loaded on Ubuntu 24.04, so its own pin is not needed or this check cannot fail", output, err)
 	}
 }

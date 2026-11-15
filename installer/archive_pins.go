@@ -11,7 +11,7 @@ import (
 //go:embed archive-pins.json
 var archivePinData []byte
 
-var distributionReleasePin = regexp.MustCompile(`^(ubuntu|debian)-[0-9]+(\.[0-9]+)*$`)
+var distributionReleasePin = regexp.MustCompile("^(ubuntu|debian)-" + distroReleaseNumber + "$")
 
 type ArchiveCatalog struct {
 	Schema    int                              `json:"schema"`

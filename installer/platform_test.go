@@ -67,13 +67,15 @@ func TestLinuxDistributionUsesExactSupportedIdentity(t *testing.T) {
 		{"ID=debian\nNAME=\"$(do not execute)\"\n", "debian", "", "apt"},
 		{"ID=ubuntu\nVERSION_ID=\"24.04\"\n", "ubuntu", "24.04", "apt"},
 		{"VERSION_ID=12\nID=debian\nVERSION_ID=13\n", "debian", "13", "apt"},
+		{"ID=ubuntu\nVERSION_ID=24.04-lts\n", "ubuntu", "", "apt"},
+		{"ID=ubuntu\nVERSION_ID=24.04\nVERSION_ID=\n", "ubuntu", "", "apt"},
 	} {
 		id, release, family, err := linuxDistribution([]byte(fixture.data))
 		if err != nil || id != fixture.id || release != fixture.release || family != fixture.family {
 			t.Fatal(fixture, id, release, family, err)
 		}
 	}
-	for _, invalid := range []string{"ID=\"ubuntu", "ID=ubuntu debian", "ID=$(uname)", "ID=", "ID_LIKE=\"debian;touch /tmp/file\"", "ID=ubuntu\nVERSION_ID=24.04-lts\n", "ID=ubuntu\nVERSION_ID=\n"} {
+	for _, invalid := range []string{"ID=\"ubuntu", "ID=ubuntu debian", "ID=$(uname)", "ID=", "ID_LIKE=\"debian;touch /tmp/file\""} {
 		if _, _, _, err := linuxDistribution([]byte(invalid)); err == nil {
 			t.Fatal("accepted malformed policy input", invalid)
 		}

@@ -80,7 +80,10 @@ func readPlatformFile(path string) ([]byte, error) {
 }
 
 var distroID = regexp.MustCompile(`^[a-z0-9._-]+$`)
-var distroRelease = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
+
+const distroReleaseNumber = `[0-9]+(\.[0-9]+)*`
+
+var distroRelease = regexp.MustCompile("^" + distroReleaseNumber + "$")
 
 // Read the exact distribution ID. ID_LIKE is not a support promise: derivatives
 // do not become supported merely because they use APT. Never source os-release.
@@ -96,17 +99,20 @@ func linuxDistribution(data []byte) (string, string, string, error) {
 			value = value[1 : len(value)-1]
 		}
 		// The specification requires readers to use the last repeated key.
-		switch {
-		case key == "ID" && distroID.MatchString(value):
-			id = value
-		case key == "VERSION_ID" && distroRelease.MatchString(value):
+		if key == "VERSION_ID" {
 			release = value
-		default:
-			return "", "", "", errors.New("invalid distribution " + key)
+			continue
 		}
+		if !distroID.MatchString(value) {
+			return "", "", "", errors.New("invalid distribution ID")
+		}
+		id = value
 	}
 	if id != "ubuntu" && id != "debian" {
 		return id, "", "", fmt.Errorf("unsupported Linux distribution %q; this release supports Ubuntu and Debian only", id)
+	}
+	if !distroRelease.MatchString(release) {
+		release = ""
 	}
 	return id, release, "apt", nil
 }

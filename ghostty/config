@@ -66,11 +66,9 @@ keybind = alt+arrow_left=esc:b
 keybind = alt+arrow_right=esc:f
 # Linux only: the Mac keyboard shortcuts (xremap) send these keys for Cmd+W,
 # Cmd+Option+arrows and Cmd+Up/Down, so splits and prompts work as on the Mac.
-# Ghostty on Linux has no key to close one split, GNOME takes its split keys
-# Ctrl+Alt+arrows for workspaces, and Ghostty 1.4 moves tabs on
-# Ctrl+Shift+PageUp/PageDown. On macOS these chords (Ctrl+Cmd+W,
-# Ctrl+Cmd+Option+arrows, Ctrl+Shift+PageUp/PageDown) are extra keys that
-# nothing else uses.
+# Ghostty on Linux has no key to close one split, and GNOME takes its split keys
+# Ctrl+Alt+arrows for workspaces. On macOS these chords (Ctrl+Cmd+W,
+# Ctrl+Cmd+Option+arrows) are extra keys that nothing else uses.
 keybind = ctrl+super+w=close_surface
 keybind = ctrl+super+alt+arrow_up=goto_split:up
 keybind = ctrl+super+alt+arrow_down=goto_split:down

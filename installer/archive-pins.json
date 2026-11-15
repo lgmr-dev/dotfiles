@@ -2803,9 +2803,9 @@
     },
     "tool.vscode": {
       "darwin/arm64": {
-        "version": "1.145.3",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/dcd3ad6e368fbe19d03f37054a40dbaf40d676f4/VSCode-darwin-arm64.zip",
-        "sha256": "c81d07705484b6017f34f2b1c106d2817b38e35cbd98adc9dec5c562aa945167",
+        "version": "1.146.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-darwin-arm64.zip",
+        "sha256": "6e8d27ee0c5a8f2aa3c43e373407eecd11c270c3fe7f46100ef682aac14bb648",
         "format": "zip",
         "commands": {
           "code": "Visual Studio Code.app/Contents/Resources/app/bin/code"
@@ -2820,9 +2820,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "1.145.3",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/dcd3ad6e368fbe19d03f37054a40dbaf40d676f4/VSCode-win32-x64-1.145.3.zip",
-        "sha256": "e204804e4093e2545219fd63d6e4552403f6bd69609cffc436c22db0a5abfb6f",
+        "version": "1.146.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-win32-x64-1.146.0.zip",
+        "sha256": "0d47f5bbff72499c6a4a92f6d72dd8cc5ba4606185f624465032626614119d61",
         "format": "zip",
         "commands": {
           "code": "bin/code.cmd"
@@ -2832,11 +2832,11 @@
         ],
         "required_files": [
           "Code.exe",
-          "dcd3ad6e36/resources/app/product.json",
-          "dcd3ad6e36/resources/app/out/cli.js",
-          "dcd3ad6e36/ffmpeg.dll",
-          "dcd3ad6e36/libEGL.dll",
-          "dcd3ad6e36/icudtl.dat"
+          "69047191fc/resources/app/product.json",
+          "69047191fc/resources/app/out/cli.js",
+          "69047191fc/ffmpeg.dll",
+          "69047191fc/libEGL.dll",
+          "69047191fc/icudtl.dat"
         ]
       }
     },
@@ -3444,9 +3444,9 @@
     },
     "tool.t3-code-app": {
       "linux/amd64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/T3-Code-0.1.8-amd64.deb",
-        "sha256": "22dac1167d4e4e68a3f3c3461b53c7d472ef70f2020732c70006eb2970830e5e",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-amd64.deb",
+        "sha256": "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1",
         "format": "deb",
         "commands": {},
         "bin_dirs": [],
@@ -3460,9 +3460,9 @@
         "t3_code_launcher": true
       },
       "linux/arm64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/T3-Code-0.1.8-arm64.deb",
-        "sha256": "522a6b36b27fe7892fb3c6101d4b1e6766b4dee4ba43d96e24bb553408767983",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-arm64.deb",
+        "sha256": "7959976b4d7fc4443c9fb770128774d4e86f14db01044be36901e488908f3bb4",
         "format": "deb",
         "commands": {},
         "bin_dirs": [],

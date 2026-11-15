@@ -299,7 +299,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           DOTFILES_TEST_GHOSTTY_RELEASES: '1'
-          GHOSTTY_OLDEST_UBUNTU_IMAGE: ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
+          GHOSTTY_OLDEST_UBUNTU_IMAGE: ubuntu:24.04@sha256:2198e4c65076e9cb0b3d695219df667c0e3b0072da64ca3c2648aca17dcecaf5
           GHOSTTY_OLDEST_DEBIAN_IMAGE: debian:13-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
         run: go test -v -count=1 -timeout 20m -run '^TestNativeGhosttyLoadsOnOldestSupportedUbuntu$' .
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RENOVATE_NODE_VERSION="26.13.0"
-RENOVATE_VERSION="44.227.4"
+RENOVATE_NODE_VERSION="26.13.1"
+RENOVATE_VERSION="44.235.1"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$REPO_ROOT"

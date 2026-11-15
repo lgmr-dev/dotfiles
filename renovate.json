@@ -16,8 +16,11 @@
   "postUpdateOptions": [
     "gomodTidy"
   ],
-  "dependencyDashboard": true,
-  "dependencyDashboardTitle": "Renovate dashboard",
+  "dependencyDashboard": {
+    "enabled": true,
+    "title": "Renovate dashboard",
+    "header": "Pinned downloads (archive pins, Linux package pins, the bootstrap Go toolchain, the Homebrew script and the Mason snapshot) are listed under Pending Approval as notices. Do not approve them here: Renovate cannot verify their checksums. The daily agent-cli-pins workflow proposes verified updates, and docs/RELEASING.md describes the manual ones."
+  },
   "schedule": [
     "before 06:00"
   ],
@@ -470,6 +473,5 @@
       "allowedVersions": "/^1\\.3\\./",
       "automerge": false
     }
-  ],
-  "dependencyDashboardHeader": "Pinned downloads (archive pins, Linux package pins, the bootstrap Go toolchain, the Homebrew script and the Mason snapshot) are listed under Pending Approval as notices. Do not approve them here: Renovate cannot verify their checksums. The daily agent-cli-pins workflow proposes verified updates, and docs/RELEASING.md describes the manual ones."
+  ]
 }

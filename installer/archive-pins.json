@@ -3444,9 +3444,9 @@
     },
     "tool.t3-code-app": {
       "linux/amd64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/T3-Code-0.1.8-amd64.deb",
-        "sha256": "22dac1167d4e4e68a3f3c3461b53c7d472ef70f2020732c70006eb2970830e5e",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-amd64.deb",
+        "sha256": "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1",
         "format": "deb",
         "commands": {},
         "bin_dirs": [],
@@ -3460,9 +3460,9 @@
         "t3_code_launcher": true
       },
       "linux/arm64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/T3-Code-0.1.8-arm64.deb",
-        "sha256": "522a6b36b27fe7892fb3c6101d4b1e6766b4dee4ba43d96e24bb553408767983",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-arm64.deb",
+        "sha256": "7959976b4d7fc4443c9fb770128774d4e86f14db01044be36901e488908f3bb4",
         "format": "deb",
         "commands": {},
         "bin_dirs": [],

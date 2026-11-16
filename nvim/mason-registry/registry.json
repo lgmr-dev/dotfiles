@@ -561,7 +561,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.8.0",
+      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.10.0",
       "asset": {
         "file": "salesforcedx-vscode-apex-{{ version | strip_prefix \"v\" }}.vsix"
       }
@@ -760,7 +760,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/ast-grep/ast-grep@0.51.1",
+      "id": "pkg:github/ast-grep/ast-grep@0.51.2",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -1494,7 +1494,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/kitagry/bqls@v0.8.6",
+      "id": "pkg:github/kitagry/bqls@v0.8.7",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -2058,7 +2058,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/CircleCI-Public/circleci-yaml-language-server@0.54.2",
+      "id": "pkg:github/CircleCI-Public/circleci-yaml-language-server@0.55.0",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -2275,7 +2275,7 @@
     "languages": [],
     "categories": [],
     "source": {
-      "id": "pkg:npm/@agentclientprotocol/claude-agent-acp@0.101.0"
+      "id": "pkg:npm/@agentclientprotocol/claude-agent-acp@0.102.0"
     },
     "bin": {
       "claude-agent-acp": "npm:claude-agent-acp"
@@ -2974,7 +2974,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:npm/%40github/copilot-language-server@1.566.0"
+      "id": "pkg:npm/%40github/copilot-language-server@1.568.0"
     },
     "bin": {
       "copilot-language-server": "npm:copilot-language-server"
@@ -3248,7 +3248,7 @@
     "languages": [],
     "categories": [],
     "source": {
-      "id": "pkg:npm/cronstrue@3.38.0"
+      "id": "pkg:npm/cronstrue@3.39.0"
     },
     "bin": {
       "cronstrue": "npm:cronstrue"
@@ -4009,7 +4009,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:npm/devsense-php-ls@1.0.19497"
+      "id": "pkg:npm/devsense-php-ls@1.0.19523"
     },
     "bin": {
       "devsense-php-ls": "npm:devsense-php-ls"
@@ -4258,7 +4258,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:pypi/djlint@1.49.10"
+      "id": "pkg:pypi/djlint@1.50.0"
     },
     "bin": {
       "djlint": "pypi:djlint"
@@ -5651,7 +5651,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/elixir-lang/expert@v0.2.2",
+      "id": "pkg:github/elixir-lang/expert@v0.2.3",
       "asset": [
         {
           "target": "darwin_x64",
@@ -11762,7 +11762,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:golang/go.uber.org/nilaway@v0.0.0-20260918162853-acb8859b9031#cmd/nilaway"
+      "id": "pkg:golang/go.uber.org/nilaway@v0.0.0-20261112030514-ccd005690d1e#cmd/nilaway"
     },
     "bin": {
       "nilaway": "golang:nilaway"
@@ -12632,7 +12632,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:npm/oxfmt@0.77.0"
+      "id": "pkg:npm/oxfmt@0.78.0"
     },
     "bin": {
       "oxfmt": "npm:oxfmt"
@@ -12657,7 +12657,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:npm/oxlint@1.92.0"
+      "id": "pkg:npm/oxlint@1.93.0"
     },
     "bin": {
       "oxlint": "npm:oxlint"
@@ -12727,7 +12727,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:github/jolars/panache@v3.17.2",
+      "id": "pkg:github/jolars/panache@v3.18.0",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -13257,7 +13257,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:composer/laravel/pint@v1.32.2"
+      "id": "pkg:composer/laravel/pint@v1.32.3"
     },
     "bin": {
       "pint": "composer:pint"
@@ -13573,7 +13573,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:github/cloudflare/pint@v0.89.4",
+      "id": "pkg:github/cloudflare/pint@v0.90.0",
       "asset": [
         {
           "target": "linux_x86",
@@ -14240,7 +14240,7 @@
       "Runtime"
     ],
     "source": {
-      "id": "pkg:pypi/pymobiledevice3@11.50.3"
+      "id": "pkg:pypi/pymobiledevice3@11.52.1"
     },
     "bin": {
       "pymobiledevice3": "pypi:pymobiledevice3"
@@ -18396,7 +18396,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:pypi/termux-language-server@0.1.16"
+      "id": "pkg:pypi/termux-language-server@0.1.17"
     },
     "bin": {
       "termux-language-server": "pypi:termux-language-server"
@@ -18512,7 +18512,7 @@
       "Runtime"
     ],
     "source": {
-      "id": "pkg:generic/hashicorp/terraform@v1.17.1",
+      "id": "pkg:generic/hashicorp/terraform@v1.17.2",
       "download": [
         {
           "target": "darwin_arm64",
@@ -19706,7 +19706,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:pypi/ty@0.0.100"
+      "id": "pkg:pypi/ty@0.0.101"
     },
     "bin": {
       "ty": "pypi:ty"
@@ -19829,7 +19829,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:github/crate-ci/typos@v1.52.1",
+      "id": "pkg:github/crate-ci/typos@v1.52.2",
       "asset": [
         {
           "target": "darwin_x64",
@@ -20576,7 +20576,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.8.0",
+      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.10.0",
       "asset": {
         "file": "salesforcedx-vscode-visualforce-{{ version | strip_prefix \"v\" }}.vsix"
       }

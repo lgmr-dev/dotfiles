@@ -4,19 +4,19 @@
     "tool.tailscale": {
       "amd64": {
         "package": "tailscale",
-        "version": "1.104.6",
+        "version": "1.104.7",
         "architecture": "amd64",
-        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.6_amd64.deb",
-        "sha256": "193acb9d298f2a00f157217cf574820a7ebea691d41afbb8ca40c1d54e888d3e",
-        "size": 40771946
+        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.7_amd64.deb",
+        "sha256": "a41efd469875e27b4d8f313e07476f9bae459bafab305a3f2621ff5b5254a885",
+        "size": 40778580
       },
       "arm64": {
         "package": "tailscale",
-        "version": "1.104.6",
+        "version": "1.104.7",
         "architecture": "arm64",
-        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.6_arm64.deb",
-        "sha256": "c2eff769cf9dcde4eaad9f3cc40e9ec44466d9387e6946c131b87350098568ac",
-        "size": 37516250
+        "url": "https://pkgs.tailscale.com/stable/tailscale_1.104.7_arm64.deb",
+        "sha256": "eed8d2dd9cdc17b2c49581e3c9b5e3a951f3d8ef7202a42fbaf351ac6ec5039f",
+        "size": 37521780
       }
     }
   }

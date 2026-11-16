@@ -1970,9 +1970,9 @@
     },
     "tool.rust": {
       "windows/amd64": {
-        "version": "1.99.1",
-        "url": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-x86_64-pc-windows-msvc.tar.gz",
-        "sha256": "4e211ed2047e7890a8aea79fc8a88922d4c0e87a325349323d56c958d8da5d3a",
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "94301a26b63fa0861b4b5a588afa92310ae4a5aa1751609bbcef1142e9664baa",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -1995,9 +1995,9 @@
         },
         "rust_components": [
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/cargo-1.99.1-x86_64-pc-windows-msvc.tar.gz",
-            "sha256": "bbf6e9295b69c9de8f2610e3e5bb90217d23826b7f2adac698262663a58ad899",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "3414e3504c016e8e17f9be2b359c1585c26a7589515bd775367b754a3a0a8c9d",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2007,9 +2007,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-std-1.99.1-x86_64-pc-windows-msvc.tar.gz",
-            "sha256": "e856f160e01c31fe35aa7255579eed0774029882692d694736106f5883a96f22",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "8f8d40104ab98eab12e5d48a3a8b1499d1fb14d1c01399954ea78e76a2693b0d",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2019,9 +2019,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rustfmt-1.99.1-x86_64-pc-windows-msvc.tar.gz",
-            "sha256": "1af7310f4a462eaaa4b737f0325196f2e3a06e8218b3abf68fad0e0ce0310383",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "8dc17cbc6f2b2a6954bd35deece48791ef4e01fdca12d74ac1be2a2e55e3a28d",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2031,9 +2031,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/clippy-1.99.1-x86_64-pc-windows-msvc.tar.gz",
-            "sha256": "36b27d3986ad62f7f17199013706ec568fb7349e29ac983f57b6f9af991cdf03",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "a153b4b68afffb14b1fd4310c2403b3ca3cfc801ba65f72ab1c3d352cb12d3ef",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2043,9 +2043,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-src-1.99.1.tar.gz",
-            "sha256": "b0d6d3a7e46a97adfe6488f8b60c04c019566b8363eeb6ffb32c6cf63609071d",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2057,9 +2057,9 @@
         ]
       },
       "darwin/arm64": {
-        "version": "1.99.1",
-        "url": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-aarch64-apple-darwin.tar.gz",
-        "sha256": "cc998c1dc8df006106472357aa87838b2da3f7b25446b98a94cfd58796cb0610",
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "6781021dd0f71f0a3e2d72e2945ced97a925e4f513996d33a2550de187fe6d6c",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -2079,9 +2079,9 @@
         "rust_target": "aarch64-apple-darwin",
         "rust_components": [
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/cargo-1.99.1-aarch64-apple-darwin.tar.gz",
-            "sha256": "b5cc7634f919949c3e5e131123f813416dc47f6b809a5371d12f1f593595ae13",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "b3bbd1d2c6a5c263b43ca0751fd6d25238bc88aac5b0fdd85d33d6275c41891e",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2091,9 +2091,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-std-1.99.1-aarch64-apple-darwin.tar.gz",
-            "sha256": "c124006d63885ba1029aca49efd59e93be6b2b171c379318ff94a00ef5eba664",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "4709763e3033e3e31d219db1457b0f4d7251f77525f8c312df2867d2d617dea5",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2103,9 +2103,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rustfmt-1.99.1-aarch64-apple-darwin.tar.gz",
-            "sha256": "738b4755ecead0bb8c6d972c3f29f76e76246e050f7a6d9883306ace4ccf56c5",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "64dbe653b1424c6ea54c4a2ec1e1e4dc90db1493d0b9ee6a795a6656b40fb8d3",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2115,9 +2115,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/clippy-1.99.1-aarch64-apple-darwin.tar.gz",
-            "sha256": "bf568a9d158bdb25fed5b8512475133b77bb856bf62ed7653819c4ec133680cc",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "2d69c78974c84d6a762164fdef5bed30e6839cc23b0cb90e2e4ed51d131a4044",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2127,9 +2127,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-src-1.99.1.tar.gz",
-            "sha256": "b0d6d3a7e46a97adfe6488f8b60c04c019566b8363eeb6ffb32c6cf63609071d",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2141,9 +2141,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.99.1",
-        "url": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-x86_64-unknown-linux-gnu.tar.gz",
-        "sha256": "85e7c0e6f21636f714e2a42966011364a6cc56b6548126d32144d6ba90904966",
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "67b0e85ff4b3eee83c48b8ae1da10dd0bcd60b43d02cd0e7df78c59d19f6b960",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -2163,9 +2163,9 @@
         "rust_target": "x86_64-unknown-linux-gnu",
         "rust_components": [
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/cargo-1.99.1-x86_64-unknown-linux-gnu.tar.gz",
-            "sha256": "47babc028247e26577f8a1bf390b11f447ad9b7ab93f5c9a0dda078935fc149b",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "4e7fc3cbe98e23c88a3c6ce37f834e3ffbc91536789782c4c4a9670df6b16a49",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2175,9 +2175,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-std-1.99.1-x86_64-unknown-linux-gnu.tar.gz",
-            "sha256": "d1290c05994a59c029e562cb75be1bddc6fb11a4c501e1b7b0f61d119c6cbb12",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "61eb09d68b338e230d698716927bd4623049c9910ef4a4972e66d763d66ed9e1",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2187,9 +2187,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rustfmt-1.99.1-x86_64-unknown-linux-gnu.tar.gz",
-            "sha256": "e3a88008061f485126fe24569c4d3e5a0f49462a06ee6339920f8f202124b13a",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "b62ba6e046a5580c52f24a817101734b73e76ea0724fc6a21d57fba4db345ced",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2199,9 +2199,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/clippy-1.99.1-x86_64-unknown-linux-gnu.tar.gz",
-            "sha256": "3c6d008544b6e456cc785c86f8ce3713f0d845b94be3a6c8a34662b8504561b5",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "277a9abd9378561d11fb67a9eb5c08895e207d07dfd985a67197aa47e030856f",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2211,9 +2211,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-src-1.99.1.tar.gz",
-            "sha256": "b0d6d3a7e46a97adfe6488f8b60c04c019566b8363eeb6ffb32c6cf63609071d",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2226,9 +2226,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.99.1",
-        "url": "https://static.rust-lang.org/dist/2026-10-15/rustc-1.99.1-aarch64-unknown-linux-gnu.tar.gz",
-        "sha256": "e4656174f0ba5ea3dab5f58d069b7afae6d7616187de31c65cb6432e4f941399",
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "7ccc960846f81e016086f1931dedadd837a3317da80e0114df68651145c0f43b",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -2248,9 +2248,9 @@
         "rust_target": "aarch64-unknown-linux-gnu",
         "rust_components": [
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/cargo-1.99.1-aarch64-unknown-linux-gnu.tar.gz",
-            "sha256": "201dbeac1795713b98aeae044e01695e70ae2ea3ded42683ebce5a8a1c90f8a6",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "b3acccbba065da7e97c20592442f104bd9554d54bf87a323bba8a1d6e61282eb",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2260,9 +2260,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-std-1.99.1-aarch64-unknown-linux-gnu.tar.gz",
-            "sha256": "32d1ddb44cd49d6497ab6a24f440d4286a20b2667fdf928b876f59c66d13d722",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "89b01323a6611c9382a401282fb66eb80f1f3241df3e139d3df41afbd2da314b",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2272,9 +2272,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rustfmt-1.99.1-aarch64-unknown-linux-gnu.tar.gz",
-            "sha256": "b61cf040e386c53732522066da16d2ba88d5766a743b3b411f1c66f3d0cb97e2",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "e555f81eccd5e2f741732be3f6784d073946eadbf2e00f4112dfdabc6c36c13e",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2284,9 +2284,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/clippy-1.99.1-aarch64-unknown-linux-gnu.tar.gz",
-            "sha256": "e1082c9d61ce461d2f5cd1878c9efe8c3faf6a5b896e0807481e0301791de848",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "41920025e43c858e777177468698a88fc270bcceb6ba61059aac1dfee4da1d37",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -2296,9 +2296,9 @@
             ]
           },
           {
-            "version": "1.99.1",
-            "url": "https://static.rust-lang.org/dist/2026-10-15/rust-src-1.99.1.tar.gz",
-            "sha256": "b0d6d3a7e46a97adfe6488f8b60c04c019566b8363eeb6ffb32c6cf63609071d",
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -3397,9 +3397,9 @@
     },
     "tool.obsidian": {
       "darwin/arm64": {
-        "version": "1.15.0",
-        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.0/Obsidian-1.15.0.dmg",
-        "sha256": "d3f837e6fd3efaf65fa0bec987b18296982995d4ddae3171a7f7f67e0e2b7aa8",
+        "version": "1.15.1",
+        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.1/Obsidian-1.15.1.dmg",
+        "sha256": "e05c7e3e2262b14c965bb246dcb74a30fc9098bd669e42957c4d9f788d04fdf4",
         "format": "dmg",
         "commands": {},
         "bin_dirs": [],
@@ -3478,9 +3478,9 @@
     },
     "tool.zen": {
       "linux/amd64": {
-        "version": "1.24.1b",
-        "url": "https://github.com/zen-browser/desktop/releases/download/1.24.1b/zen.linux-x86_64.tar.xz",
-        "sha256": "c592a31fe8faa5ddfe91d6243b50c3107e1831c1247539fe03cc04f0fd5cb9cd",
+        "version": "1.24.2b",
+        "url": "https://github.com/zen-browser/desktop/releases/download/1.24.2b/zen.linux-x86_64.tar.xz",
+        "sha256": "bcf7e43160ecfe5f29953ed2a984e7a8028a58f2ec0e3114d36bb904d5f5ce80",
         "format": "tar.xz",
         "strip_components": 1,
         "commands": {
@@ -3499,9 +3499,9 @@
         "zen_profile_revision": 1
       },
       "linux/arm64": {
-        "version": "1.24.1b",
-        "url": "https://github.com/zen-browser/desktop/releases/download/1.24.1b/zen.linux-aarch64.tar.xz",
-        "sha256": "ac0fc39fd2342066027e56a42bdebfea910e9fdc539d02dd7d658e39c38e42dc",
+        "version": "1.24.2b",
+        "url": "https://github.com/zen-browser/desktop/releases/download/1.24.2b/zen.linux-aarch64.tar.xz",
+        "sha256": "8591434fcf498a836a32bc7314eb89fbdc4bdc8f03a2d735774b1ae69b6b21d5",
         "format": "tar.xz",
         "strip_components": 1,
         "commands": {

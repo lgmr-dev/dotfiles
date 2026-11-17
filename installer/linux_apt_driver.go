@@ -297,7 +297,7 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 			return o, err
 		}
 		if o.Healthy {
-			if err := d.check(ctx, r); err != nil {
+			if err := d.check(ctx, r, pkg.Version); err != nil {
 				if ctx.Err() != nil {
 					return o, ctx.Err()
 				}
@@ -597,7 +597,7 @@ func (d *LinuxAPTDriver) change(ctx context.Context, r Resource, action string, 
 	return d.finish(ctx, r, receipt, intent, state)
 }
 
-func (d *LinuxAPTDriver) check(ctx context.Context, r Resource) error {
+func (d *LinuxAPTDriver) check(ctx context.Context, r Resource, version string) error {
 	command, ok := d.Checks[r.ID]
 	if !ok {
 		return nil
@@ -626,7 +626,11 @@ func (d *LinuxAPTDriver) check(ctx context.Context, r Resource) error {
 		return fmt.Errorf("APT %s has changed package files%s", r.Name, nativeDiagnostic(output))
 	}
 	if r.ID == "tool.vscode" {
-		if output, err := d.Query(ctx, false, "/bin/sh", nil, append([]string{"-c", linuxCodeHealth, "sh"}, unreadable...)...); err != nil || len(output) != 0 {
+		modes, err := linuxCodeDeclaredModes(version)
+		if err != nil {
+			return err
+		}
+		if output, err := d.Query(ctx, false, "/bin/sh", nil, append([]string{"-c", linuxCodeHealth, "sh", modes.Sandbox, modes.RootOnly}, unreadable...)...); err != nil || len(output) != 0 {
 			return errors.Join(fmt.Errorf("Code canonical native executable is missing or changed%s", nativeDiagnostic(output)), err)
 		}
 	}
@@ -717,7 +721,7 @@ func (d *LinuxAPTDriver) finish(ctx context.Context, r Resource, receipt Receipt
 		if !present || !pkg.Healthy || intent.Code != nil && (pkg.Version != intent.Code.Pin.Version || identity != "code:"+intent.Code.Pin.Architecture) {
 			return Observation{}, errors.New("APT root has not reached its requested installed native state")
 		}
-		if err := d.check(ctx, r); err != nil {
+		if err := d.check(ctx, r, pkg.Version); err != nil {
 			return Observation{}, err
 		}
 		if intent.Claim != "" {

@@ -15,5 +15,14 @@
       "size": 262905366,
       "architecture": "arm64"
     }
+  },
+  "modes": {
+    "1.146.0-1794340865": {
+      "sandbox": "4755",
+      "root_only": "/usr/share/code/resources/app/node-compile-cache"
+    },
+    "1.146.0-1794340783": {
+      "sandbox": "4755"
+    }
   }
 }

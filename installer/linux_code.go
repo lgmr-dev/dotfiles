@@ -43,27 +43,59 @@ func (pin LinuxCodePin) validate() error {
 	return nil
 }
 
-func defaultLinuxCodePin(arch string) (LinuxCodePin, error) {
+type linuxCodeModes struct {
+	Sandbox  string `json:"sandbox"`
+	RootOnly string `json:"root_only,omitempty"`
+}
+
+var linuxCodeRootOnly = regexp.MustCompile(`^/usr/share/code(/[A-Za-z0-9_-][A-Za-z0-9_.-]*)+$`)
+
+func linuxCodePinFile() (map[string]LinuxCodePin, map[string]linuxCodeModes, error) {
 	var data struct {
-		Schema int                     `json:"schema"`
-		Pins   map[string]LinuxCodePin `json:"pins"`
+		Schema int                       `json:"schema"`
+		Pins   map[string]LinuxCodePin   `json:"pins"`
+		Modes  map[string]linuxCodeModes `json:"modes"`
 	}
 	if err := Decode(linuxCodePinData, &data); err != nil {
-		return LinuxCodePin{}, err
+		return nil, nil, err
 	}
 	if data.Schema != 1 || len(data.Pins) != 2 {
-		return LinuxCodePin{}, errors.New("invalid Linux Code pins")
+		return nil, nil, errors.New("invalid Linux Code pins")
 	}
 	for architecture, pin := range data.Pins {
 		if err := pin.validate(); err != nil || architecture != pin.Architecture {
-			return LinuxCodePin{}, errors.Join(errors.New("invalid Linux Code platform pin"), err)
+			return nil, nil, errors.Join(errors.New("invalid Linux Code platform pin"), err)
 		}
 	}
-	pin, ok := data.Pins[arch]
+	for version, modes := range data.Modes {
+		if !linuxCodeVersion.MatchString(version) || modes.Sandbox != "755" && modes.Sandbox != "4755" || modes.RootOnly != "" && !linuxCodeRootOnly.MatchString(modes.RootOnly) {
+			return nil, nil, errors.New("invalid Linux Code declared modes")
+		}
+	}
+	return data.Pins, data.Modes, nil
+}
+
+func defaultLinuxCodePin(arch string) (LinuxCodePin, error) {
+	pins, _, err := linuxCodePinFile()
+	if err != nil {
+		return LinuxCodePin{}, err
+	}
+	pin, ok := pins[arch]
 	if !ok {
 		return pin, errors.New("unsupported Linux Code architecture")
 	}
 	return pin, nil
+}
+
+func linuxCodeDeclaredModes(version string) (linuxCodeModes, error) {
+	_, declared, err := linuxCodePinFile()
+	if err != nil {
+		return linuxCodeModes{}, err
+	}
+	if modes, ok := declared[version]; ok {
+		return modes, nil
+	}
+	return linuxCodeModes{Sandbox: "755"}, nil
 }
 
 // Debconf's environment grammar cannot encode a filename containing whitespace;
@@ -309,24 +341,28 @@ func (d *LinuxAPTDriver) checkCodeCollisions(ctx context.Context, absent bool) e
 }
 
 // dpkg --verify checks neither this postinst-created symlink nor file modes.
-// Since 1.144 the DEBs ship the Chromium sandbox helper setuid root, and the
-// amd64 DEB ships a compile cache that only root can read. The arguments are
-// the package files that dpkg could not read.
+// The arguments are the declared sandbox helper mode, the declared root-only
+// directory or "", and the package files that dpkg could not read.
 const linuxCodeHealth = "set -eu\n" +
 	"fail() { printf 'Code native health: %s\\n' \"$*\" >&2; exit 1; }\n" +
+	"sandbox=$1 cache=$2\n" +
+	"shift 2\n" +
 	"link=$(readlink /usr/bin/code) || fail '/usr/bin/code target unreadable'\n" +
 	"[ \"$link\" = /usr/share/code/bin/code ] || fail \"/usr/bin/code target=$link\"\n" +
 	"for p in /usr /usr/share /usr/share/code /usr/share/code/code /usr/share/code/chrome-sandbox; do\n" +
 	"  [ ! -L \"$p\" ] || fail \"$p is a symbolic link\"\n" +
 	"  owner=$(stat -c %u \"$p\") || fail \"$p owner unreadable\"\n" +
 	"  mode=$(stat -c %a \"$p\") || fail \"$p mode unreadable\"\n" +
-	"  [ \"$owner\" = 0 ] && { [ \"$mode\" = 755 ] || [ \"$p:$mode\" = /usr/share/code/chrome-sandbox:4755 ]; } ||\n" +
-	"    fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755, or 4755 for the sandbox helper)\"\n" +
+	"  expected=755\n" +
+	"  [ \"$p\" != /usr/share/code/chrome-sandbox ] || expected=$sandbox\n" +
+	"  [ \"$owner\" = 0 ] && [ \"$mode\" = \"$expected\" ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=$expected)\"\n" +
 	"done\n" +
+	"if [ -n \"$cache\" ]; then\n" +
+	"  changed=$(find \"$cache\" ! -type d ! \\( -type f -user 0 -group 0 -perm 600 \\) -print -quit) || fail \"$cache unreadable\"\n" +
+	"  [ -z \"$changed\" ] || fail \"$changed is not a regular root:root 0600 file\"\n" +
+	"fi\n" +
 	"for p do\n" +
-	"  case $p in /usr/share/code/resources/app/node-compile-cache/*) ;; *) fail \"$p is unreadable outside the compile cache\" ;; esac\n" +
-	"  meta=$(stat -c %u:%g:%f \"$p\") || fail \"$p metadata unreadable\"\n" +
-	"  [ \"$meta\" = 0:0:8180 ] || fail \"$p owner:group:raw mode=$meta (expected 0:0:8180, a regular root-only 0600 file)\"\n" +
+	"  [ -n \"$cache\" ] && case $p in \"$cache\"/*) true ;; *) false ;; esac || fail \"$p is unreadable but not declared root-only\"\n" +
 	"done\n"
 
 const linuxCodeRemoveLink = "set -eu\n" +

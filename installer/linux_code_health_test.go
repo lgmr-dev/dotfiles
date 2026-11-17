@@ -24,7 +24,7 @@ func TestLinuxCodeHealthReportsExactNativeMismatch(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			cmd := exec.Command("/bin/sh", "-c", linuxCodeHealth)
+			cmd := exec.Command("/bin/sh", "-c", linuxCodeHealth, "sh", "755", "")
 			cmd.Env = []string{"PATH=" + bin, "MISMATCH=" + mismatch}
 			out, err := cmd.CombinedOutput()
 			if mismatch == "healthy" {
@@ -51,20 +51,21 @@ func TestLinuxCodeHealthReportsExactNativeMismatch(t *testing.T) {
 }
 
 func TestLinuxCodeCheckAcceptsOnlyTheModesThatThePackageDeclares(t *testing.T) {
+	const older = "1.141.2-1791980535"
 	const cache = "/usr/share/code/resources/app/node-compile-cache/main/v24.22.1-x64-7034790f/0a1b2c3d"
 	for name, c := range map[string]struct {
-		verify, sandbox, cache string
-		healthy                bool
+		version, verify, sandbox, found string
+		healthy                         bool
 	}{
-		"plain sandbox":                 {sandbox: "755", healthy: true},
-		"setuid sandbox and root cache": {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "0:0:8180", healthy: true},
-		"group-writable setuid sandbox": {sandbox: "4775"},
-		"setgid sandbox":                {sandbox: "6755"},
-		"cache owned by a user":         {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "1000:0:8180"},
-		"cache with another mode":       {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "0:0:8100"},
-		"cache is a symbolic link":      {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "0:0:a1ff"},
-		"unreadable file outside cache": {verify: "?????????   /usr/share/code/resources/app/out/main.js\n", sandbox: "4755", cache: "0:0:8180"},
-		"changed sandbox digest":        {verify: "??5??????   /usr/share/code/chrome-sandbox\n", sandbox: "4755"},
+		"pinned DEB as shipped":                {verify: "?????????   " + cache + "\n", sandbox: "4755", healthy: true},
+		"pinned sandbox lost its setuid bit":   {sandbox: "755"},
+		"pinned sandbox is group-writable":     {sandbox: "4775"},
+		"pinned cache file became readable":    {sandbox: "4755", found: cache},
+		"pinned unreadable file outside cache": {verify: "?????????   /usr/share/code/resources/app/out/main.js\n", sandbox: "4755"},
+		"pinned sandbox digest changed":        {verify: "??5??????   /usr/share/code/chrome-sandbox\n", sandbox: "4755"},
+		"older DEB as shipped":                 {version: older, sandbox: "755", healthy: true},
+		"older sandbox gained a setuid bit":    {version: older, sandbox: "4755"},
+		"older DEB with an unreadable file":    {version: older, verify: "?????????   " + cache + "\n", sandbox: "755"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f, r := linuxCodeFixture(t)
@@ -73,10 +74,16 @@ func TestLinuxCodeCheckAcceptsOnlyTheModesThatThePackageDeclares(t *testing.T) {
 			if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, receipt); err != nil {
 				t.Fatal(err)
 			}
+			if c.version != "" {
+				pkg := f.installed["code:amd64"]
+				pkg.Version = c.version
+				f.installed[pkg.Name] = pkg
+			}
 			bin := t.TempDir()
 			for program, text := range map[string]string{
 				"readlink": "#!/bin/sh\nprintf '/usr/share/code/bin/code\\n'\n",
-				"stat":     "#!/bin/sh\ncase \"$2 $3\" in\n'%a /usr/share/code/chrome-sandbox') printf '%s\\n' \"$SANDBOX\";;\n'%u '*) printf '0\\n';;\n'%a '*) printf '755\\n';;\n\"%u:%g:%f $CACHE\") printf '%s\\n' \"$META\";;\n*) exit 1;;\nesac\n",
+				"stat":     "#!/bin/sh\ncase \"$2 $3\" in\n'%a /usr/share/code/chrome-sandbox') printf '%s\\n' \"$SANDBOX\";;\n'%u '*) printf '0\\n';;\n'%a '*) printf '755\\n';;\n*) exit 1;;\nesac\n",
+				"find":     "#!/bin/sh\n[ \"$1\" = /usr/share/code/resources/app/node-compile-cache ] || exit 1\n[ -z \"$FOUND\" ] || printf '%s\\n' \"$FOUND\"\n",
 			} {
 				if err := os.WriteFile(filepath.Join(bin, program), []byte(text), 0755); err != nil {
 					t.Fatal(err)
@@ -89,7 +96,7 @@ func TestLinuxCodeCheckAcceptsOnlyTheModesThatThePackageDeclares(t *testing.T) {
 				}
 				if program == "/bin/sh" && len(args) >= 2 && args[1] == linuxCodeHealth {
 					cmd := exec.CommandContext(ctx, program, args...)
-					cmd.Env = []string{"PATH=" + bin, "SANDBOX=" + c.sandbox, "CACHE=" + cache, "META=" + c.cache}
+					cmd.Env = []string{"PATH=" + bin, "SANDBOX=" + c.sandbox, "FOUND=" + c.found}
 					return cmd.CombinedOutput()
 				}
 				return query(ctx, privileged, program, input, args...)

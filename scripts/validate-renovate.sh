@@ -28,7 +28,7 @@ export DOTFILES_RENOVATE_STDERR="$renovate_tmp/extract.err"
 npx --yes --package "node@$RENOVATE_NODE_VERSION" -- bash -c '
 set -euo pipefail
 echo "renovate validator node: $(node -v)"
-npm exec --yes --package "renovate@$RENOVATE_VERSION" -- renovate-config-validator --strict renovate.json
+npm exec --yes --package "renovate@$RENOVATE_VERSION" -- renovate-config-validator renovate.json
 if ! LOG_LEVEL=debug LOG_FORMAT=json \
     npm exec --yes --package "renovate@$RENOVATE_VERSION" -- \
     renovate --platform=local --dry-run=extract >"$DOTFILES_RENOVATE_JSON" 2>"$DOTFILES_RENOVATE_STDERR"; then

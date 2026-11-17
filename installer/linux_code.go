@@ -66,6 +66,9 @@ func linuxCodePinFile() (map[string]LinuxCodePin, map[string]linuxCodeModes, err
 		if err := pin.validate(); err != nil || architecture != pin.Architecture {
 			return nil, nil, errors.Join(errors.New("invalid Linux Code platform pin"), err)
 		}
+		if _, declared := data.Modes[pin.Version]; !declared {
+			return nil, nil, errors.New("Linux Code pin " + pin.Version + " lacks its declared modes")
+		}
 	}
 	for version, modes := range data.Modes {
 		if !linuxCodeVersion.MatchString(version) || modes.Sandbox != "755" && modes.Sandbox != "4755" || modes.RootOnly != "" && !linuxCodeRootOnly.MatchString(modes.RootOnly) {

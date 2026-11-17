@@ -694,7 +694,7 @@ func TestLinuxAPTUnqualifiedNameResolvesNativeArchitectureAmongMultiArchInstance
 		if program != f.driver.Location.Dpkg {
 			return f.query(ctx, privileged, program, input, args...)
 		}
-		if len(args) != 2 || args[0] != "--verify" || f.installed[args[1]].Name == "" {
+		if !slices.Equal(args, []string{"--verify", "libatomic1:amd64"}) {
 			return nil, fmt.Errorf("dpkg: error: --verify needs a valid package name but %q is not: ambiguous package name with more than one installed instance", args)
 		}
 		return nil, nil

@@ -108,9 +108,6 @@ func linuxCodeDeclaredModes(version string) (linuxCodeModes, error) {
 // normal system database. This also suppresses postrm's repository/key removal.
 const linuxCodeDebconf = "Name: code/add-microsoft-repo\nTemplate: code/add-microsoft-repo\nValue: false\nOwners: code\nFlags: seen\n\n"
 
-// Since 1.145 the postinst links /usr/bin/copilot to a shim that offers an
-// unpinned Copilot CLI. tool.copilot owns that command. Debconf writes the
-// database in name order.
 const linuxCodeCopilotDebconf = "Name: code/add-copilot-command\nTemplate: code/add-copilot-command\nValue: false\nOwners: code\nFlags: seen\n\n" + linuxCodeDebconf
 
 type linuxCodeInput struct {
@@ -120,7 +117,6 @@ type linuxCodeInput struct {
 	Identity  string       `json:"identity"`
 	// Older pending inputs omit this permission and retain their exact commands.
 	AllowDowngrade bool `json:"allow_downgrade,omitempty"`
-	// Older pending inputs omit this answer and retain their exact database.
 	DeclineCopilot bool `json:"decline_copilot,omitempty"`
 }
 
@@ -343,9 +339,8 @@ func (d *LinuxAPTDriver) checkCodeCollisions(ctx context.Context, absent bool) e
 	return nil
 }
 
-// dpkg --verify checks neither this postinst-created symlink nor file modes.
-// The arguments are the declared sandbox helper mode, the declared root-only
-// directory or "", and the package files that dpkg could not read.
+// Package checksum verification does not check this postinst-created symlink.
+// Verify the actual canonical executable and trusted parent ownership as well.
 const linuxCodeHealth = "set -eu\n" +
 	"fail() { printf 'Code native health: %s\\n' \"$*\" >&2; exit 1; }\n" +
 	"sandbox=$1 cache=$2\n" +
@@ -364,8 +359,8 @@ const linuxCodeHealth = "set -eu\n" +
 	"  changed=$(find \"$cache\" ! -type d ! \\( -type f -user 0 -group 0 -perm 600 \\) -print -quit) || fail \"$cache unreadable\"\n" +
 	"  [ -z \"$changed\" ] || fail \"$changed is not a regular root:root 0600 file\"\n" +
 	"fi\n" +
-	"for p do\n" +
-	"  [ -n \"$cache\" ] && case $p in \"$cache\"/*) true ;; *) false ;; esac || fail \"$p is unreadable but not declared root-only\"\n" +
+	"for unreadable do\n" +
+	"  [ -n \"$cache\" ] && case $unreadable in \"$cache\"/*) true ;; *) false ;; esac || fail \"$unreadable is unreadable but not declared root-only\"\n" +
 	"done\n"
 
 const linuxCodeRemoveLink = "set -eu\n" +

@@ -108,3 +108,50 @@ func TestLinuxCodeCheckAcceptsOnlyTheModesThatThePackageDeclares(t *testing.T) {
 		})
 	}
 }
+
+func TestLinuxCodeHealthRunsTheRealRootOnlyPredicate(t *testing.T) {
+	bin := t.TempDir()
+	for name, text := range map[string]string{
+		"readlink": "#!/bin/sh\nprintf '/usr/share/code/bin/code\\n'\n",
+		"stat":     "#!/bin/sh\ncase \"$2\" in\n%u) printf '0\\n';;\n%a) printf '755\\n';;\nesac\n",
+	} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte(text), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for name, c := range map[string]struct {
+		readable bool
+		missing  bool
+		want     string
+	}{
+		"only folders":  {},
+		"readable file": {readable: true, want: " is not a regular root:root 0600 file"},
+		"missing":       {missing: true, want: " unreadable"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache := filepath.Join(t.TempDir(), "node-compile-cache")
+			if !c.missing {
+				if err := os.MkdirAll(filepath.Join(cache, "main"), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if c.readable {
+				if err := os.WriteFile(filepath.Join(cache, "main", "entry"), []byte("cache"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.Command("/bin/sh", "-c", linuxCodeHealth, "sh", "755", cache)
+			cmd.Env = []string{"PATH=" + bin + ":/usr/bin:/bin"}
+			out, err := cmd.CombinedOutput()
+			if c.want == "" {
+				if err != nil || len(out) != 0 {
+					t.Fatal("folders in the root-only folder failed the check", string(out), err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(string(out), c.want) {
+				t.Fatal("the real find predicate accepted a changed root-only folder", string(out), err)
+			}
+		})
+	}
+}

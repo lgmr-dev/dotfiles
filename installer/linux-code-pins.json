@@ -17,6 +17,12 @@
     }
   },
   "modes": {
+    "1.141.2-1791980535": {
+      "sandbox": "755"
+    },
+    "1.141.2-1791980485": {
+      "sandbox": "755"
+    },
     "1.146.0-1794340865": {
       "sandbox": "4755",
       "root_only": "/usr/share/code/resources/app/node-compile-cache"

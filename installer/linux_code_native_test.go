@@ -232,6 +232,13 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 		if _, err := os.Lstat(d.codePayload(pin)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatal("completed operation retained DEB cache", action, err)
 		}
+		intent, err := d.intent(receipt.OperationID)
+		if err != nil || intent.Code == nil || !intent.Code.DeclineCopilot {
+			t.Fatal("completed operation lost its debconf input", action, err)
+		}
+		if _, err := os.Lstat(intent.Code.Directory); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("debconf changed the bytes of the saved answers", action, err)
+		}
 		if _, err := os.Stat("/usr/share/applications/com.microsoft.VSCode.desktop"); (action == "remove" && !errors.Is(err, os.ErrNotExist)) || (action != "remove" && err != nil) {
 			t.Fatal("native package launcher lifecycle", action, err)
 		}

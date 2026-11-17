@@ -16,6 +16,7 @@
   "postUpdateOptions": [
     "gomodTidy"
   ],
+  "configMigration": true,
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate dashboard",
   "schedule": [

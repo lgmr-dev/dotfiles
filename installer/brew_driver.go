@@ -159,7 +159,7 @@ func (d *BrewDriver) intent(operation string) (brewIntent, error) {
 	if err := Decode(data, &intent); err != nil {
 		return intent, err
 	}
-	if (intent.Schema != 3 && intent.Schema != 4) || intent.Before == nil || intent.Operation != operation || !resourceID.MatchString(intent.Resource) || !slices.Contains([]string{"install", "update", "repair", "remove"}, intent.Action) || len(intent.Commands) == 0 || len(intent.Commands) > 32 {
+	if intent.Schema < 3 || intent.Schema > 5 || intent.Before == nil || intent.Operation != operation || !resourceID.MatchString(intent.Resource) || !slices.Contains([]string{"install", "update", "repair", "remove"}, intent.Action) || len(intent.Commands) == 0 || len(intent.Commands) > 32 {
 		return intent, errors.New("invalid Homebrew operation intent")
 	}
 	if _, err := brewShortName(intent.Package); err != nil {
@@ -219,7 +219,8 @@ func (d *BrewDriver) intent(operation string) (brewIntent, error) {
 		} else {
 			mode := map[string]string{"install": "install", "update": "upgrade", "repair": "reinstall"}[intent.Action]
 			rootCommand := len(command.Arguments) == 3 && command.Arguments[0] == mode && command.Arguments[2] == intent.Package
-			if !rootCommand {
+			relink := intent.relinks(i) && slices.Equal(command.Arguments, []string{"link", "--formula", intent.Package})
+			if !rootCommand && !relink {
 				if i == 0 || len(command.Arguments) != 3 || command.Arguments[0] != "reinstall" {
 					return intent, errors.New("invalid saved Homebrew package command")
 				}
@@ -236,6 +237,11 @@ func (d *BrewDriver) intent(operation string) (brewIntent, error) {
 		}
 	}
 	return intent, nil
+}
+
+func (intent brewIntent) relinks(position int) bool {
+	return intent.Schema >= 5 && (intent.Action == "install" || intent.Action == "repair") && position > 0 &&
+		slices.Equal(intent.Commands[position-1].Arguments, []string{"reinstall", "--formula", intent.Package})
 }
 
 func validBrewCaskIdentity(name string) bool {
@@ -442,7 +448,7 @@ func (d *BrewDriver) change(ctx context.Context, r Resource, action string, rece
 		if _, present := installed[name]; action == "install" && present {
 			return Observation{}, errors.New("Homebrew root appeared before installation; preserve it and review a fresh plan")
 		}
-		intent = brewIntent{Schema: 4, Resource: r.ID, Operation: receipt.OperationID, Package: d.Packages[r.ID], Action: action, Before: map[string]nativePackage{}}
+		intent = brewIntent{Schema: 5, Resource: r.ID, Operation: receipt.OperationID, Package: d.Packages[r.ID], Action: action, Before: map[string]nativePackage{}}
 		for name, pkg := range installed {
 			intent.Before[name] = pkg
 		}
@@ -621,6 +627,16 @@ func (d *BrewDriver) finish(ctx context.Context, r Resource, receipt Receipt, in
 		intent.Preserved = sortedUnique(intent.Preserved)
 	} else {
 		pkg, present := installed[name]
+		if present && !pkg.Healthy && intent.relinks(len(intent.Commands)) {
+			if err := d.runCommand(ctx, &intent, []string{"link", "--formula", intent.Package}); err != nil {
+				return Observation{}, err
+			}
+			installed, err = brewInventory(ctx, d.Query)
+			if err != nil {
+				return Observation{}, err
+			}
+			pkg, present = installed[name]
+		}
 		if !present || !pkg.Healthy || pkg.Source != intent.Package {
 			return Observation{}, errors.New("Homebrew formula did not pass native activation checks")
 		}

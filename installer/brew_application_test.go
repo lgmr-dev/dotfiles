@@ -374,7 +374,7 @@ func TestNativeAppSchema3CompletionRemainsReadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	intent, err := f.d.intent(f.receipt.OperationID)
-	if err != nil || intent.Schema != 4 || !slices.Contains(intent.Commands[0].Environment, "HOMEBREW_NO_EMOJI=") {
+	if err != nil || intent.Schema != 5 || !slices.Contains(intent.Commands[0].Environment, "HOMEBREW_NO_EMOJI=") {
 		t.Fatal("new cask intent did not bind its output controls", intent, err)
 	}
 	// Serialize the earlier schema exactly, including the worker's command hash.

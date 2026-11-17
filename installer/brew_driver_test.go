@@ -3,6 +3,7 @@ package installer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -83,7 +84,7 @@ func TestBrewFormulaSchema3CompletionRemainsReadable(t *testing.T) {
 		t.Fatal(err)
 	}
 	intent, err := d.intent(receipt.OperationID)
-	if err != nil || intent.Schema != 4 || !slices.Contains(intent.Commands[0].Environment, "HOMEBREW_NO_EMOJI=") {
+	if err != nil || intent.Schema != 5 || !slices.Contains(intent.Commands[0].Environment, "HOMEBREW_NO_EMOJI=") {
 		t.Fatal("new formula intent did not bind its output controls", intent, err)
 	}
 	command := intent.Commands[0]
@@ -143,5 +144,102 @@ func TestBrewDriverRequiresPreservationControlsAndRejectsInheritedSecrets(t *tes
 		if _, err := d.validate(r); err == nil {
 			t.Fatal("unsafe native command environment was accepted")
 		}
+	}
+}
+
+func TestBrewRepairRelinksAKegThatReinstallKeepsUnlinked(t *testing.T) {
+	for _, mode := range []string{"relink", "conflict", "schema-4-resume", "install-resume"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := context.Background()
+			installed := map[string]nativePackage{
+				"shared":  {Name: "shared", Source: "shared", Version: "1.0", Automatic: true, Healthy: true},
+				"outside": {Name: "outside", Source: "outside", Version: "1.0", Healthy: true, Dependencies: []string{"shared"}},
+			}
+			d, r, receipt := brewMutationInventoryFixture(t, installed, nil)
+			first := nativePackage{Name: "first", Source: "first", Version: "1.0", Dependencies: []string{"shared"}}
+			if mode != "install-resume" {
+				if _, err := d.Apply(ctx, r, Operation{Action: "install"}, receipt); err != nil {
+					t.Fatal(err)
+				}
+				installed["first"] = first
+			}
+			var commands [][]string
+			d.Run = func(_ context.Context, command nativeCommand) ([]byte, error) {
+				commands = append(commands, command.Arguments)
+				output, code := fmt.Sprintf("dotfiles-operation-%s  %s/first/1.0: fixture\n", command.Operation, filepath.ToSlash(d.Cellar)), 0
+				if command.Arguments[0] == "install" {
+					output, code = output+"Error: The `brew link` step did not complete successfully\n", 1
+					installed["first"] = first
+				} else if command.Arguments[0] == "link" && mode == "conflict" {
+					output, code = "Error: Could not symlink bin/first\nTarget /opt/homebrew/bin/first\nalready exists.\n", 1
+				} else if command.Arguments[0] == "link" {
+					output = "Linking first... 1 symlinks created.\n"
+					first.Healthy = true
+					installed["first"] = first
+				}
+				reply := nativeReply{Output: []byte(output), ExitCode: &code}
+				if code != 0 {
+					reply.Error = "exit status 1"
+				}
+				hash, err := digest(command)
+				if err == nil {
+					err = saveDocument(filepath.Join(d.Directory, "worker", "commands", command.Operation+".json"), nativeCommandRecord{Schema: 1, Command: hash, Reply: &reply})
+				}
+				if err == nil && code != 0 {
+					err = reply.failure()
+				}
+				return reply.Output, err
+			}
+			repair := Receipt{OperationID: strings.Repeat("b", 64), Status: "in-progress"}
+			reinstall := []string{"reinstall", "--formula", "first"}
+			link := []string{"link", "--formula", "first"}
+			if mode == "install-resume" {
+				if _, err := d.Apply(ctx, r, Operation{Action: "install"}, receipt); err == nil {
+					t.Fatal("fixture install did not fail at its link step")
+				}
+				observed, err := d.ResumeResource(ctx, r, Operation{Action: "install"}, receipt)
+				if err != nil || !observed.Healthy || !slices.EqualFunc(commands, [][]string{{"install", "--formula", "first"}, reinstall, link}, slices.Equal) {
+					t.Fatal("install recovery did not link the keg that reinstall kept unlinked", commands, observed, err)
+				}
+				return
+			}
+			if mode == "schema-4-resume" {
+				before, err := brewInventory(ctx, d.Query)
+				if err != nil {
+					t.Fatal(err)
+				}
+				operation, err := digest(struct {
+					Operation string
+					Attempt   int
+				}{repair.OperationID, 0})
+				if err != nil {
+					t.Fatal(err)
+				}
+				command := nativeCommand{Operation: operation, Program: d.Program, Arguments: reinstall, Environment: d.commandEnvironment(r.ID, operation, 4)}
+				intent := brewIntent{Schema: 4, Resource: r.ID, Operation: repair.OperationID, Package: "first", Action: "repair", Before: before, Commands: []nativeCommand{command}}
+				if err := saveDocument(d.intentPath(repair.OperationID), intent); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := d.Run(ctx, command); err != nil {
+					t.Fatal(err)
+				}
+				_, err = d.ResumeResource(ctx, r, Operation{Action: "repair"}, repair)
+				saved, readErr := d.intent(repair.OperationID)
+				if err == nil || readErr != nil || len(saved.Commands) != 1 || len(commands) != 1 {
+					t.Fatal("resume changed the commands of a schema 4 repair", err, readErr, saved.Commands, commands)
+				}
+				return
+			}
+			observed, err := d.Apply(ctx, r, Operation{Action: "repair"}, repair)
+			if !slices.EqualFunc(commands, [][]string{reinstall, link}, slices.Equal) {
+				t.Fatal("repair did not link the keg that reinstall kept unlinked", commands)
+			}
+			if mode == "relink" && (err != nil || !observed.Healthy) {
+				t.Fatal("repair did not end with a linked keg", observed, err)
+			}
+			if mode == "conflict" && (err == nil || !strings.Contains(err.Error(), "already exists")) {
+				t.Fatal("a link conflict did not fail the repair", err)
+			}
+		})
 	}
 }

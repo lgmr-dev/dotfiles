@@ -73,6 +73,11 @@ func defaultLinuxCodePin(arch string) (LinuxCodePin, error) {
 // normal system database. This also suppresses postrm's repository/key removal.
 const linuxCodeDebconf = "Name: code/add-microsoft-repo\nTemplate: code/add-microsoft-repo\nValue: false\nOwners: code\nFlags: seen\n\n"
 
+// Since 1.145 the postinst links /usr/bin/copilot to a shim that offers an
+// unpinned Copilot CLI. tool.copilot owns that command. Debconf writes the
+// database in name order.
+const linuxCodeCopilotDebconf = "Name: code/add-copilot-command\nTemplate: code/add-copilot-command\nValue: false\nOwners: code\nFlags: seen\n\n" + linuxCodeDebconf
+
 type linuxCodeInput struct {
 	Pin       LinuxCodePin `json:"pin"`
 	Operation string       `json:"operation"`
@@ -80,6 +85,23 @@ type linuxCodeInput struct {
 	Identity  string       `json:"identity"`
 	// Older pending inputs omit this permission and retain their exact commands.
 	AllowDowngrade bool `json:"allow_downgrade,omitempty"`
+	// Older pending inputs omit this answer and retain their exact database.
+	DeclineCopilot bool `json:"decline_copilot,omitempty"`
+}
+
+func (input linuxCodeInput) database() string {
+	if input.DeclineCopilot {
+		return linuxCodeCopilotDebconf
+	}
+	return linuxCodeDebconf
+}
+
+func (input linuxCodeInput) debconfOverride() string {
+	questions := "^code/add-microsoft-repo$"
+	if input.DeclineCopilot {
+		questions = "^code/add-(copilot-command|microsoft-repo)$"
+	}
+	return "DEBCONF_DB_OVERRIDE=File{filename:" + filepath.Join(input.Directory, "answer.dat") + " accept_name:" + questions + " mode:0644 backup:no}"
 }
 
 func newLinuxCodeInput(pin LinuxCodePin, operation string) (*linuxCodeInput, error) {
@@ -98,12 +120,12 @@ func newLinuxCodeInput(pin LinuxCodePin, operation string) (*linuxCodeInput, err
 	if err != nil {
 		return nil, errors.Join(err, os.Remove(directory))
 	}
-	input := &linuxCodeInput{Pin: pin, Operation: operation, Directory: directory, Identity: identity}
+	input := &linuxCodeInput{Pin: pin, Operation: operation, Directory: directory, Identity: identity, DeclineCopilot: true}
 	file, err := os.OpenFile(filepath.Join(directory, "answer.dat"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return nil, errors.Join(err, os.Remove(directory))
 	}
-	_, writeErr := io.WriteString(file, linuxCodeDebconf)
+	_, writeErr := io.WriteString(file, input.database())
 	if err := errors.Join(writeErr, file.Chmod(0644), file.Sync(), file.Close()); err != nil {
 		return nil, err // Preserve uncertain input for inspection.
 	}
@@ -143,8 +165,8 @@ func (input linuxCodeInput) inspect(absentOK bool) error {
 			return errors.New("unexpected Code temporary input is preserved for inspection")
 		}
 		path := filepath.Join(input.Directory, entry.Name())
-		data, err := readLinuxCodeDatabase(path)
-		if err != nil || string(data) != linuxCodeDebconf {
+		data, err := readLinuxCodeDatabase(path, len(input.database()))
+		if err != nil || string(data) != input.database() {
 			return errors.Join(errors.New("changed Code temporary database bytes are preserved for inspection"), err)
 		}
 		found = found || entry.Name() == "answer.dat"
@@ -286,8 +308,10 @@ func (d *LinuxAPTDriver) checkCodeCollisions(ctx context.Context, absent bool) e
 	return nil
 }
 
-// Package checksum verification does not check this postinst-created symlink.
-// Verify the actual canonical executable and trusted parent ownership as well.
+// dpkg --verify checks neither this postinst-created symlink nor file modes.
+// Since 1.144 the DEBs ship the Chromium sandbox helper setuid root, and the
+// amd64 DEB ships a compile cache that only root can read. The arguments are
+// the package files that dpkg could not read.
 const linuxCodeHealth = "set -eu\n" +
 	"fail() { printf 'Code native health: %s\\n' \"$*\" >&2; exit 1; }\n" +
 	"link=$(readlink /usr/bin/code) || fail '/usr/bin/code target unreadable'\n" +
@@ -296,7 +320,13 @@ const linuxCodeHealth = "set -eu\n" +
 	"  [ ! -L \"$p\" ] || fail \"$p is a symbolic link\"\n" +
 	"  owner=$(stat -c %u \"$p\") || fail \"$p owner unreadable\"\n" +
 	"  mode=$(stat -c %a \"$p\") || fail \"$p mode unreadable\"\n" +
-	"  [ \"$owner\" = 0 ] && [ \"$mode\" = 755 ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755)\"\n" +
+	"  [ \"$owner\" = 0 ] && { [ \"$mode\" = 755 ] || [ \"$p:$mode\" = /usr/share/code/chrome-sandbox:4755 ]; } ||\n" +
+	"    fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755, or 4755 for the sandbox helper)\"\n" +
+	"done\n" +
+	"for p do\n" +
+	"  case $p in /usr/share/code/resources/app/node-compile-cache/*) ;; *) fail \"$p is unreadable outside the compile cache\" ;; esac\n" +
+	"  meta=$(stat -c %u:%g:%f \"$p\") || fail \"$p metadata unreadable\"\n" +
+	"  [ \"$meta\" = 0:0:8180 ] || fail \"$p owner:group:raw mode=$meta (expected 0:0:8180, a regular root-only 0600 file)\"\n" +
 	"done\n"
 
 const linuxCodeRemoveLink = "set -eu\n" +

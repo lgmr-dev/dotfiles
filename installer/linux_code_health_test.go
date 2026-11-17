@@ -3,9 +3,11 @@
 package installer
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -43,6 +45,58 @@ func TestLinuxCodeHealthReportsExactNativeMismatch(t *testing.T) {
 			}
 			if err == nil || !strings.Contains(string(out), want) || len(out) > 1024 {
 				t.Fatal("native mismatch lost its bounded path/metadata diagnostic", string(out), err)
+			}
+		})
+	}
+}
+
+func TestLinuxCodeCheckAcceptsOnlyTheModesThatThePackageDeclares(t *testing.T) {
+	const cache = "/usr/share/code/resources/app/node-compile-cache/main/v24.22.1-x64-7034790f/0a1b2c3d"
+	for name, c := range map[string]struct {
+		verify, sandbox, cache string
+		healthy                bool
+	}{
+		"plain sandbox":                 {sandbox: "755", healthy: true},
+		"setuid sandbox and root cache": {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "0:0:8180", healthy: true},
+		"group-writable setuid sandbox": {sandbox: "4775"},
+		"setgid sandbox":                {sandbox: "6755"},
+		"cache owned by a user":         {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "1000:0:8180"},
+		"cache with another mode":       {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "0:0:8100"},
+		"cache is a symbolic link":      {verify: "?????????   " + cache + "\n", sandbox: "4755", cache: "0:0:a1ff"},
+		"unreadable file outside cache": {verify: "?????????   /usr/share/code/resources/app/out/main.js\n", sandbox: "4755", cache: "0:0:8180"},
+		"changed sandbox digest":        {verify: "??5??????   /usr/share/code/chrome-sandbox\n", sandbox: "4755"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, r := linuxCodeFixture(t)
+			f.approve()
+			receipt := aptFixtureReceipt("code-modes")
+			if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, receipt); err != nil {
+				t.Fatal(err)
+			}
+			bin := t.TempDir()
+			for program, text := range map[string]string{
+				"readlink": "#!/bin/sh\nprintf '/usr/share/code/bin/code\\n'\n",
+				"stat":     "#!/bin/sh\ncase \"$2 $3\" in\n'%a /usr/share/code/chrome-sandbox') printf '%s\\n' \"$SANDBOX\";;\n'%u '*) printf '0\\n';;\n'%a '*) printf '755\\n';;\n\"%u:%g:%f $CACHE\") printf '%s\\n' \"$META\";;\n*) exit 1;;\nesac\n",
+			} {
+				if err := os.WriteFile(filepath.Join(bin, program), []byte(text), 0755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			query := f.driver.Query
+			f.driver.Query = func(ctx context.Context, privileged bool, program string, input []byte, args ...string) ([]byte, error) {
+				if slices.Equal(args, []string{"--verify", "code"}) {
+					return []byte(c.verify), nil
+				}
+				if program == "/bin/sh" && len(args) >= 2 && args[1] == linuxCodeHealth {
+					cmd := exec.CommandContext(ctx, program, args...)
+					cmd.Env = []string{"PATH=" + bin, "SANDBOX=" + c.sandbox, "CACHE=" + cache, "META=" + c.cache}
+					return cmd.CombinedOutput()
+				}
+				return query(ctx, privileged, program, input, args...)
+			}
+			o, err := f.driver.Observe(context.Background(), r, receipt)
+			if err != nil || o.Healthy != c.healthy || c.healthy != (o.HealthIssue == "") {
+				t.Fatal("Code health differs from the modes that the package declares", o.Healthy, o.HealthIssue, err)
 			}
 		})
 	}

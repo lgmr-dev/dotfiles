@@ -253,6 +253,9 @@ private launcher or shell profile is needed for Linux Code. Update reconciles an
 owned installation to the reviewed checkout pin, including a disclosed downgrade.
 A healthy owned installation already recorded at that pin is kept without another
 DEB download. Setup preserves existing Microsoft repository settings and keys.
+It declines the package's `/usr/bin/copilot` link: the Copilot CLI selection
+supplies `copilot`. Check accepts the setuid `chrome-sandbox` helper and the
+root-only compile cache of the package only with their declared owner and mode.
 Changed temporary inputs are preserved and reported after successful package
 completion; they do not block readiness or removal.
 

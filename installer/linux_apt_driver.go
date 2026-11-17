@@ -297,7 +297,7 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 			return o, err
 		}
 		if o.Healthy {
-			if err := d.check(ctx, r); err != nil {
+			if err := d.check(ctx, r, pkg.Version); err != nil {
 				if ctx.Err() != nil {
 					return o, ctx.Err()
 				}
@@ -597,7 +597,7 @@ func (d *LinuxAPTDriver) change(ctx context.Context, r Resource, action string, 
 	return d.finish(ctx, r, receipt, intent, state)
 }
 
-func (d *LinuxAPTDriver) check(ctx context.Context, r Resource) error {
+func (d *LinuxAPTDriver) check(ctx context.Context, r Resource, version string) error {
 	command, ok := d.Checks[r.ID]
 	if !ok {
 		return nil
@@ -608,22 +608,29 @@ func (d *LinuxAPTDriver) check(ctx context.Context, r Resource) error {
 	}
 	// dpkg --verify reports changed files on stdout while returning zero.
 	_, vendorPackage := d.Debs[r.ID]
-	changedFiles := strings.TrimSpace(string(output)) != ""
-	if vendorPackage {
-		changedFiles = false
-		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-			// dpkg marks administrator-owned configuration with `c`. Normal
-			// package removal/reinstallation preserves these personal changes.
-			if line != "" && !(len(line) > 12 && line[9:12] == " c " && line[12] == '/') {
-				changedFiles = true
-			}
+	changedFiles := false
+	unreadable := []string{}
+	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+		switch {
+		case line == "":
+		// dpkg marks administrator-owned configuration with `c`. Normal
+		// package removal/reinstallation preserves these personal changes.
+		case vendorPackage && len(line) > 12 && line[9:12] == " c " && line[12] == '/':
+		case r.ID == "tool.vscode" && strings.HasPrefix(line, "?????????   /"):
+			unreadable = append(unreadable, line[12:])
+		default:
+			changedFiles = true
 		}
 	}
 	if (r.Action == "apt-library" || r.ID == "tool.vscode" || vendorPackage) && changedFiles {
 		return fmt.Errorf("APT %s has changed package files%s", r.Name, nativeDiagnostic(output))
 	}
 	if r.ID == "tool.vscode" {
-		if output, err := d.Query(ctx, false, "/bin/sh", nil, "-c", linuxCodeHealth); err != nil || len(output) != 0 {
+		modes, err := linuxCodeDeclaredModes(version)
+		if err != nil {
+			return err
+		}
+		if output, err := d.Query(ctx, false, "/bin/sh", nil, append([]string{"-c", linuxCodeHealth, "sh", modes.Sandbox, modes.RootOnly}, unreadable...)...); err != nil || len(output) != 0 {
 			return errors.Join(fmt.Errorf("Code canonical native executable is missing or changed%s", nativeDiagnostic(output)), err)
 		}
 	}
@@ -714,7 +721,7 @@ func (d *LinuxAPTDriver) finish(ctx context.Context, r Resource, receipt Receipt
 		if !present || !pkg.Healthy || intent.Code != nil && (pkg.Version != intent.Code.Pin.Version || identity != "code:"+intent.Code.Pin.Architecture) {
 			return Observation{}, errors.New("APT root has not reached its requested installed native state")
 		}
-		if err := d.check(ctx, r); err != nil {
+		if err := d.check(ctx, r, pkg.Version); err != nil {
 			return Observation{}, err
 		}
 		if intent.Claim != "" {

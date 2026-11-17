@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func readLinuxCodeDatabase(path string) ([]byte, error) {
+func readLinuxCodeDatabase(path string, size int) ([]byte, error) {
 	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return nil, err
@@ -23,10 +23,10 @@ func readLinuxCodeDatabase(path string) ([]byte, error) {
 	// Debconf can atomically replace the caller-created file while running as
 	// root. Mode 0644 remains private beneath the caller-owned 0700 directory,
 	// while letting that caller verify a root-rewritten file after completion.
-	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0777 != 0644 || stat.Uid != 0 && int(stat.Uid) != os.Geteuid() || stat.Size != int64(len(linuxCodeDebconf)) {
+	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0777 != 0644 || stat.Uid != 0 && int(stat.Uid) != os.Geteuid() || stat.Size != int64(size) {
 		return nil, errors.Join(errors.New("Code database has changed owner, mode or size"), file.Close())
 	}
-	data, err := io.ReadAll(io.LimitReader(file, int64(len(linuxCodeDebconf))+1))
+	data, err := io.ReadAll(io.LimitReader(file, int64(size)+1))
 	return data, errors.Join(err, file.Close())
 }
 

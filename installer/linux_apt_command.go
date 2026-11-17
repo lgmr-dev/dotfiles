@@ -118,7 +118,7 @@ func (d *LinuxAPTDriver) command(intent linuxAPTIntent, index int, kind string, 
 		command.Environment = []string{"LC_ALL=C", "DEBIAN_FRONTEND=noninteractive"}
 	}
 	if intent.Code != nil && (kind == "install" || kind == "remove") {
-		environment := "DEBCONF_DB_OVERRIDE=File{filename:" + filepath.Join(intent.Code.Directory, "answer.dat") + " accept_name:^code/add-microsoft-repo$ mode:0644 backup:no}"
+		environment := intent.Code.debconfOverride()
 		if d.Location.root {
 			command.Environment = append(command.Environment, environment)
 		} else {

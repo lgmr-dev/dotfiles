@@ -203,7 +203,7 @@ func TestLinuxCodeTemporaryInputPreservesUnexpectedContents(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"answer.dat-new", "answer.dat-old"} {
-		if err := os.WriteFile(filepath.Join(input.Directory, name), []byte(linuxCodeDebconf), 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(input.Directory, name), []byte(input.database()), 0644); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -395,7 +395,7 @@ func TestLinuxCodeInputCleanupRecoveryPreservesUnexpectedFiles(t *testing.T) {
 	}
 }
 
-func TestLinuxCodeOldSavedCommandsRetainDowngradePolicy(t *testing.T) {
+func TestLinuxCodeOldSavedInputsRetainTheirExactCommands(t *testing.T) {
 	f, r := linuxCodeFixture(t)
 	f.approve()
 	if _, err := f.driver.Apply(context.Background(), r, Operation{Action: "install"}, aptFixtureReceipt("before-old-update")); err != nil {
@@ -412,9 +412,21 @@ func TestLinuxCodeOldSavedCommandsRetainDowngradePolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Reproduce the old saved shape and its actual recorded command identity.
-	intent.Code.AllowDowngrade = false
+	newer := intent.Code.debconfOverride()
+	intent.Code.AllowDowngrade, intent.Code.DeclineCopilot = false, false
+	if err := os.WriteFile(filepath.Join(intent.Code.Directory, "answer.dat"), []byte(linuxCodeDebconf), 0644); err != nil {
+		t.Fatal(err)
+	}
 	last := &intent.Commands[len(intent.Commands)-1]
 	last.Command.Arguments = slices.DeleteFunc(last.Command.Arguments, func(s string) bool { return s == "--allow-downgrades" })
+	for _, values := range [][]string{last.Command.Arguments, last.Command.Environment} {
+		if index := slices.Index(values, newer); index >= 0 {
+			values[index] = intent.Code.debconfOverride()
+		}
+	}
+	if !slices.Contains(append(last.Command.Arguments, last.Command.Environment...), intent.Code.debconfOverride()) || strings.Contains(intent.Code.debconfOverride(), "copilot") {
+		t.Fatal("not an old saved debconf command")
+	}
 	hash, err := digest(last.Command)
 	if err != nil {
 		t.Fatal(err)
@@ -427,13 +439,13 @@ func TestLinuxCodeOldSavedCommandsRetainDowngradePolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(f.driver.intentPath(intent.Operation))
-	if err != nil || bytes.Contains(data, []byte("allow_downgrade")) {
+	if err != nil || bytes.Contains(data, []byte("allow_downgrade")) || bytes.Contains(data, []byte("decline_copilot")) {
 		t.Fatal("not an old serialized input", err)
 	}
 	calls := f.runs
 	f.approve()
 	got, err := f.driver.ResumeResource(context.Background(), r, Operation{Action: "update"}, receipt)
-	if err != nil || got.CompletedOperation != receipt.OperationID || f.runs != calls {
+	if err != nil || got.CompletedOperation != receipt.OperationID || f.runs != calls || len(got.Preserved) != 0 {
 		t.Fatal("old saved command changed or repeated", got, err)
 	}
 }

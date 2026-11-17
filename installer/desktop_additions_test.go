@@ -158,7 +158,7 @@ func TestTailscaleHealthPreservesPersonalConffiles(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d := LinuxAPTDriver{Debs: pins, Checks: map[string][]string{r.ID: {"/usr/bin/dpkg", "--verify", "tailscale"}}, Query: func(context.Context, bool, string, []byte, ...string) ([]byte, error) { return []byte(tc.output), nil }}
-			if err := d.check(t.Context(), r); (err == nil) != tc.healthy {
+			if err := d.check(t.Context(), r, ""); (err == nil) != tc.healthy {
 				t.Fatal(err)
 			}
 		})

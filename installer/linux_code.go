@@ -43,27 +43,62 @@ func (pin LinuxCodePin) validate() error {
 	return nil
 }
 
-func defaultLinuxCodePin(arch string) (LinuxCodePin, error) {
+type linuxCodeModes struct {
+	Sandbox  string `json:"sandbox"`
+	RootOnly string `json:"root_only,omitempty"`
+}
+
+var linuxCodeRootOnly = regexp.MustCompile(`^/usr/share/code(/[A-Za-z0-9_-][A-Za-z0-9_.-]*)+$`)
+
+func linuxCodePinFile() (map[string]LinuxCodePin, map[string]linuxCodeModes, error) {
 	var data struct {
-		Schema int                     `json:"schema"`
-		Pins   map[string]LinuxCodePin `json:"pins"`
+		Schema int                       `json:"schema"`
+		Pins   map[string]LinuxCodePin   `json:"pins"`
+		Modes  map[string]linuxCodeModes `json:"modes"`
 	}
 	if err := Decode(linuxCodePinData, &data); err != nil {
-		return LinuxCodePin{}, err
+		return nil, nil, err
 	}
 	if data.Schema != 1 || len(data.Pins) != 2 {
-		return LinuxCodePin{}, errors.New("invalid Linux Code pins")
+		return nil, nil, errors.New("invalid Linux Code pins")
 	}
 	for architecture, pin := range data.Pins {
 		if err := pin.validate(); err != nil || architecture != pin.Architecture {
-			return LinuxCodePin{}, errors.Join(errors.New("invalid Linux Code platform pin"), err)
+			return nil, nil, errors.Join(errors.New("invalid Linux Code platform pin"), err)
+		}
+		if _, declared := data.Modes[pin.Version]; !declared {
+			return nil, nil, errors.New("Linux Code pin " + pin.Version + " lacks its declared modes")
 		}
 	}
-	pin, ok := data.Pins[arch]
+	for version, modes := range data.Modes {
+		if !linuxCodeVersion.MatchString(version) || modes.Sandbox != "755" && modes.Sandbox != "4755" || modes.RootOnly != "" && !linuxCodeRootOnly.MatchString(modes.RootOnly) {
+			return nil, nil, errors.New("invalid Linux Code declared modes")
+		}
+	}
+	return data.Pins, data.Modes, nil
+}
+
+func defaultLinuxCodePin(arch string) (LinuxCodePin, error) {
+	pins, _, err := linuxCodePinFile()
+	if err != nil {
+		return LinuxCodePin{}, err
+	}
+	pin, ok := pins[arch]
 	if !ok {
 		return pin, errors.New("unsupported Linux Code architecture")
 	}
 	return pin, nil
+}
+
+func linuxCodeDeclaredModes(version string) (linuxCodeModes, error) {
+	_, declared, err := linuxCodePinFile()
+	if err != nil {
+		return linuxCodeModes{}, err
+	}
+	if modes, ok := declared[version]; ok {
+		return modes, nil
+	}
+	return linuxCodeModes{Sandbox: "755"}, nil
 }
 
 // Debconf's environment grammar cannot encode a filename containing whitespace;
@@ -73,6 +108,8 @@ func defaultLinuxCodePin(arch string) (LinuxCodePin, error) {
 // normal system database. This also suppresses postrm's repository/key removal.
 const linuxCodeDebconf = "Name: code/add-microsoft-repo\nTemplate: code/add-microsoft-repo\nValue: false\nOwners: code\nFlags: seen\n\n"
 
+const linuxCodeCopilotDebconf = "Name: code/add-copilot-command\nTemplate: code/add-copilot-command\nValue: false\nOwners: code\nFlags: seen\n\n" + linuxCodeDebconf
+
 type linuxCodeInput struct {
 	Pin       LinuxCodePin `json:"pin"`
 	Operation string       `json:"operation"`
@@ -80,6 +117,22 @@ type linuxCodeInput struct {
 	Identity  string       `json:"identity"`
 	// Older pending inputs omit this permission and retain their exact commands.
 	AllowDowngrade bool `json:"allow_downgrade,omitempty"`
+	DeclineCopilot bool `json:"decline_copilot,omitempty"`
+}
+
+func (input linuxCodeInput) database() string {
+	if input.DeclineCopilot {
+		return linuxCodeCopilotDebconf
+	}
+	return linuxCodeDebconf
+}
+
+func (input linuxCodeInput) debconfOverride() string {
+	questions := "^code/add-microsoft-repo$"
+	if input.DeclineCopilot {
+		questions = "^code/add-(copilot-command|microsoft-repo)$"
+	}
+	return "DEBCONF_DB_OVERRIDE=File{filename:" + filepath.Join(input.Directory, "answer.dat") + " accept_name:" + questions + " mode:0644 backup:no}"
 }
 
 func newLinuxCodeInput(pin LinuxCodePin, operation string) (*linuxCodeInput, error) {
@@ -98,12 +151,12 @@ func newLinuxCodeInput(pin LinuxCodePin, operation string) (*linuxCodeInput, err
 	if err != nil {
 		return nil, errors.Join(err, os.Remove(directory))
 	}
-	input := &linuxCodeInput{Pin: pin, Operation: operation, Directory: directory, Identity: identity}
+	input := &linuxCodeInput{Pin: pin, Operation: operation, Directory: directory, Identity: identity, DeclineCopilot: true}
 	file, err := os.OpenFile(filepath.Join(directory, "answer.dat"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return nil, errors.Join(err, os.Remove(directory))
 	}
-	_, writeErr := io.WriteString(file, linuxCodeDebconf)
+	_, writeErr := io.WriteString(file, input.database())
 	if err := errors.Join(writeErr, file.Chmod(0644), file.Sync(), file.Close()); err != nil {
 		return nil, err // Preserve uncertain input for inspection.
 	}
@@ -143,8 +196,8 @@ func (input linuxCodeInput) inspect(absentOK bool) error {
 			return errors.New("unexpected Code temporary input is preserved for inspection")
 		}
 		path := filepath.Join(input.Directory, entry.Name())
-		data, err := readLinuxCodeDatabase(path)
-		if err != nil || string(data) != linuxCodeDebconf {
+		data, err := readLinuxCodeDatabase(path, len(input.database()))
+		if err != nil || string(data) != input.database() {
 			return errors.Join(errors.New("changed Code temporary database bytes are preserved for inspection"), err)
 		}
 		found = found || entry.Name() == "answer.dat"
@@ -290,13 +343,24 @@ func (d *LinuxAPTDriver) checkCodeCollisions(ctx context.Context, absent bool) e
 // Verify the actual canonical executable and trusted parent ownership as well.
 const linuxCodeHealth = "set -eu\n" +
 	"fail() { printf 'Code native health: %s\\n' \"$*\" >&2; exit 1; }\n" +
+	"sandbox=$1 cache=$2\n" +
+	"shift 2\n" +
 	"link=$(readlink /usr/bin/code) || fail '/usr/bin/code target unreadable'\n" +
 	"[ \"$link\" = /usr/share/code/bin/code ] || fail \"/usr/bin/code target=$link\"\n" +
 	"for p in /usr /usr/share /usr/share/code /usr/share/code/code /usr/share/code/chrome-sandbox; do\n" +
 	"  [ ! -L \"$p\" ] || fail \"$p is a symbolic link\"\n" +
 	"  owner=$(stat -c %u \"$p\") || fail \"$p owner unreadable\"\n" +
 	"  mode=$(stat -c %a \"$p\") || fail \"$p mode unreadable\"\n" +
-	"  [ \"$owner\" = 0 ] && [ \"$mode\" = 755 ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755)\"\n" +
+	"  expected=755\n" +
+	"  [ \"$p\" != /usr/share/code/chrome-sandbox ] || expected=$sandbox\n" +
+	"  [ \"$owner\" = 0 ] && [ \"$mode\" = \"$expected\" ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=$expected)\"\n" +
+	"done\n" +
+	"if [ -n \"$cache\" ]; then\n" +
+	"  changed=$(find \"$cache\" ! -type d ! \\( -type f -user 0 -group 0 -perm 600 \\) -print -quit) || fail \"$cache unreadable\"\n" +
+	"  [ -z \"$changed\" ] || fail \"$changed is not a regular root:root 0600 file\"\n" +
+	"fi\n" +
+	"for unreadable do\n" +
+	"  [ -n \"$cache\" ] && case $unreadable in \"$cache\"/*) true ;; *) false ;; esac || fail \"$unreadable is unreadable but not declared root-only\"\n" +
 	"done\n"
 
 const linuxCodeRemoveLink = "set -eu\n" +

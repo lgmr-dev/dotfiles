@@ -53,16 +53,16 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 		t.Fatal("Code fixture requires absent Code and installed apt-utils", identity, err)
 	}
 	paths := []string{"/etc/apt/sources.list.d/vscode.sources", "/usr/share/keyrings/microsoft.gpg"}
-	for _, path := range paths {
+	for _, path := range append(paths, "/usr/bin/copilot") {
 		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
-			t.Fatal("Code fixture will not replace existing native repository/key", path, err)
+			t.Fatal("Code fixture will not replace an existing native path", path, err)
 		}
 	}
 	const repo = "# personal repository fixture\nTypes: deb\nURIs: https://example.invalid/personal-code\nSuites: stable\nComponents: main\nEnabled: no\n"
 	const key = "personal Microsoft key fixture\n"
 	run(repo, "/usr/bin/tee", paths[0])
 	run(key, "/usr/bin/tee", paths[1])
-	run("code code/add-microsoft-repo boolean true\n", "/usr/bin/debconf-set-selections")
+	run("code code/add-microsoft-repo boolean true\ncode code/add-copilot-command boolean true\n", "/usr/bin/debconf-set-selections")
 	t.Cleanup(func() {
 		// Only fixture-created paths are removed, after checking their bytes.
 		for i, want := range []string{repo, key} {
@@ -82,8 +82,13 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 				t.Fatal("Code changed a personal repository/key", paths[i], err)
 			}
 		}
-		if out := run("GET code/add-microsoft-repo\n", "/usr/bin/debconf-communicate", "code"); strings.TrimSpace(string(out)) != "0 true" {
-			t.Fatal("Code replaced the original personal debconf answer", string(out))
+		for _, question := range []string{"code/add-microsoft-repo", "code/add-copilot-command"} {
+			if out := run("GET "+question+"\n", "/usr/bin/debconf-communicate", "code"); strings.TrimSpace(string(out)) != "0 true" {
+				t.Fatal("Code replaced the original personal debconf answer", question, string(out))
+			}
+		}
+		if _, err := os.Lstat("/usr/bin/copilot"); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("Code published the declined Copilot command", err)
 		}
 	}
 	root := filepath.Join(t.TempDir(), "private Code state ü with spaces")
@@ -148,7 +153,7 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			run("", "/usr/bin/env", "DEBCONF_DB_OVERRIDE=File{filename:"+filepath.Join(input.Directory, "answer.dat")+" accept_name:^code/add-microsoft-repo$ mode:0644 backup:no}", location.Dpkg, "--install", external)
+			run("", "/usr/bin/env", input.debconfOverride(), location.Dpkg, "--install", external)
 			if err := input.cleanup(); err != nil {
 				t.Fatal(err)
 			}
@@ -226,6 +231,13 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 		}
 		if _, err := os.Lstat(d.codePayload(pin)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatal("completed operation retained DEB cache", action, err)
+		}
+		intent, err := d.intent(receipt.OperationID)
+		if err != nil || intent.Code == nil || !intent.Code.DeclineCopilot {
+			t.Fatal("completed operation lost its debconf input", action, err)
+		}
+		if _, err := os.Lstat(intent.Code.Directory); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("debconf changed the bytes of the saved answers", action, err)
 		}
 		if _, err := os.Stat("/usr/share/applications/com.microsoft.VSCode.desktop"); (action == "remove" && !errors.Is(err, os.ErrNotExist)) || (action != "remove" && err != nil) {
 			t.Fatal("native package launcher lifecycle", action, err)

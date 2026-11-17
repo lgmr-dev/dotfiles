@@ -296,8 +296,21 @@ const linuxCodeHealth = "set -eu\n" +
 	"  [ ! -L \"$p\" ] || fail \"$p is a symbolic link\"\n" +
 	"  owner=$(stat -c %u \"$p\") || fail \"$p owner unreadable\"\n" +
 	"  mode=$(stat -c %a \"$p\") || fail \"$p mode unreadable\"\n" +
-	"  [ \"$owner\" = 0 ] && [ \"$mode\" = 755 ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=755)\"\n" +
+	"  expected=755\n" +
+	"  [ \"$p\" != /usr/share/code/chrome-sandbox ] || expected=4755\n" +
+	"  [ \"$owner\" = 0 ] && [ \"$mode\" = \"$expected\" ] || fail \"$p owner=$owner mode=$mode (expected owner=0 mode=$expected)\"\n" +
+	"done\n" +
+	"for p in \"$@\"; do\n" +
+	"  meta=$(stat -c 'owner=%u mode=%A' \"$p\") || fail \"$p metadata unreadable\"\n" +
+	"  [ \"$meta\" = 'owner=0 mode=-rw-------' ] || fail \"$p $meta (expected owner=0 mode=-rw-------)\"\n" +
 	"done\n"
+
+const linuxCodeRootOnlyCache = "/usr/share/code/resources/app/node-compile-cache/"
+
+func unreadableLinuxCodeCacheFile(verifyLine string) (string, bool) {
+	path, digestUnreadable := strings.CutPrefix(verifyLine, "?????????   ")
+	return path, digestUnreadable && strings.HasPrefix(path, linuxCodeRootOnlyCache) && filepath.Clean(path) == path
+}
 
 const linuxCodeRemoveLink = "set -eu\n" +
 	"if [ -e /usr/bin/code ] || [ -L /usr/bin/code ]; then\n" +

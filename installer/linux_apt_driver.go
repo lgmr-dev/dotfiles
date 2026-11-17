@@ -609,12 +609,17 @@ func (d *LinuxAPTDriver) check(ctx context.Context, r Resource) error {
 	// dpkg --verify reports changed files on stdout while returning zero.
 	_, vendorPackage := d.Debs[r.ID]
 	changedFiles := strings.TrimSpace(string(output)) != ""
-	if vendorPackage {
+	var codeCacheFiles []string
+	if vendorPackage || r.ID == "tool.vscode" {
 		changedFiles = false
 		for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
+			if path, ok := unreadableLinuxCodeCacheFile(line); ok && r.ID == "tool.vscode" {
+				codeCacheFiles = append(codeCacheFiles, path)
+				continue
+			}
 			// dpkg marks administrator-owned configuration with `c`. Normal
 			// package removal/reinstallation preserves these personal changes.
-			if line != "" && !(len(line) > 12 && line[9:12] == " c " && line[12] == '/') {
+			if line != "" && !(vendorPackage && len(line) > 12 && line[9:12] == " c " && line[12] == '/') {
 				changedFiles = true
 			}
 		}
@@ -623,7 +628,8 @@ func (d *LinuxAPTDriver) check(ctx context.Context, r Resource) error {
 		return fmt.Errorf("APT %s has changed package files%s", r.Name, nativeDiagnostic(output))
 	}
 	if r.ID == "tool.vscode" {
-		if output, err := d.Query(ctx, false, "/bin/sh", nil, "-c", linuxCodeHealth); err != nil || len(output) != 0 {
+		health := append([]string{"-c", linuxCodeHealth, "sh"}, codeCacheFiles...)
+		if output, err := d.Query(ctx, false, "/bin/sh", nil, health...); err != nil || len(output) != 0 {
 			return errors.Join(fmt.Errorf("Code canonical native executable is missing or changed%s", nativeDiagnostic(output)), err)
 		}
 	}

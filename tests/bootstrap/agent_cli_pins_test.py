@@ -437,7 +437,7 @@ class GitHubPinBumpTest(unittest.TestCase):
                 self.assertEqual(resources, self.pins)
 
     def test_github_assets_respect_the_installer_download_limit(self):
-        for size, status in [(536_870_912, 0), (536_870_913, 1), (538_725_004, 1)]:
+        for size, status in [(538_725_004, 0), (1_073_741_824, 0), (1_073_741_825, 1)]:
             with self.subTest(size=size):
                 self.path.write_text(self.original)
                 self.releases.clear()

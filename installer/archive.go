@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const maxArchiveBytes int64 = 512 << 20
+const maxArchiveBytes int64 = 1 << 30
 const maxPackageBytes int64 = 2 << 30
 const maxPackageEntries = 100000
 

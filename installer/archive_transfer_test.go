@@ -308,6 +308,34 @@ func TestArchiveTransferStopsOnlyRetryableFailures(t *testing.T) {
 	}
 }
 
+type zeroes struct{}
+
+func (zeroes) ReadAt(data []byte, _ int64) (int, error) {
+	clear(data)
+	return len(data), nil
+}
+
+func TestArchiveDownloadAcceptsTheOpenWhisprLinuxArchiveSize(t *testing.T) {
+	const openWhisprLinuxArchiveBytes = 538725004
+	payload := func() io.ReadSeeker { return io.NewSectionReader(zeroes{}, 0, openWhisprLinuxArchiveBytes) }
+	digest := sha256.New()
+	if _, err := io.Copy(digest, payload()); err != nil {
+		t.Fatal(err)
+	}
+	server, _ := transferServer(t, false, func(_ int, w http.ResponseWriter, r *http.Request) {
+		http.ServeContent(w, r, "OpenWhispr-linux-x64", time.Unix(1, 0), payload())
+	})
+	pin := ArchivePin{Version: "1.0", URL: server.URL + "/OpenWhispr-linux-x64", SHA256: hex.EncodeToString(digest.Sum(nil)), Format: "file", File: "open-whispr", Commands: map[string]string{"open-whispr": "open-whispr"}, BinDirs: []string{"."}}
+	destination := filepath.Join(t.TempDir(), "payload")
+	if err := downloadArchive(t.Context(), server.Client(), pin, destination); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(filepath.Join(destination, "open-whispr"))
+	if err != nil || info.Size() != openWhisprLinuxArchiveBytes {
+		t.Fatalf("payload = %v, %v", info, err)
+	}
+}
+
 func TestArchiveTransferHonorsItsTotalLimit(t *testing.T) {
 	data := transferData(64 << 10)
 	server, _ := transferServer(t, false, func(_ int, w http.ResponseWriter, r *http.Request) {

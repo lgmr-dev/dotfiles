@@ -104,6 +104,9 @@ func TestLinuxAPTAbsentReferencesPreserveArchitectureAndProvidesResolution(t *te
 			t.Fatal("unqualified multiarchitecture identity did not resolve to the native architecture", native, identity)
 		}
 	}
+	if identity := linuxAPTIdentity("data", "arm64", installed); identity != "data:all" {
+		t.Fatal("architecture-independent package did not resolve", identity)
+	}
 	if identity := linuxAPTIdentity("shared:arm64", "amd64", installed); identity != "shared:arm64" {
 		t.Fatal("exact architecture changed", identity)
 	}

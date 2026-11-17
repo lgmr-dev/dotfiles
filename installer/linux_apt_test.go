@@ -684,8 +684,21 @@ func TestLinuxAPTLibraryHealthRejectsChangedFilesDespiteSuccessfulDpkgExit(t *te
 
 func TestLinuxAPTUnqualifiedNameResolvesNativeArchitectureAmongMultiArchInstances(t *testing.T) {
 	f := newLinuxAPTFixture(t)
-	f.driver.Packages["library.libatomic1"] = "libatomic1"
-	r := Resource{ID: "library.libatomic1", Name: "libatomic1", Action: "apt-library"}
+	r := Resource{ID: "library.libatomic1", Name: "libatomic1", Action: "apt-library", Bindings: map[string]Binding{"linux": {Provider: "apt", Package: "libatomic1"}}}
+	configured, err := configureLinuxAPT(&f.driver.Location, &Catalog{Resources: []Resource{r}}, &nativeSession{Directory: f.driver.WorkerDirectory}, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.driver.Packages, f.driver.Checks = configured.Packages, configured.Checks
+	f.driver.Query = func(ctx context.Context, privileged bool, program string, input []byte, args ...string) ([]byte, error) {
+		if program != f.driver.Location.Dpkg {
+			return f.query(ctx, privileged, program, input, args...)
+		}
+		if len(args) != 2 || args[0] != "--verify" || f.installed[args[1]].Name == "" {
+			return nil, fmt.Errorf("dpkg: error: --verify needs a valid package name but %q is not: ambiguous package name with more than one installed instance", args)
+		}
+		return nil, nil
+	}
 	f.installed["libatomic1:amd64"] = nativePackage{Name: "libatomic1:amd64", Source: "gcc-14", Version: "14.2.0", Healthy: true}
 	f.installed["libatomic1:i386"] = nativePackage{Name: "libatomic1:i386", Source: "gcc-14", Version: "14.2.0"}
 	o, err := f.driver.Observe(context.Background(), r, Receipt{})

@@ -148,22 +148,29 @@ func TestBrewDriverRequiresPreservationControlsAndRejectsInheritedSecrets(t *tes
 }
 
 func TestBrewRepairRelinksAKegThatReinstallKeepsUnlinked(t *testing.T) {
-	for _, mode := range []string{"relink", "conflict", "schema-4-resume"} {
+	for _, mode := range []string{"relink", "conflict", "schema-4-resume", "install-resume"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx := context.Background()
-			var installed map[string]nativePackage
-			d, r, receipt := brewMutationFixture(t, func(current map[string]nativePackage) { installed = current })
-			if _, err := d.Apply(ctx, r, Operation{Action: "install"}, receipt); err != nil {
-				t.Fatal(err)
+			installed := map[string]nativePackage{
+				"shared":  {Name: "shared", Source: "shared", Version: "1.0", Automatic: true, Healthy: true},
+				"outside": {Name: "outside", Source: "outside", Version: "1.0", Healthy: true, Dependencies: []string{"shared"}},
 			}
-			first := installed["first"]
-			first.Healthy = false
-			installed["first"] = first
+			d, r, receipt := brewMutationInventoryFixture(t, installed, nil)
+			first := nativePackage{Name: "first", Source: "first", Version: "1.0", Dependencies: []string{"shared"}}
+			if mode != "install-resume" {
+				if _, err := d.Apply(ctx, r, Operation{Action: "install"}, receipt); err != nil {
+					t.Fatal(err)
+				}
+				installed["first"] = first
+			}
 			var commands [][]string
 			d.Run = func(_ context.Context, command nativeCommand) ([]byte, error) {
 				commands = append(commands, command.Arguments)
 				output, code := fmt.Sprintf("dotfiles-operation-%s  %s/first/1.0: fixture\n", command.Operation, filepath.ToSlash(d.Cellar)), 0
-				if command.Arguments[0] == "link" && mode == "conflict" {
+				if command.Arguments[0] == "install" {
+					output, code = output+"Error: The `brew link` step did not complete successfully\n", 1
+					installed["first"] = first
+				} else if command.Arguments[0] == "link" && mode == "conflict" {
 					output, code = "Error: Could not symlink bin/first\nTarget /opt/homebrew/bin/first\nalready exists.\n", 1
 				} else if command.Arguments[0] == "link" {
 					output = "Linking first... 1 symlinks created.\n"
@@ -185,6 +192,17 @@ func TestBrewRepairRelinksAKegThatReinstallKeepsUnlinked(t *testing.T) {
 			}
 			repair := Receipt{OperationID: strings.Repeat("b", 64), Status: "in-progress"}
 			reinstall := []string{"reinstall", "--formula", "first"}
+			link := []string{"link", "--formula", "first"}
+			if mode == "install-resume" {
+				if _, err := d.Apply(ctx, r, Operation{Action: "install"}, receipt); err == nil {
+					t.Fatal("fixture install did not fail at its link step")
+				}
+				observed, err := d.ResumeResource(ctx, r, Operation{Action: "install"}, receipt)
+				if err != nil || !observed.Healthy || !slices.EqualFunc(commands, [][]string{{"install", "--formula", "first"}, reinstall, link}, slices.Equal) {
+					t.Fatal("install recovery did not link the keg that reinstall kept unlinked", commands, observed, err)
+				}
+				return
+			}
 			if mode == "schema-4-resume" {
 				before, err := brewInventory(ctx, d.Query)
 				if err != nil {
@@ -213,8 +231,7 @@ func TestBrewRepairRelinksAKegThatReinstallKeepsUnlinked(t *testing.T) {
 				return
 			}
 			observed, err := d.Apply(ctx, r, Operation{Action: "repair"}, repair)
-			t.Logf("repair commands %v: healthy=%t err=%v", commands, observed.Healthy, err)
-			if !slices.EqualFunc(commands, [][]string{reinstall, {"link", "--formula", "first"}}, slices.Equal) {
+			if !slices.EqualFunc(commands, [][]string{reinstall, link}, slices.Equal) {
 				t.Fatal("repair did not link the keg that reinstall kept unlinked", commands)
 			}
 			if mode == "relink" && (err != nil || !observed.Healthy) {

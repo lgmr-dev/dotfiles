@@ -219,7 +219,7 @@ func (d *BrewDriver) intent(operation string) (brewIntent, error) {
 		} else {
 			mode := map[string]string{"install": "install", "update": "upgrade", "repair": "reinstall"}[intent.Action]
 			rootCommand := len(command.Arguments) == 3 && command.Arguments[0] == mode && command.Arguments[2] == intent.Package
-			relink := intent.Schema >= 5 && intent.Action == "repair" && i > 0 && slices.Equal(command.Arguments, []string{"link", "--formula", intent.Package})
+			relink := intent.relinks(i) && slices.Equal(command.Arguments, []string{"link", "--formula", intent.Package})
 			if !rootCommand && !relink {
 				if i == 0 || len(command.Arguments) != 3 || command.Arguments[0] != "reinstall" {
 					return intent, errors.New("invalid saved Homebrew package command")
@@ -237,6 +237,11 @@ func (d *BrewDriver) intent(operation string) (brewIntent, error) {
 		}
 	}
 	return intent, nil
+}
+
+func (intent brewIntent) relinks(position int) bool {
+	return intent.Schema >= 5 && (intent.Action == "install" || intent.Action == "repair") && position > 0 &&
+		slices.Equal(intent.Commands[position-1].Arguments, []string{"reinstall", "--formula", intent.Package})
 }
 
 func validBrewCaskIdentity(name string) bool {
@@ -622,7 +627,7 @@ func (d *BrewDriver) finish(ctx context.Context, r Resource, receipt Receipt, in
 		intent.Preserved = sortedUnique(intent.Preserved)
 	} else {
 		pkg, present := installed[name]
-		if present && !pkg.Healthy && intent.Schema >= 5 && intent.Action == "repair" {
+		if present && !pkg.Healthy && intent.relinks(len(intent.Commands)) {
 			if err := d.runCommand(ctx, &intent, []string{"link", "--formula", intent.Package}); err != nil {
 				return Observation{}, err
 			}

@@ -99,13 +99,15 @@ func TestLinuxAPTAbsentReferencesPreserveArchitectureAndProvidesResolution(t *te
 	if err != nil || !slices.Equal(installed["browser:amd64"].Dependencies, []string{"data:all", "missing", "shared:amd64", "shared:arm64"}) {
 		t.Fatal("unresolved alternatives changed real architecture or virtual resolution", installed, err)
 	}
-	if _, err := linuxAPTIdentity("shared", installed); err == nil {
-		t.Fatal("unqualified multiarchitecture identity became unambiguous")
+	for _, native := range []string{"amd64", "arm64"} {
+		if identity, err := linuxAPTIdentity("shared", native, installed); err != nil || identity != "shared:"+native {
+			t.Fatal("unqualified multiarchitecture identity did not resolve to the native architecture", native, identity, err)
+		}
 	}
-	if identity, err := linuxAPTIdentity("shared:arm64", installed); err != nil || identity != "shared:arm64" {
+	if identity, err := linuxAPTIdentity("shared:arm64", "amd64", installed); err != nil || identity != "shared:arm64" {
 		t.Fatal("exact architecture changed", identity, err)
 	}
-	if identity, err := linuxAPTIdentity("missing", installed); err != nil || identity != "" {
+	if identity, err := linuxAPTIdentity("missing", "amd64", installed); err != nil || identity != "" {
 		t.Fatal("unresolved declaration fabricated an installed package", identity, err)
 	}
 	candidates, protected, err := nativePoolCandidates([]string{"data:all", "shared:amd64", "shared:arm64"}, nil, nil, installed)

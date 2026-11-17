@@ -681,3 +681,20 @@ func TestLinuxAPTLibraryHealthRejectsChangedFilesDespiteSuccessfulDpkgExit(t *te
 		}
 	}
 }
+
+func TestLinuxAPTUnqualifiedNameResolvesNativeArchitectureAmongMultiArchInstances(t *testing.T) {
+	f := newLinuxAPTFixture(t)
+	f.driver.Packages["library.libatomic1"] = "libatomic1"
+	r := Resource{ID: "library.libatomic1", Name: "libatomic1", Action: "apt-library"}
+	f.installed["libatomic1:amd64"] = nativePackage{Name: "libatomic1:amd64", Source: "gcc-14", Version: "14.2.0", Healthy: true}
+	f.installed["libatomic1:i386"] = nativePackage{Name: "libatomic1:i386", Source: "gcc-14", Version: "14.2.0"}
+	o, err := f.driver.Observe(context.Background(), r, Receipt{})
+	if err != nil || !o.Present || !o.Healthy || o.Identity != "apt:libatomic1" {
+		t.Fatal("unqualified catalog package did not resolve to the native architecture", o, err)
+	}
+	delete(f.installed, "libatomic1:amd64")
+	f.installed["libatomic1:arm64"] = nativePackage{Name: "libatomic1:arm64", Source: "gcc-14", Version: "14.2.0", Healthy: true}
+	if _, err := f.driver.Observe(context.Background(), r, Receipt{}); err == nil {
+		t.Fatal("foreign architectures alone resolved an unqualified catalog package")
+	}
+}

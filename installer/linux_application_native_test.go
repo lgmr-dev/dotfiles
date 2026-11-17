@@ -47,7 +47,7 @@ func TestNativeLinuxAPTInstalledApplicationLifecycle(t *testing.T) {
 	}
 	before := inventory()
 	for _, name := range []string{"git", "tmux", "zsh"} {
-		if identity, err := linuxAPTIdentity(name, before); err != nil || identity != "" {
+		if identity, err := linuxAPTIdentity(name, runtime.GOARCH, before); err != nil || identity != "" {
 			t.Fatal("fresh fixture requires real package absence; preserve existing packages and their consumers", name, identity, err)
 		}
 	}
@@ -84,7 +84,7 @@ func TestNativeLinuxAPTInstalledApplicationLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"git", "tmux", "zsh"} {
-		identity, err := linuxAPTIdentity(name, before)
+		identity, err := linuxAPTIdentity(name, runtime.GOARCH, before)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -117,7 +117,7 @@ func TestNativeLinuxAPTInstalledApplicationLifecycle(t *testing.T) {
 	shell("set -e; tmux -V; test -f \"$HOME/.tmux.plugins.conf\"")
 	apply(Request{Schema: 1, Mode: "apply", Selected: []string{}, RemoveShared: []string{"tool.tmux"}})
 	after := inventory()
-	if identity, err := linuxAPTIdentity("tmux", after); err != nil || identity != "" {
+	if identity, err := linuxAPTIdentity("tmux", runtime.GOARCH, after); err != nil || identity != "" {
 		t.Fatal("owned tmux survived removal", identity, err)
 	}
 	for name, old := range before {

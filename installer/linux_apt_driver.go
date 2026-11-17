@@ -222,7 +222,7 @@ func (d *LinuxAPTDriver) intent(operation string) (linuxAPTIntent, error) {
 		}
 	}
 	if intent.PreserveAutomatic {
-		identity, err := linuxAPTIdentity(intent.Package, intent.Before)
+		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, intent.Before)
 		if err != nil || identity == "" || !intent.Before[identity].Automatic {
 			return intent, errors.Join(errors.New("APT automatic classification differs from its saved baseline"), err)
 		}
@@ -271,7 +271,7 @@ func (d *LinuxAPTDriver) Observe(ctx context.Context, r Resource, receipt Receip
 	if err != nil {
 		return Observation{}, err
 	}
-	identity, err := linuxAPTIdentity(name, installed)
+	identity, err := linuxAPTIdentity(name, d.Architecture, installed)
 	if err != nil {
 		return Observation{}, err
 	}
@@ -451,7 +451,7 @@ func (d *LinuxAPTDriver) change(ctx context.Context, r Resource, action string, 
 	if err != nil {
 		return Observation{}, err
 	}
-	identity, err := linuxAPTIdentity(name, installed)
+	identity, err := linuxAPTIdentity(name, d.Architecture, installed)
 	if err != nil {
 		return Observation{}, err
 	}
@@ -679,7 +679,7 @@ func (d *LinuxAPTDriver) finish(ctx context.Context, r Resource, receipt Receipt
 			return Observation{}, fmt.Errorf("APT version change for %s lacks operation-specific dpkg evidence", name)
 		}
 	}
-	identity, err := linuxAPTIdentity(intent.Package, installed)
+	identity, err := linuxAPTIdentity(intent.Package, d.Architecture, installed)
 	if err != nil {
 		return Observation{}, err
 	}

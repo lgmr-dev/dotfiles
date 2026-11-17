@@ -25,7 +25,7 @@ func requireFreshLinuxMasonPrerequisitesAbsent(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"curl", "unzip"} {
-		if identity, err := linuxAPTIdentity(name, inventory); err != nil || identity != "" {
+		if identity, err := linuxAPTIdentity(name, runtime.GOARCH, inventory); err != nil || identity != "" {
 			t.Fatal("fresh Neovim acceptance requires native package absence", name, identity, err)
 		}
 		if _, err := os.Lstat("/usr/bin/" + name); !os.IsNotExist(err) {

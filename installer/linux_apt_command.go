@@ -205,7 +205,7 @@ func (d *LinuxAPTDriver) commandResult(command nativeCommand) (nativeReply, erro
 
 func (d *LinuxAPTDriver) verifyCompletion(intent linuxAPTIntent) error {
 	if intent.Claim != "" {
-		identity, err := linuxAPTIdentity(intent.Package, intent.Before)
+		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, intent.Before)
 		if err != nil || identity == "" {
 			return errors.Join(errors.New("APT claim lacks its exact package baseline"), err)
 		}
@@ -257,7 +257,7 @@ func (d *LinuxAPTDriver) validateDispatch(ctx context.Context, intent linuxAPTIn
 		if err := d.verifyPackagePayload(*intent.Deb); err != nil {
 			return err
 		}
-		identity, err := linuxAPTIdentity(intent.Package, installed)
+		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, installed)
 		if err != nil {
 			return err
 		}
@@ -273,7 +273,7 @@ func (d *LinuxAPTDriver) validateDispatch(ctx context.Context, intent linuxAPTIn
 			if err := d.verifyCodePayload(intent.Code.Pin); err != nil {
 				return err
 			}
-			identity, err := linuxAPTIdentity("code", installed)
+			identity, err := linuxAPTIdentity("code", d.Architecture, installed)
 			if err != nil {
 				return err
 			}
@@ -289,7 +289,7 @@ func (d *LinuxAPTDriver) validateDispatch(ctx context.Context, intent linuxAPTIn
 		return err
 	}
 	if saved.Kind != "remove" {
-		identity, err := linuxAPTIdentity(intent.Package, installed)
+		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, installed)
 		if err != nil {
 			return err
 		}

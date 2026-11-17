@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.24.6",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "756b7d2f8cb919d29888ea52b2fb19aba92ed52ddbca456839088ccc63257f5b",
+        "version": "18.24.8",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "1c33bb672cf09eecf595578ad3136e415a3e54eb34de92247f637d1fa9eae688",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.24.6",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "49b6e7a93cd6d8c77ee02bdb0eef0acff4c80ddaa0efb00c8179285771043698",
+        "version": "18.24.8",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "f8dfc3f9d27cadc2e2c9d489394ef7c568291e2382a4d184865701bf1a4ac30a",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.24.6",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "0dcc72a06738f913040cdd990298a37d9ef062c8849026d0a3410d2def4c6bf7",
+        "version": "18.24.8",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "e058ab045e9a694e709a23fb87bb55a8737e98dfda9752cb33ea5e9f70c32a13",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.24.6",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "d500e0dc85a85bb69513da6c9d933cf15dbeb2497ab404e0189ba47a5d829fe9",
+        "version": "18.24.8",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "f6ff4e13feed0e49853618ab5f1ec849ccbb34dcab2df711c85d5f0333d8e717",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -580,9 +580,9 @@
     },
     "tool.gh": {
       "darwin/arm64": {
-        "version": "2.103.3",
-        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_macOS_arm64.zip",
-        "sha256": "d700207eae9ae98fe2b89535c2c087c07823d4628c56364695a5a07ef311c062",
+        "version": "2.104.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_macOS_arm64.zip",
+        "sha256": "23b12706219b9892e44236f988444a24adcf29284e16b35e03ba5b863fb6eb8e",
         "format": "zip",
         "commands": {
           "gh": "bin/gh"
@@ -593,9 +593,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.103.3",
-        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_arm64.tar.gz",
-        "sha256": "ee32df2323c8847f5fac6cb6b4b69ca75828e9329a8f22f677021f7b3306ce63",
+        "version": "2.104.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_linux_arm64.tar.gz",
+        "sha256": "cb34cefc6f4e77b90731374a2b737516bb8f3033c6ca46aa949e5344f68069e3",
         "format": "tar.gz",
         "commands": {
           "gh": "bin/gh"
@@ -606,9 +606,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.103.3",
-        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_amd64.zip",
-        "sha256": "98d0cfa794721665d7973dd728c78aff7bd836d58f10f6d7a03568eccb0a22e0",
+        "version": "2.104.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_windows_amd64.zip",
+        "sha256": "08c06d10482f12c478018cd259f64acbd5f625712cadf331aad19ba973c879e5",
         "format": "zip",
         "commands": {
           "gh": "bin/gh.exe"
@@ -618,9 +618,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.103.3",
-        "url": "https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_linux_amd64.tar.gz",
-        "sha256": "4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d",
+        "version": "2.104.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_linux_amd64.tar.gz",
+        "sha256": "98cb101ad87dbbd3f6b2f2bfcbd43197ccd07643140121d8a9cfaa91eadbc24e",
         "format": "tar.gz",
         "commands": {
           "gh": "bin/gh"
@@ -3206,9 +3206,9 @@
     },
     "tool.opencode": {
       "darwin/arm64": {
-        "version": "2.2.7",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-darwin-arm64.zip",
-        "sha256": "811c42be9cad489ea8c411ead49e06f691deee4957ba9a0a56a159a7d6c1abdc",
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-darwin-arm64.zip",
+        "sha256": "7907df2b12720a840fbb49c5b978b9b82925b6bf75479a5fd216afa8932b6702",
         "format": "zip",
         "commands": {
           "opencode": "opencode"
@@ -3218,9 +3218,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.2.7",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-linux-x64-baseline.tar.gz",
-        "sha256": "89a6cee227b54bc011179c528a5e63176032462b1a5e21723b616801cddc2ca7",
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "fc0f81522aceeabac47693d88389efa2bc517ce74c2c38fd6967819fcc6e4d3b",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3231,9 +3231,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "2.2.7",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-linux-arm64.tar.gz",
-        "sha256": "c1682057f0815cb2abdd6e00305f1146ebaf1c167f0335cdb74ddc80008120e7",
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-linux-arm64.tar.gz",
+        "sha256": "3207fb5cdec448d479242c0f1a14f4f7bdfcad3a79209b5eb8f9003725e93711",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3244,9 +3244,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "2.2.7",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-windows-x64-baseline.zip",
-        "sha256": "93323d0d6f72f9d1ba9f847e8002de71ace79bb5ea64f18d6b70bbbc30cc719e",
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-windows-x64-baseline.zip",
+        "sha256": "a3abde3f736a1b51acb28466001333189184507096cb2fe0d684fe822cbd37ec",
         "format": "zip",
         "commands": {
           "opencode": "opencode.exe"
@@ -3313,9 +3313,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.109",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-darwin-arm64.tar.gz",
-        "sha256": "9c21ad663ce98f500c1f0b62e0a6d687bc1b1661e59f4c2161cc114515a01942",
+        "version": "1.0.111",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-darwin-arm64.tar.gz",
+        "sha256": "398b49ebeafa67231151347794e07c4665a0ec904708645ca4992c917565a901",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3325,9 +3325,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.109",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-linux-x64.tar.gz",
-        "sha256": "45a7f37e822e8c8725eda6b27deaed55dad2688ff4163ed27ec22e23293cb761",
+        "version": "1.0.111",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-linux-x64.tar.gz",
+        "sha256": "33ea4378ccc829bc18520648ad97c8fb1d9de4ba478ebff8eb2ad890aa0a95c8",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3338,9 +3338,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.109",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-linux-arm64.tar.gz",
-        "sha256": "679db06c3168457d8154cd8ce93b822f7c46d3169e61da4c0b78ac6e110c4af6",
+        "version": "1.0.111",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-linux-arm64.tar.gz",
+        "sha256": "203ffacb01d40383d34427fac7577eb7c847d77cd88b45b2c7ab560e044d9613",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3351,9 +3351,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.109",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-win32-x64.zip",
-        "sha256": "794c16bcc5535cdf478598d6cf4af3228daec3b7801bfa3540c56b8d3524beee",
+        "version": "1.0.111",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-win32-x64.zip",
+        "sha256": "af5cdf0a5ad8c5e868dc87b292315a175d3a3930642d30a3840bd9c73bf85c23",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"
@@ -3412,9 +3412,9 @@
     },
     "tool.obsidian-portable": {
       "linux/amd64": {
-        "version": "1.15.0",
-        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.0/obsidian-1.15.0.tar.gz",
-        "sha256": "75594ae09914ca0191dde13c0697dee653322287a3a806c15519332d9ada14d3",
+        "version": "1.15.1",
+        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.1/obsidian-1.15.1.tar.gz",
+        "sha256": "09074f0635ecf366307d808d0fec06c01a87a0bcc66da6d34126ceece0eb8519",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {},
@@ -3427,9 +3427,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.15.0",
-        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.0/obsidian-1.15.0-arm64.tar.gz",
-        "sha256": "7e1bdd82fc65dcc3c03de5b8a85a8d79258f94642ba27987c2d1188b9763e903",
+        "version": "1.15.1",
+        "url": "https://github.com/obsidianmd/obsidian-releases/releases/download/v1.15.1/obsidian-1.15.1-arm64.tar.gz",
+        "sha256": "acc219e57e2630c4936e7655126572b62167ea02c2e66f8c25c948ad072b4e70",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {},

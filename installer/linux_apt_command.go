@@ -205,9 +205,9 @@ func (d *LinuxAPTDriver) commandResult(command nativeCommand) (nativeReply, erro
 
 func (d *LinuxAPTDriver) verifyCompletion(intent linuxAPTIntent) error {
 	if intent.Claim != "" {
-		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, intent.Before)
-		if err != nil || identity == "" {
-			return errors.Join(errors.New("APT claim lacks its exact package baseline"), err)
+		identity := linuxAPTIdentity(intent.Package, d.Architecture, intent.Before)
+		if identity == "" {
+			return errors.New("APT claim lacks its exact package baseline")
 		}
 		pkg := intent.Before[identity]
 		if !d.matchesOwnership(linuxAPTOwnership{identity, pkg.Source, intent.Claim}, pkg) {
@@ -257,10 +257,7 @@ func (d *LinuxAPTDriver) validateDispatch(ctx context.Context, intent linuxAPTIn
 		if err := d.verifyPackagePayload(*intent.Deb); err != nil {
 			return err
 		}
-		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, installed)
-		if err != nil {
-			return err
-		}
+		identity := linuxAPTIdentity(intent.Package, d.Architecture, installed)
 		if err := d.checkPackagePublications(ctx, intent.Package, identity == ""); err != nil {
 			return err
 		}
@@ -273,10 +270,7 @@ func (d *LinuxAPTDriver) validateDispatch(ctx context.Context, intent linuxAPTIn
 			if err := d.verifyCodePayload(intent.Code.Pin); err != nil {
 				return err
 			}
-			identity, err := linuxAPTIdentity("code", d.Architecture, installed)
-			if err != nil {
-				return err
-			}
+			identity := linuxAPTIdentity("code", d.Architecture, installed)
 			if err := d.checkCodeCollisions(ctx, identity == ""); err != nil {
 				return err
 			}
@@ -289,10 +283,7 @@ func (d *LinuxAPTDriver) validateDispatch(ctx context.Context, intent linuxAPTIn
 		return err
 	}
 	if saved.Kind != "remove" {
-		identity, err := linuxAPTIdentity(intent.Package, d.Architecture, installed)
-		if err != nil {
-			return err
-		}
+		identity := linuxAPTIdentity(intent.Package, d.Architecture, installed)
 		if pkg, present := installed[identity]; present {
 			if pkg.Held {
 				return errors.New("APT package became held before native dispatch")

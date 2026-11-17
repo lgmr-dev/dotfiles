@@ -100,15 +100,15 @@ func TestLinuxAPTAbsentReferencesPreserveArchitectureAndProvidesResolution(t *te
 		t.Fatal("unresolved alternatives changed real architecture or virtual resolution", installed, err)
 	}
 	for _, native := range []string{"amd64", "arm64"} {
-		if identity, err := linuxAPTIdentity("shared", native, installed); err != nil || identity != "shared:"+native {
-			t.Fatal("unqualified multiarchitecture identity did not resolve to the native architecture", native, identity, err)
+		if identity := linuxAPTIdentity("shared", native, installed); identity != "shared:"+native {
+			t.Fatal("unqualified multiarchitecture identity did not resolve to the native architecture", native, identity)
 		}
 	}
-	if identity, err := linuxAPTIdentity("shared:arm64", "amd64", installed); err != nil || identity != "shared:arm64" {
-		t.Fatal("exact architecture changed", identity, err)
+	if identity := linuxAPTIdentity("shared:arm64", "amd64", installed); identity != "shared:arm64" {
+		t.Fatal("exact architecture changed", identity)
 	}
-	if identity, err := linuxAPTIdentity("missing", "amd64", installed); err != nil || identity != "" {
-		t.Fatal("unresolved declaration fabricated an installed package", identity, err)
+	if identity := linuxAPTIdentity("missing", "amd64", installed); identity != "" {
+		t.Fatal("unresolved declaration fabricated an installed package", identity)
 	}
 	candidates, protected, err := nativePoolCandidates([]string{"data:all", "shared:amd64", "shared:arm64"}, nil, nil, installed)
 	if err != nil || len(candidates) != 0 || len(protected) != 3 {

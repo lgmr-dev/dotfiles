@@ -694,7 +694,23 @@ func TestLinuxAPTUnqualifiedNameResolvesNativeArchitectureAmongMultiArchInstance
 	}
 	delete(f.installed, "libatomic1:amd64")
 	f.installed["libatomic1:arm64"] = nativePackage{Name: "libatomic1:arm64", Source: "gcc-14", Version: "14.2.0", Healthy: true}
-	if _, err := f.driver.Observe(context.Background(), r, Receipt{}); err == nil {
-		t.Fatal("foreign architectures alone resolved an unqualified catalog package")
+	if o, err := f.driver.Observe(context.Background(), r, Receipt{}); err != nil || o.Present {
+		t.Fatal("foreign architectures alone resolved an unqualified catalog package", o, err)
+	}
+}
+
+func TestLinuxAPTForeignArchitectureInstanceIsNotTheCatalogPackage(t *testing.T) {
+	f := newLinuxAPTFixture(t)
+	ctx := context.Background()
+	f.installed["first:i386"] = nativePackage{Name: "first:i386", Source: "first", Version: "0.9", Healthy: true}
+	f.approve()
+	got, err := f.driver.Apply(ctx, aptFixtureResource("first"), Operation{Action: "install"}, aptFixtureReceipt("install-native"))
+	if err != nil || !got.Present || f.installed["first:amd64"].Name == "" {
+		t.Fatal("a foreign architecture instance blocked the native installation", got, err)
+	}
+	f.approve()
+	got, err = f.driver.Remove(ctx, aptFixtureResource("first"), aptFixtureReceipt("remove-native"))
+	if err != nil || got.Present || f.installed["first:amd64"].Name != "" || f.installed["first:i386"].Version != "0.9" {
+		t.Fatal("native removal did not complete beside the preserved foreign instance", got, f.installed, err)
 	}
 }

@@ -119,23 +119,15 @@ func parseLinuxAPTInventory(output, automatic []byte) (map[string]nativePackage,
 	return installed, nil
 }
 
-func linuxAPTIdentity(packageName, architecture string, installed map[string]nativePackage) (string, error) {
-	candidates := []string{}
-	for name := range installed {
-		base, _, _ := strings.Cut(name, ":")
-		if name == packageName || base == packageName {
-			candidates = append(candidates, name)
+func linuxAPTIdentity(packageName, architecture string, installed map[string]nativePackage) string {
+	names := []string{packageName}
+	if !strings.Contains(packageName, ":") {
+		names = []string{packageName + ":" + architecture, packageName + ":all"}
+	}
+	for _, name := range names {
+		if _, ok := installed[name]; ok {
+			return name
 		}
 	}
-	if len(candidates) > 1 {
-		native := packageName + ":" + architecture
-		if _, ok := installed[native]; !ok {
-			return "", errors.New("APT package has multiple installed architectures and none is native; use an exact package identity")
-		}
-		return native, nil
-	}
-	if len(candidates) == 0 {
-		return "", nil
-	}
-	return candidates[0], nil
+	return ""
 }

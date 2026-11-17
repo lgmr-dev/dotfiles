@@ -52,10 +52,7 @@ func (d *LinuxAPTDriver) removalCandidates(resource string, state linuxAPTLedger
 		roots = append(roots, root.Name)
 	}
 	for _, name := range d.Keep {
-		resolved, err := linuxAPTIdentity(name, d.Architecture, installed)
-		if err != nil {
-			return nil, err
-		}
+		resolved := linuxAPTIdentity(name, d.Architecture, installed)
 		if resolved != "" {
 			keep = append(keep, resolved)
 		}

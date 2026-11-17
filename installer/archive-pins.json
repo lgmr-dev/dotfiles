@@ -1176,9 +1176,9 @@
     },
     "tool.gh-dash": {
       "darwin/arm64": {
-        "version": "4.26.2",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_darwin-arm64",
-        "sha256": "591cfe85838c3459b56b4a08bcdf0ce11a5c59a92d466ab312cca0c4ad0d163f",
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_darwin-arm64",
+        "sha256": "850c0f652f77837462ba4eba43513b10a63ac7e06646dbc80e00a9d7c1c959ab",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash"
@@ -1189,9 +1189,9 @@
         "file": "gh-dash"
       },
       "linux/amd64": {
-        "version": "4.26.2",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_linux-amd64",
-        "sha256": "565d7dbfafc568c06441ab49d31c7059b7ade7cbba12490fa7f12f9bb71dc1b5",
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_linux-amd64",
+        "sha256": "9178abe35621ebe0d03978db0601c1f1aa9e7d42437bf71a07b6f6e43a7e7b40",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash"
@@ -1202,9 +1202,9 @@
         "file": "gh-dash"
       },
       "linux/arm64": {
-        "version": "4.26.2",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_linux-arm64",
-        "sha256": "67e55fe550e86dc7555979f8e0d05b88e1ba086b022a6e19e071dfc67369ec50",
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_linux-arm64",
+        "sha256": "940e93c216dc7fdea5b0c6471ce44eb7f6199d5a3b015bf3ea8adc50e67cccd0",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash"
@@ -1215,9 +1215,9 @@
         "file": "gh-dash"
       },
       "windows/amd64": {
-        "version": "4.26.2",
-        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.2/gh-dash_v4.26.2_windows-amd64.exe",
-        "sha256": "047ad12a4aebaedd4fa6997ae195f0ec791bf57f0caabe71059401c1ad3c5ca0",
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_windows-amd64.exe",
+        "sha256": "972d49d0dddc2b47cb6d81f0e0a18638a4753776d38d130b13b1d0026f65ac3c",
         "format": "file",
         "commands": {
           "gh-dash": "gh-dash.exe"
@@ -1337,9 +1337,9 @@
     },
     "tool.cmake": {
       "darwin/arm64": {
-        "version": "4.4.5",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-macos-universal.tar.gz",
-        "sha256": "679e77a96b9ef9484cc6c1445255fc4f84206b48a65420efbedf16bdab55fbff",
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-macos-universal.tar.gz",
+        "sha256": "a645d69fd21e521759cc0c64e7c60462d43faf0c7214ac05f75c80f7c5037dde",
         "format": "tar.gz",
         "commands": {
           "cmake": "CMake.app/Contents/bin/cmake",
@@ -1351,13 +1351,13 @@
         ],
         "strip_components": 1,
         "required_files": [
-          "CMake.app/Contents/share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+          "CMake.app/Contents/share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
         ]
       },
       "linux/amd64": {
-        "version": "4.4.5",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-linux-x86_64.tar.gz",
-        "sha256": "ed85135c5a5135b45e50423cb406dea04ca3338da0b8ef3c9ede963559680be0",
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-x86_64.tar.gz",
+        "sha256": "81f0d5b0960fb6adc8197030ffc827fba937640d51e73e39e0e9e40d88c66f6f",
         "format": "tar.gz",
         "commands": {
           "cmake": "bin/cmake",
@@ -1369,14 +1369,14 @@
         ],
         "strip_components": 1,
         "required_files": [
-          "share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+          "share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
         ],
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "4.4.5",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-linux-aarch64.tar.gz",
-        "sha256": "301d5063ab259577c1b57ce5490b1aab9ea5c56dc4c822f73499553dab94925f",
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-aarch64.tar.gz",
+        "sha256": "0c8447e7bba9701467b5ac6155d157aa9e309e71af4981f78bd4b9176107f553",
         "format": "tar.gz",
         "commands": {
           "cmake": "bin/cmake",
@@ -1388,14 +1388,14 @@
         ],
         "strip_components": 1,
         "required_files": [
-          "share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+          "share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
         ],
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "4.4.5",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.4.5/cmake-4.4.5-windows-x86_64.zip",
-        "sha256": "326c826486d46a23cf9d5a1c9ee3a567d427bdd02c4a34071937a2a675cff004",
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-windows-x86_64.zip",
+        "sha256": "301b1728317ccd84e984b02e366a8293735bc5ac618757d3d8f58b578f062411",
         "format": "zip",
         "commands": {
           "cmake": "bin/cmake.exe",
@@ -1407,7 +1407,7 @@
         ],
         "strip_components": 1,
         "required_files": [
-          "share/cmake-4.4/Modules/CMakeDetermineSystem.cmake"
+          "share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
         ]
       }
     },
@@ -3313,9 +3313,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.111",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-darwin-arm64.tar.gz",
-        "sha256": "398b49ebeafa67231151347794e07c4665a0ec904708645ca4992c917565a901",
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-darwin-arm64.tar.gz",
+        "sha256": "4a4a6aa624dceb76a23e1a53fb5f64e87a0bb5a2161a5017e0edf78d7082ce68",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3325,9 +3325,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.111",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-linux-x64.tar.gz",
-        "sha256": "33ea4378ccc829bc18520648ad97c8fb1d9de4ba478ebff8eb2ad890aa0a95c8",
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-linux-x64.tar.gz",
+        "sha256": "dfe7e59acf04f0b7f59b024ea9db101a9246503e9bf7152eb668fbb2a469b151",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3338,9 +3338,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.111",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-linux-arm64.tar.gz",
-        "sha256": "203ffacb01d40383d34427fac7577eb7c847d77cd88b45b2c7ab560e044d9613",
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-linux-arm64.tar.gz",
+        "sha256": "491d18303505935675dc20987ef0c5f3ae899f81e66c53d567ad97a8b03e504e",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3351,9 +3351,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.111",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.111/copilot-win32-x64.zip",
-        "sha256": "af5cdf0a5ad8c5e868dc87b292315a175d3a3930642d30a3840bd9c73bf85c23",
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-win32-x64.zip",
+        "sha256": "159a5e610c7b64c4b68b97a812fd7913182f372cb84ce688d81167d5277896d9",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"

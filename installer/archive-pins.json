@@ -3000,9 +3000,9 @@
     },
     "tool.codex": {
       "darwin/arm64": {
-        "version": "0.169.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-darwin-arm64.tgz",
-        "sha256": "d67d443253294438a21fde15753d7c1174e6a32147d842eb84428479d664c93d",
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-darwin-arm64.tgz",
+        "sha256": "ab7ba154261db88eef760dfe69978fbb67018c2e1200ff536dc8c51ed9c758b5",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-apple-darwin/bin/codex",
@@ -3020,9 +3020,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "0.169.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-linux-x64.tgz",
-        "sha256": "89801b4b97faba562eb80fe0a833159ac79399be674022f4b1a0ccab1d153faa",
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-linux-x64.tgz",
+        "sha256": "67c4bccce8e6c3a2b9ae0e586750e0efac7e0b8cd85e6b4734ad474317d2cc32",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-unknown-linux-musl/bin/codex",
@@ -3041,9 +3041,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "0.169.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-linux-arm64.tgz",
-        "sha256": "c1555c8ad3913e703d736584ff15e98eaeda685bf6eaedc83ae15943badbc1ff",
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-linux-arm64.tgz",
+        "sha256": "72a1b05ee522eb7b57a96ad60d26056da8adda20c630f54079c53dd8c292613a",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-unknown-linux-musl/bin/codex",
@@ -3062,9 +3062,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "0.169.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-win32-x64.tgz",
-        "sha256": "c48d07b46034d2b0a6c091227993c50e19c389680169244d0dcbb96c4ebc429f",
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-win32-x64.tgz",
+        "sha256": "49eedd5e5e1c828b0cfcdde97f19d83528d8fda4eafef3b02cc770da218b6da3",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-pc-windows-msvc/bin/codex.exe",

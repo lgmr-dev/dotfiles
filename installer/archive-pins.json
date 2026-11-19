@@ -3152,9 +3152,9 @@
     },
     "tool.muse": {
       "darwin/arm64": {
-        "version": "1.4.20-R8619.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-aarch64-macos",
-        "sha256": "89964f68f7f020896fc75679dc2f3975e5e15a6efe8537d91512a1b45ffb37aa",
+        "version": "1.4.24-R9131.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.24-R9131.1&file=muse-aarch64-macos",
+        "sha256": "51224e835fccf2ba8c1abe9c2957b187252050a0b7315e0b1ee4cdcd2f090494",
         "format": "file",
         "commands": {
           "muse": "muse"
@@ -3165,9 +3165,9 @@
         "file": "muse"
       },
       "linux/amd64": {
-        "version": "1.4.20-R8619.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-x86-linux",
-        "sha256": "3685b023d45a1a07c8c559da00088bdf59564920b13a85adad11e13ad6f4d181",
+        "version": "1.4.24-R9131.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.24-R9131.1&file=muse-x86-linux",
+        "sha256": "d752c45dce079ee29e118804b091d81ac2b1b89b67f317b4a162fa1af1206465",
         "format": "file",
         "commands": {
           "muse": "muse"
@@ -3178,9 +3178,9 @@
         "file": "muse"
       },
       "linux/arm64": {
-        "version": "1.4.20-R8619.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-aarch64-linux",
-        "sha256": "7159d6431fc5ff4c9dea32c62d0b771f5089d14389ec672ae903755bd39374dc",
+        "version": "1.4.24-R9131.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.24-R9131.1&file=muse-aarch64-linux",
+        "sha256": "31d4c1fdf382e6711b1c8854d976a6095fe4743eb17b2a8f9a5bb43aef5bad63",
         "format": "file",
         "commands": {
           "muse": "muse"
@@ -3191,9 +3191,9 @@
         "file": "muse"
       },
       "windows/amd64": {
-        "version": "1.4.20-R8619.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-x86-windows.exe",
-        "sha256": "2d223f7f992f02c313225ed47adf3dda24e7361b6b8389f2c19f7c12f026618a",
+        "version": "1.4.24-R9131.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.24-R9131.1&file=muse-x86-windows.exe",
+        "sha256": "9c948338ba8b0a463ca81a1826660b3d3a59fb96feef8669f51cdfb5c2a3cb93",
         "format": "file",
         "commands": {
           "muse": "muse.exe"

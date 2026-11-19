@@ -29,8 +29,8 @@ func TestNativeTailscalePackageLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity, err := linuxAPTIdentity("tailscale", inventory); err != nil || identity != "" {
-		t.Fatal("fixture requires absent Tailscale", identity, err)
+	if identity := linuxAPTIdentity("tailscale", runtime.GOARCH, inventory); identity != "" {
+		t.Fatal("fixture requires absent Tailscale", identity)
 	}
 	repository, err := filepath.Abs("..")
 	if err != nil {
@@ -98,16 +98,16 @@ func TestNativeTailscalePackageLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity, err := linuxAPTIdentity("tailscale", retained); err != nil || identity == "" {
-		t.Fatal("deselection removed shared machine infrastructure", identity, err)
+	if identity := linuxAPTIdentity("tailscale", runtime.GOARCH, retained); identity == "" {
+		t.Fatal("deselection removed shared machine infrastructure", identity)
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}, RemoveShared: []string{"tool.tailscale"}})
 	installed, err := linuxAPTInventory(ctx, platform.APT.query)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity, err := linuxAPTIdentity("tailscale", installed); err != nil || identity != "" {
-		t.Fatal("owned Tailscale remains", identity, err)
+	if identity := linuxAPTIdentity("tailscale", runtime.GOARCH, installed); identity != "" {
+		t.Fatal("owned Tailscale remains", identity)
 	}
 	if after, err := os.ReadFile(config); err != nil || !bytes.Equal(after, personal) {
 		t.Fatal("native maintenance/removal changed personal service configuration", err)

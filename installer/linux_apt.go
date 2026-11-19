@@ -147,7 +147,11 @@ func configureLinuxAPT(location *LinuxAPTLocation, catalog *Catalog, session *na
 			}
 			// Shared libraries have no executable entrypoint. Verify their
 			// package files; native application acceptance proves loader/ABI use.
-			check = []string{location.Dpkg, "--verify", binding.Package}
+			library := binding.Package
+			if !strings.Contains(library, ":") {
+				library += ":" + arch
+			}
+			check = []string{location.Dpkg, "--verify", library}
 		}
 		d.Checks[resource.ID] = check
 	}

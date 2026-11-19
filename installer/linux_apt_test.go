@@ -681,3 +681,49 @@ func TestLinuxAPTLibraryHealthRejectsChangedFilesDespiteSuccessfulDpkgExit(t *te
 		}
 	}
 }
+
+func TestLinuxAPTUnqualifiedNameResolvesNativeArchitectureAmongMultiArchInstances(t *testing.T) {
+	f := newLinuxAPTFixture(t)
+	r := Resource{ID: "library.libatomic1", Name: "libatomic1", Action: "apt-library", Bindings: map[string]Binding{"linux": {Provider: "apt", Package: "libatomic1"}}}
+	configured, err := configureLinuxAPT(&f.driver.Location, &Catalog{Resources: []Resource{r}}, &nativeSession{Directory: f.driver.WorkerDirectory}, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.driver.Packages, f.driver.Checks = configured.Packages, configured.Checks
+	f.driver.Query = func(ctx context.Context, privileged bool, program string, input []byte, args ...string) ([]byte, error) {
+		if program != f.driver.Location.Dpkg {
+			return f.query(ctx, privileged, program, input, args...)
+		}
+		if !slices.Equal(args, []string{"--verify", "libatomic1:amd64"}) {
+			return nil, fmt.Errorf("dpkg: error: --verify needs a valid package name but %q is not: ambiguous package name with more than one installed instance", args)
+		}
+		return nil, nil
+	}
+	f.installed["libatomic1:amd64"] = nativePackage{Name: "libatomic1:amd64", Source: "gcc-14", Version: "14.2.0", Healthy: true}
+	f.installed["libatomic1:i386"] = nativePackage{Name: "libatomic1:i386", Source: "gcc-14", Version: "14.2.0"}
+	o, err := f.driver.Observe(context.Background(), r, Receipt{})
+	if err != nil || !o.Present || !o.Healthy || o.Identity != "apt:libatomic1" {
+		t.Fatal("unqualified catalog package did not resolve to the native architecture", o, err)
+	}
+	delete(f.installed, "libatomic1:amd64")
+	f.installed["libatomic1:arm64"] = nativePackage{Name: "libatomic1:arm64", Source: "gcc-14", Version: "14.2.0", Healthy: true}
+	if o, err := f.driver.Observe(context.Background(), r, Receipt{}); err != nil || o.Present {
+		t.Fatal("foreign architectures alone resolved an unqualified catalog package", o, err)
+	}
+}
+
+func TestLinuxAPTForeignArchitectureInstanceIsNotTheCatalogPackage(t *testing.T) {
+	f := newLinuxAPTFixture(t)
+	ctx := context.Background()
+	f.installed["first:i386"] = nativePackage{Name: "first:i386", Source: "first", Version: "0.9", Healthy: true}
+	f.approve()
+	got, err := f.driver.Apply(ctx, aptFixtureResource("first"), Operation{Action: "install"}, aptFixtureReceipt("install-native"))
+	if err != nil || !got.Present || f.installed["first:amd64"].Name == "" {
+		t.Fatal("a foreign architecture instance blocked the native installation", got, err)
+	}
+	f.approve()
+	got, err = f.driver.Remove(ctx, aptFixtureResource("first"), aptFixtureReceipt("remove-native"))
+	if err != nil || got.Present || f.installed["first:amd64"].Name != "" || f.installed["first:i386"].Version != "0.9" {
+		t.Fatal("native removal did not complete beside the preserved foreign instance", got, f.installed, err)
+	}
+}

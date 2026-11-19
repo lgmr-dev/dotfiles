@@ -49,8 +49,8 @@ func TestNativeLinuxCodeDEBLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity, err := linuxAPTIdentity("code", installed); err != nil || identity != "" || !installed["apt-utils:"+runtime.GOARCH].Healthy {
-		t.Fatal("Code fixture requires absent Code and installed apt-utils", identity, err)
+	if identity := linuxAPTIdentity("code", runtime.GOARCH, installed); identity != "" || !installed["apt-utils:"+runtime.GOARCH].Healthy {
+		t.Fatal("Code fixture requires absent Code and installed apt-utils", identity)
 	}
 	paths := []string{"/etc/apt/sources.list.d/vscode.sources", "/usr/share/keyrings/microsoft.gpg"}
 	for _, path := range append(paths, "/usr/bin/copilot") {

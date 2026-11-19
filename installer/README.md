@@ -45,7 +45,7 @@ operation. Casks never enter formula linkage/repair commands.
 Claude Code and Codex reuse the private archive lifecycle as independent
 capabilities. Git is resolved automatically; neither pulls in Node/npm, fd or a
 second coding-agent checkbox. Codex's full package includes its native helpers.
-Claude Code uses the signed-manifest stable native binary. Both native platform
+Claude Code uses the signed-manifest native binary of the latest channel. Both native platform
 packages are downloaded as compressed registry archives and extracted directly;
 no npm installer or Node runtime is used. Package SRI and every Claude binary
 hash were independently verified before recording the SHA-256 pins. The selected shell

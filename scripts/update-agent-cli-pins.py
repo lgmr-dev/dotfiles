@@ -70,7 +70,7 @@ MUSE_BASE = "https://lookaside.facebook.com/lookaside/muse/download/?channel=mus
 MUSE_VERSION = re.compile(r"([0-9]+)\.([0-9]+)\.([0-9]+)-R([0-9]+)\.([0-9]+)")
 MUSE_FILES = {"darwin/arm64": ("aarch64_macos", "muse-aarch64-macos"), "linux/amd64": ("x86_linux", "muse-x86-linux"),
               "linux/arm64": ("aarch64_linux", "muse-aarch64-linux"), "windows/amd64": ("x86_windows", "muse-x86-windows.exe")}
-MAX_DOWNLOAD = 512 << 20
+MAX_DOWNLOAD = 1 << 30
 MIN_RELEASE_AGE = datetime.timedelta(days=3)
 
 

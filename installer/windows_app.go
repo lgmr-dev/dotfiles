@@ -43,7 +43,7 @@ func (pin WindowsAppPin) Validate() error {
 	u, err := url.Parse(pin.URL)
 	if err != nil || u.Scheme != "https" || u.Host != "github.com" || u.User != nil || u.Fragment != "" || u.RawQuery != "" ||
 		!strings.HasPrefix(u.Path, "/pingdotgg/t3code/releases/download/v"+pin.Version+"/") || !strings.HasSuffix(u.Path, "-x64.exe") ||
-		!operationID.MatchString(pin.SHA256) || !windowsAppVersion.MatchString(pin.Version) || pin.Size <= 0 || pin.Size > 512<<20 ||
+		!operationID.MatchString(pin.SHA256) || !windowsAppVersion.MatchString(pin.Version) || pin.Size <= 0 || pin.Size > maxArchiveBytes ||
 		!windowsAppGUID.MatchString(pin.ProductCode) || !windowsAppName(pin.Publisher) || !windowsAppName(pin.Folder) ||
 		!windowsAppName(pin.Executable) || !strings.HasSuffix(pin.Executable, ".exe") || !windowsAppName(pin.Uninstaller) || !strings.HasSuffix(pin.Uninstaller, ".exe") {
 		return errors.New("Windows application requires an exact official x64 installer, version, size, SHA-256, publisher and layout")

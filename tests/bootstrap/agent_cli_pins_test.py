@@ -97,7 +97,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         version = version or self.versions["tool.claude"]
         base = pins_script.CLAUDE_RELEASES
         net, platforms = self.network, {}
-        net.texts[f"{base}/stable"] = (version + "\n").encode()
+        net.texts[f"{base}/latest"] = (version + "\n").encode()
         for target, platform in pins_script.CLAUDE_PLATFORMS.items():
             binary = f"claude {platform} {version}".encode()
             name = self.pins["tool.claude"][target]["commands"]["claude"]

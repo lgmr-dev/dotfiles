@@ -5,7 +5,7 @@ Claude Code, Codex, GitHub Copilot CLI, Kiro CLI and Muse Code move quickly, so 
 workflow runs this script and proposes the result as a pull request. Every
 pinned byte is verified the same way the reviewed pins were prepared:
 
-- Claude Code: the stable channel's release manifest must carry a valid
+- Claude Code: the latest channel's release manifest must carry a valid
   detached signature from Anthropic's release key (fixed fingerprint); each npm
   platform package must match its published SHA-512 integrity, and the binary
   inside it must match the signed manifest checksum.
@@ -330,7 +330,7 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
 
 
 def claude(network, pins: dict, work: pathlib.Path, verify=gpg_verify):
-    version = require_stable("Claude Code", network.text(f"{CLAUDE_RELEASES}/stable").decode().strip())
+    version = require_stable("Claude Code", network.text(f"{CLAUDE_RELEASES}/latest").decode().strip())
     check_version("tool.claude", pins, version)
     manifest_bytes = network.text(f"{CLAUDE_RELEASES}/{version}/manifest.json")
     verify(manifest_bytes, network.text(f"{CLAUDE_RELEASES}/{version}/manifest.json.sig"), network.text(CLAUDE_KEY))

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/state"
 )
 
@@ -144,5 +145,111 @@ func TestWiringKeepsTheLegacyCommandFoldersOfDeferredMacApplications(t *testing.
 	}
 	if got := newWiring(s).profiles.LegacyCommandDirectories; len(got) != 0 {
 		t.Fatalf("after the release of the legacy link: %v", got)
+	}
+}
+
+type restoreScreen struct {
+	proposals []engine.Proposal
+	check     []string
+	closed    bool
+}
+
+func (r *restoreScreen) Review(ctx context.Context, _ engine.Catalog, proposal engine.Proposal, revise engine.Revise) (bool, error) {
+	r.proposals = append(r.proposals, proposal)
+	choices := slices.Clone(proposal.Choices)
+	for i := range choices {
+		choices[i].Checked = slices.Contains(r.check, choices[i].ID)
+	}
+	revised, err := revise(ctx, choices)
+	r.proposals = append(r.proposals, revised)
+	return true, err
+}
+
+func (r *restoreScreen) Close() error { r.closed = true; return nil }
+
+func TestTheRestoreMenuUsesTheReviewScreenWithTheFullListAndTheReplacementChoices(t *testing.T) {
+	s, original := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	edited, kept := filepath.Join(s.folders.Home, "edited.conf"), filepath.Join(s.folders.Home, "kept.conf")
+	manifestPath := filepath.Join(s.stateDir, "v2-restore", "manifest.json")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	slots := map[string]any{}
+	for _, path := range []string{edited, kept} {
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("my content of "+filepath.Base(path)+"\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		slots[path] = map[string]any{"resource": "config.fixture", "kind": "file", "saved": "absent"}
+	}
+	manifest["slots"] = slots
+	if data, err = json.Marshal(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	options, _, err := importOptions(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := os.Create(filepath.Join(t.TempDir(), "output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	s.output = output
+	screen := &restoreScreen{check: []string{edited}}
+	if err := restoreMenu(context.Background(), screen, s, options); err != nil {
+		t.Fatal(err)
+	}
+	if len(screen.proposals) != 2 || !screen.closed {
+		t.Fatalf("the restore approval must use the review screen: %+v", screen)
+	}
+	first, revised := screen.proposals[0], screen.proposals[1]
+	for _, path := range []string{edited, kept} {
+		if !strings.Contains(first.Details, "changed  "+path) {
+			t.Fatalf("the details of the review must hold each line of the preview:\n%s", first.Details)
+		}
+	}
+	if len(first.Choices) != 2 || first.Choices[0].Group != restoreReplaceGroup || first.Choices[0].Checked || first.Choices[1].Checked || !strings.Contains(first.Notice, "2 saved targets") {
+		t.Fatalf("the review must offer each changed target, unchecked: %+v", first)
+	}
+	if !revised.Choices[0].Checked || revised.Choices[1].Checked {
+		t.Fatalf("a toggle must give the revised choices: %+v", revised.Choices)
+	}
+	if _, err := os.Lstat(edited); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("the chosen target must get its value of release v2, which is absence")
+	}
+	if data, err := os.ReadFile(kept); err != nil || string(data) != "my content of kept.conf\n" {
+		t.Fatalf("a target without a choice must stay: %q %v", data, err)
+	}
+	saved := ""
+	entries, err := os.ReadDir(filepath.Join(s.stateDir, "baselines"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		content, err := os.ReadFile(filepath.Join(s.stateDir, "baselines", entry.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		saved += string(content)
+	}
+	if saved != "my content of edited.conf\n" {
+		t.Fatalf("setup must save the replaced content first: %q", saved)
+	}
+	if data, err := os.ReadFile(filepath.Join(s.stateDir, state.File)); err != nil || string(data) != string(original) {
+		t.Fatalf("the restore must publish the state of release v2: %v", err)
 	}
 }

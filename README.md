@@ -267,7 +267,7 @@ developer signature. A real signed app in `/Applications` or `~/Applications`
 satisfies the selection. These apps update themselves, and Check compares no
 version. Setup links the `code` and `ghostty` commands to the app. Quit the app
 before setup changes it. An installation that comes from v2 keeps its v2 app
-until a later run moves it. Read [the upgrade guide](docs/UPGRADING.md#from-v2-to-v300).
+until **Update tools** moves it. Read [the upgrade guide](docs/UPGRADING.md#from-v2-to-v300).
 
 On Linux, Zen uses Mozilla's legacy profile selection to retain the same personal
 profile across managed generations. Its application policy disables self-updates;

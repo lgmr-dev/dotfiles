@@ -108,15 +108,17 @@ In the import run, VS Code, Ghostty and OpenWhispr keep their v2 payloads and
 their v2 commands. Release v3 installs them from the Homebrew casks
 `visual-studio-code`, `ghostty` and `openwhispr`.
 
-A later **Choose tools** or **Update tools** run offers each cask install in
-its review. Each move is one reviewed decision. Quit the application first.
+A later **Update tools** run offers each cask install in its review.
+**Choose tools** keeps the v2 payload. Each move is one reviewed decision.
+Quit the application first.
 Setup installs the signed app in `/Applications` and verifies it. Then it
 moves the `code` or `ghostty` command to the new app and releases the v2
 application link. For VS Code, it also releases the managed `update.mode`
 field and restores its earlier value. Setup keeps and reports a v2 entry that
 you changed.
 
-That run closes the fallback. Do it only when the Mac works with release v3.
+The first confirmed run that changes something closes the v2 fallback. A cask
+move is such a change. Do it only when the Mac works with release v3.
 
 ### Go back to release v2
 
@@ -135,8 +137,10 @@ active. Resolve the items that it lists and run the same command again. The
 private builds in `<state>/tools` and the restore set stay. Delete them
 yourself when you do not need them.
 
-The first confirmed **Choose tools** or **Update tools** run after the import
-closes the fallback, before its first change. Its preview shows this line:
+The first confirmed **Choose tools** or **Update tools** run that changes
+something closes the fallback, immediately before its first change. A run
+that changes nothing keeps the fallback open. The preview of a run that
+closes the fallback shows this line:
 `This closes the v2 fallback: after you confirm this run, restore-v2 is not
 available. The v2 folders stay for your cleanup.` **Check installation** does
 not close the fallback.
@@ -152,6 +156,9 @@ Resume, Abandon, journal and receipt steps apply only to a v2 checkout, up to
 `v2.3.0`. Use them to finish v2 work before the import.
 
 ## From a release before v1.2.0
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 Release v2 reads the installer states that v1.2.0 and later leave on a
 machine. Update an older machine to v1.2.0 first. The steps are the same on each
@@ -190,6 +197,9 @@ checkout to examine them.
 
 ## Windows
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The new Windows installer discovers actual known folders independently, including
 redirected Documents and Start Menu Programs. Neovim uses a directory junction;
 other configuration uses copies/scoped settings. Developer Mode is not required.
@@ -199,6 +209,9 @@ contains ambiguous legacy combined actions, launch it once to let Terminal migra
 its own settings, then retry the reviewed setup.
 
 ## Interruptions and conflicts
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 An unfinished transaction from a released old installer must first be recovered
 with that exact retained release and recovery directory. Recover an unfinished
@@ -275,6 +288,9 @@ manufacture a clean install. A changed file, unreadable baseline or live consume
 remains a visible action item until its real cause is resolved.
 
 ## Later updates and removal
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 OpenWhispr, Obsidian, Tailscale and Zen are new optional selections; updating
 the checkout does not select them automatically. Consult the README platform
@@ -359,6 +375,9 @@ Exclude `update.mode` from sync in Code if those machines should update separate
 
 ## Sentinel rules and skills
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The Sentinel rules and skills selection runs the installer of the latest
 Sentinel release. Before you update the checkout, finish or abandon an
 interrupted Sentinel operation with the release that started it. Follow
@@ -374,6 +393,9 @@ Kiro files in `${KIRO_HOME:-~/.kiro}`. Copilot CLI reads `~/.agents/skills` also
 when you set `COPILOT_HOME`.
 
 ## T3 Code
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 The **T3 Code** selection now installs the desktop app on macOS and on
 Ubuntu/Debian. The earlier selection keeps its standalone `t3` package and is
@@ -417,6 +439,9 @@ or Update all buttons in T3; those can invoke the CLI's own updater.
 
 ### Zen macOS native application
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The macOS selection now uses Homebrew's official `zen` cask and normal browser
 updates. Existing authentic app bundles are reused without acquiring removal
 rights. Finish an interrupted earlier operation using its original checkout
@@ -432,6 +457,9 @@ at the same path is indistinguishable from a normal browser update. An unverifie
 app, changed uninstall recipe or an existing shared `zen` command blocks removal.
 
 ### Windows Neovim formatter correction
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 Windows now uses standalone Gersemi and clang-format archives at the same pinned
 versions as the POSIX Mason tools. An approved Update builds a fresh Neovim
@@ -452,6 +480,9 @@ abandoned safely; preserve it for recovery rather than deleting its journal.
 
 ### Windows VC++ registry reconciliation
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 Build Tools installation can leave differing VC++ version entries across the
 Windows registry views. Setup now accepts the newer entry only when the installed
 bundle, both MSI providers and the runtime DLL versions agree. Older entries are
@@ -462,6 +493,9 @@ cannot be reinterpreted as the new recipe.
 
 
 ### Windows legacy profile ownership
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 An earlier elevated setup can leave Git configuration or a PowerShell profile
 owned by `BUILTIN\Administrators`. Windows may let your normal account edit its
@@ -488,6 +522,9 @@ general way to preserve an arbitrary owner SID.
 
 ### Private Python tools and existing terminal sessions
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The managed `latex2text` and `yamllint` commands now use their own command-only
 directories. Their private Python/pip executables no longer enter your shell PATH.
 Update replaces these two tool generations and the shell integration; the selected
@@ -513,6 +550,9 @@ journal fragment omits the full file's BOM.
 
 ### Continuing removal after restoring personal settings
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 Restoring an adopted settings file completes removal of that integration even
 when the personal file remains present. A subsequent removal preview releases
 its former prerequisites when the saved completion and restored baseline still
@@ -534,6 +574,9 @@ the affected configuration, then remove it again to establish a new verified
 lifecycle. The released chezmoi/Nix migration uses the separate v1.0.1 migrate workflow.
 
 ## A personal Homebrew Zen without its app
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 If you installed Zen yourself through Homebrew and then removed only its app,
 restore it with

@@ -210,54 +210,95 @@ func (k pathKind) Save(ctx context.Context, d Desired, dir string) (string, erro
 	return "backup:" + backup, nil
 }
 
+func leftover(path string) error {
+	return fmt.Errorf("%s has a name that setup reserves, and the record cannot prove that setup made it; examine it, move it away, then run setup again", path)
+}
+
+func reserve(staged string) error {
+	if _, err := os.Lstat(staged); !errors.Is(err, os.ErrNotExist) {
+		return errors.Join(leftover(staged), err)
+	}
+	return nil
+}
+
+func expectedStage(kind Kind, record state.Record) string {
+	if !record.Release {
+		return record.Next
+	}
+	baseline, err := kind.Baseline(baselineOf(record))
+	if err != nil || baseline == Absent {
+		return ""
+	}
+	return baseline
+}
+
 func (k pathKind) Recover(_ context.Context, d Desired, record state.Record) error {
 	staged, aside := siblings(d)
-	if err := removeEntry(staged); err != nil {
-		return err
-	}
 	moved, err := snapshot(aside)
-	if err != nil || moved == Absent {
-		return err
-	}
-	current, err := snapshot(d.Path)
 	if err != nil {
-		return err
+		return errors.Join(leftover(aside), err)
 	}
-	if current == Absent {
-		return platform.MoveNoReplace(aside, d.Path)
+	if moved != Absent {
+		baseline := ""
+		if record.Before != "" {
+			baseline, _ = k.Baseline(record.Before)
+		}
+		if moved != record.Applied && moved != baseline {
+			return leftover(aside)
+		}
+		current, err := snapshot(d.Path)
+		if err != nil {
+			return err
+		}
+		if current == Absent {
+			err = platform.MoveNoReplace(aside, d.Path)
+		} else {
+			err = removeEntry(aside)
+		}
+		if err != nil {
+			return err
+		}
 	}
-	baseline := ""
-	if record.Before != "" {
-		baseline, _ = k.Baseline(record.Before)
+	left, err := snapshot(staged)
+	if err != nil {
+		return errors.Join(leftover(staged), err)
 	}
-	if moved != record.Applied && moved != baseline {
-		return fmt.Errorf("an earlier run left %s beside its target; examine it, move it away, then run setup again", aside)
+	if left == Absent {
+		return nil
 	}
-	return removeEntry(aside)
+	if left != expectedStage(k, record) {
+		return leftover(staged)
+	}
+	return removeEntry(staged)
 }
 
 func (k pathKind) swap(d Desired, from, want string, stage func(staged string) error) error {
 	staged, aside := siblings(d)
+	clean := func() error { return nil }
 	if stage != nil {
 		if err := os.MkdirAll(filepath.Dir(d.Path), 0700); err != nil {
 			return err
 		}
-		if err := removeEntry(staged); err != nil {
+		if err := reserve(staged); err != nil {
 			return err
 		}
 		if err := stage(staged); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				return errors.Join(leftover(staged), err)
+			}
 			return errors.Join(err, removeEntry(staged))
 		}
+		clean = func() error { return removeEntry(staged) }
 		if made, err := snapshot(staged); err != nil || made != want {
-			return errors.Join(errors.New("the staged content differs from the selected content"), err, removeEntry(staged))
+			return errors.Join(errors.New("the staged content differs from the selected content"), err, clean())
 		}
 	}
 	if from != Absent {
 		if err := platform.MoveNoReplace(d.Path, aside); err != nil {
-			return errors.Join(err, removeEntry(staged))
+			return errors.Join(err, clean())
 		}
 		if moved, err := snapshot(aside); err != nil || moved != from {
-			return errors.Join(fmt.Errorf("%s changed during the write: %w", d.Path, ErrChanged), err, platform.MoveNoReplace(aside, d.Path), removeEntry(staged))
+			return errors.Join(fmt.Errorf("%s changed during the write: %w", d.Path, ErrChanged), err, platform.MoveNoReplace(aside, d.Path), clean())
 		}
 		if err := hit("move"); err != nil {
 			return err

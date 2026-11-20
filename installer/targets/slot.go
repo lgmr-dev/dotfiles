@@ -147,27 +147,71 @@ func (k slotKind) Save(_ context.Context, d Desired, _ string) (string, error) {
 
 func (k slotKind) Discard(string, string) error { return nil }
 
-func (k slotKind) Recover(_ context.Context, d Desired, _ state.Record) error {
+func (k slotKind) valueOf(data []byte, d Desired) (string, []byte, error) {
+	raw, present, err := k.slot.Extract(data, d)
+	if err != nil || !present {
+		return Absent, nil, err
+	}
+	return k.fingerprint(raw), raw, nil
+}
+
+func (k slotKind) Recover(_ context.Context, d Desired, record state.Record) error {
 	staged, aside := siblings(d)
-	if err := removeEntry(staged); err != nil {
-		return err
-	}
 	earlier, moved, err := readSlotFile(aside)
-	if err != nil || moved == Absent {
-		return err
+	if err != nil {
+		return errors.Join(leftover(aside), err)
 	}
-	current, file, _, raw, err := k.read(d)
+	if moved != Absent {
+		current, file, _, raw, err := k.read(d)
+		if err != nil {
+			return err
+		}
+		if file == Absent {
+			expected := record.Applied
+			if expected == "" {
+				if expected, err = k.Baseline(baselineOf(record)); err != nil {
+					return err
+				}
+			}
+			value, _, err := k.valueOf(earlier, d)
+			if err != nil || value != expected || value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path {
+				return errors.Join(leftover(aside), err)
+			}
+			err = platform.MoveNoReplace(aside, d.Path)
+		} else {
+			expected, replaceErr := k.slot.Replace(earlier, d, raw, raw != nil)
+			if replaceErr != nil || !bytes.Equal(expected, current) {
+				return errors.Join(leftover(aside), replaceErr)
+			}
+			err = os.Remove(aside)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	left, file, err := readSlotFile(staged)
+	if err != nil {
+		return errors.Join(leftover(staged), err)
+	}
+	if file == Absent {
+		return nil
+	}
+	value, raw, err := k.valueOf(left, d)
+	if err != nil || value != expectedStage(k, record) {
+		return errors.Join(leftover(staged), err)
+	}
+	current, file, _, _, err := k.read(d)
 	if err != nil {
 		return err
 	}
-	if file == Absent {
-		return platform.MoveNoReplace(aside, d.Path)
+	if file == Absent && d.BOM {
+		current = []byte{0xef, 0xbb, 0xbf}
 	}
-	expected, err := k.slot.Replace(earlier, d, raw, raw != nil)
-	if err != nil || !bytes.Equal(expected, current) {
-		return errors.Join(fmt.Errorf("an earlier run left %s beside its target; examine it, move it away, then run setup again", aside), err)
+	rendered, err := k.slot.Replace(current, d, raw, true)
+	if err != nil || !bytes.Equal(rendered, left) {
+		return errors.Join(leftover(staged), err)
 	}
-	return os.Remove(aside)
+	return os.Remove(staged)
 }
 
 func writeStaged(path string, content []byte) error {
@@ -226,11 +270,12 @@ func (k slotKind) publish(ctx context.Context, d Desired, from string, value []b
 		}
 	}
 	staged, aside := siblings(d)
+	clean := func() error { return nil }
 	if !remove {
 		if err := os.MkdirAll(filepath.Dir(d.Path), 0700); err != nil {
 			return err
 		}
-		if err := removeEntry(staged); err != nil {
+		if err := reserve(staged); err != nil {
 			return err
 		}
 		if exists {
@@ -239,6 +284,9 @@ func (k slotKind) publish(ctx context.Context, d Desired, from string, value []b
 			}
 		} else {
 			created, err := os.OpenFile(staged, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+			if errors.Is(err, os.ErrExist) {
+				return errors.Join(leftover(staged), err)
+			}
 			if err != nil {
 				return err
 			}
@@ -246,16 +294,17 @@ func (k slotKind) publish(ctx context.Context, d Desired, from string, value []b
 				return errors.Join(err, removeEntry(staged))
 			}
 		}
+		clean = func() error { return removeEntry(staged) }
 		if err := writeStaged(staged, content); err != nil {
-			return errors.Join(err, removeEntry(staged))
+			return errors.Join(err, clean())
 		}
 	}
 	if exists {
 		if err := platform.MoveNoReplace(d.Path, aside); err != nil {
-			return errors.Join(err, removeEntry(staged))
+			return errors.Join(err, clean())
 		}
 		if moved, err := snapshot(aside); err != nil || moved != file {
-			return errors.Join(fmt.Errorf("%s changed during the write: %w", d.Path, ErrChanged), err, platform.MoveNoReplace(aside, d.Path), removeEntry(staged))
+			return errors.Join(fmt.Errorf("%s changed during the write: %w", d.Path, ErrChanged), err, platform.MoveNoReplace(aside, d.Path), clean())
 		}
 		if err := hit("move"); err != nil {
 			return err

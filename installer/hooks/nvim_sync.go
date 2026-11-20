@@ -102,7 +102,7 @@ func (p *NvimSync) validate(r catalog.Resource) error {
 		}
 	}
 	for _, path := range []string{p.current(), p.public()} {
-		if err := nvimBound(path); err != nil {
+		if err := builds.Bound(path); err != nil {
 			return errors.Join(errors.New("Neovim runtime parent was redirected"), err)
 		}
 	}
@@ -147,7 +147,7 @@ func (p *NvimSync) stale(build string, seen map[string]bool) bool {
 	if !ok {
 		return false
 	}
-	data, err := platform.ReadDocument(build + nvimManifestSuffix)
+	data, err := platform.ReadDocument(build + ".manifest.json")
 	var manifest builds.Manifest
 	if err != nil || platform.Decode(data, &manifest) != nil {
 		return true
@@ -290,7 +290,7 @@ func (o nvimObservation) token() string {
 func (p *NvimSync) observe(rec engine.Records, source nvimSource, deep bool) (nvimObservation, error) {
 	o := nvimObservation{Source: source}
 	o.Record, o.Recorded = rec.State().Targets[p.current()]
-	link, err := nvimLinkTarget(p.current())
+	link, err := builds.LinkTarget(p.current())
 	if err != nil {
 		o.LinkErr = err.Error()
 		return o, nil
@@ -308,13 +308,13 @@ func (p *NvimSync) observe(rec engine.Records, source nvimSource, deep bool) (nv
 	if !deep || link == "" || !o.Recorded || link != o.Record.Applied && link != o.Record.Next {
 		return o, nil
 	}
-	manifest, err := nvimReadManifest(p.StateDir, link)
+	manifest, err := builds.ReadManifest(p.StateDir, NvimResource, link)
 	if err != nil {
 		o.Problem = "the manifest of the current Neovim runtime is not valid: " + err.Error()
 		return o, nil
 	}
 	o.Manifest = &manifest
-	if o.Tree, err = nvimSnapshot(link); err != nil {
+	if o.Tree, err = builds.SnapshotBuild(link); err != nil {
 		o.Problem = "setup cannot read the current Neovim runtime: " + err.Error()
 	} else if o.Tree != manifest.Tree {
 		o.Problem = "the current Neovim runtime differs from its manifest"
@@ -393,13 +393,12 @@ func (p *NvimSync) Inspect(ctx context.Context, r catalog.Resource, want engine.
 		if err != nil {
 			return engine.Finding{}, err
 		}
-		publicRecord := rec.State().Targets[p.public()]
 		switch {
 		case t.waiting != "":
 			f.Status, f.Reason = engine.Unhealthy, t.waiting
 		case o.Manifest.Digest != nvimDigest(source, t.uses):
 			f.Status, f.Reason = engine.Unhealthy, "Neovim runtime does not match the current configuration"
-		case public.State != targets.StateApplied || publicRecord.Applied != public.Want || publicRecord.Next != "" || publicRecord.Release:
+		case !public.Satisfied:
 			f.Status, f.Reason = engine.Unhealthy, "the public runtime link of Neovim does not point at the current runtime"
 		case t.outdated != "":
 			f.Status, f.Reason = engine.Outdated, t.outdated
@@ -426,18 +425,16 @@ func (p *NvimSync) publicWant(build string) string {
 }
 
 func (p *NvimSync) reusable(ctx context.Context, t nvimTools, version, digest string) (string, error) {
-	names, _, err := nvimBuilds(p.directory(), version, digest)
+	candidates, err := builds.Candidates(p.StateDir, NvimResource, version, digest)
 	if err != nil {
 		return "", err
 	}
-	slices.Sort(names)
-	for _, name := range slices.Backward(names) {
-		build := filepath.Join(p.directory(), name)
-		manifest, err := nvimReadManifest(p.StateDir, build)
+	for _, build := range slices.Backward(candidates) {
+		manifest, err := builds.ReadManifest(p.StateDir, NvimResource, build)
 		if err != nil || manifest.Digest != digest {
 			continue
 		}
-		if tree, err := nvimSnapshot(build); err != nil || tree != manifest.Tree {
+		if tree, err := builds.SnapshotBuild(build); err != nil || tree != manifest.Tree {
 			continue
 		}
 		if p.check(ctx, t, build) == nil {
@@ -451,13 +448,9 @@ func (p *NvimSync) build(ctx context.Context, t nvimTools, source nvimSource, ve
 	if p.Runner == nil {
 		return "", errors.New("Neovim sync requires a command runner")
 	}
-	_, serial, err := nvimBuilds(p.directory(), version, digest)
+	build, err := builds.NextBuild(p.StateDir, NvimResource, version, digest)
 	if err != nil {
 		return "", err
-	}
-	build := filepath.Join(p.directory(), nvimBuildPrefix(version, digest)+fmt.Sprint(serial+1))
-	if !nvimBuildName.MatchString(filepath.Base(build)) {
-		return "", fmt.Errorf("no free build name remains in %s", p.directory())
 	}
 	if err := os.Mkdir(build, 0700); err != nil {
 		return "", fmt.Errorf("cannot reserve fresh Neovim runtime: %w", err)
@@ -465,7 +458,7 @@ func (p *NvimSync) build(ctx context.Context, t nvimTools, source nvimSource, ve
 	unfinished := func(err error) (string, error) {
 		return "", fmt.Errorf("%w; the unfinished runtime stays at %s and the next run uses a new folder", err, build)
 	}
-	if err := nvimBound(filepath.Join(build, "lazy")); err != nil {
+	if err := builds.Bound(filepath.Join(build, "lazy")); err != nil {
 		return unfinished(errors.Join(errors.New("Neovim stage was redirected"), err))
 	}
 	platform.Detail(ctx, "Building the Neovim runtime at %s", build)
@@ -493,40 +486,14 @@ func (p *NvimSync) build(ctx context.Context, t nvimTools, source nvimSource, ve
 	if after, err := p.source(); err != nil || after != source {
 		return unfinished(errors.Join(errors.New("Neovim source changed during synchronization"), err))
 	}
-	tree, err := nvimSnapshot(build)
+	tree, err := builds.SnapshotBuild(build)
 	if err != nil {
 		return unfinished(err)
 	}
-	if err := nvimWriteManifest(build, builds.Manifest{Schema: 1, Resource: NvimResource, Version: version, Digest: digest, Tree: tree, Uses: t.uses}); err != nil {
+	if err := builds.WriteManifest(build, builds.Manifest{Schema: 1, Resource: NvimResource, Version: version, Digest: digest, Tree: tree, Uses: t.uses}); err != nil {
 		return "", err
 	}
 	return build, nil
-}
-
-func (p *NvimSync) publish(build string, rec engine.Records) error {
-	current := p.current()
-	record, recorded := rec.State().Targets[current]
-	link, err := nvimLinkTarget(current)
-	if err != nil {
-		return err
-	}
-	if !recorded || record.Applied != build || record.Next != "" || record.Release || link != build {
-		if err := rec.Update(func(s *state.State) error {
-			return s.BeginTarget(current, state.Record{Resource: NvimResource, Kind: "link", Next: build, Before: targets.Absent})
-		}); err != nil {
-			return err
-		}
-		if err := nvimSwitchLink(p.directory(), build); err != nil {
-			return err
-		}
-		if link, err = nvimLinkTarget(current); err != nil || link != build {
-			return errors.Join(fmt.Errorf("the link %s does not point at the new Neovim runtime", current), err)
-		}
-		if err := rec.Update(func(s *state.State) error { return s.Promote(current) }); err != nil {
-			return err
-		}
-	}
-	return nvimRemoveStagedLinks(p.StateDir)
 }
 
 // Apply implements engine.Provider. It reuses a runtime that has a manifest,
@@ -582,7 +549,7 @@ func (p *NvimSync) Apply(ctx context.Context, r catalog.Resource, approved engin
 			return err
 		}
 	}
-	if err := p.publish(candidate, rec); err != nil {
+	if err := builds.Publish(p.StateDir, NvimResource, candidate, rec); err != nil {
 		return err
 	}
 	return p.writer().Converge(ctx, p.publicLink(candidate), rec, desktopChoice(approved))
@@ -602,33 +569,5 @@ func (p *NvimSync) Remove(ctx context.Context, r catalog.Resource, approved engi
 	if err := p.writer().Release(ctx, p.public(), rec, desktopChoice(approved)); err != nil {
 		return err
 	}
-	current := p.current()
-	record, recorded := rec.State().Targets[current]
-	if !recorded {
-		return nil
-	}
-	link, err := nvimLinkTarget(current)
-	if err != nil {
-		return err
-	}
-	if link != "" && link != record.Applied && link != record.Next {
-		return fmt.Errorf("the link %s is not the one that setup published; it stays", current)
-	}
-	if record.Applied != "" && !record.Release {
-		if err := rec.Update(func(s *state.State) error { return s.BeginRelease(current) }); err != nil {
-			return err
-		}
-	}
-	if link != "" {
-		if err := os.Remove(current); err != nil {
-			return err
-		}
-	}
-	if err := nvimRemoveStagedLinks(p.StateDir); err != nil {
-		return err
-	}
-	if err := platform.SyncDirectory(p.directory()); err != nil {
-		return err
-	}
-	return rec.Update(func(s *state.State) error { s.Drop(current); return nil })
+	return builds.Unpublish(p.StateDir, NvimResource, rec)
 }

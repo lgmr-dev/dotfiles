@@ -253,3 +253,57 @@ func nextBuild(dir, version, digest string) (string, error) {
 	}
 	return filepath.Join(dir, name), nil
 }
+
+// LinkTarget returns the cleaned absolute target of the directory link at
+// path, or an empty text when path does not exist.
+func LinkTarget(path string) (string, error) { return linkTarget(path) }
+
+// Bound fails when a parent folder of path is a link or was redirected.
+func Bound(path string) error { return bound(path) }
+
+// ReadManifest reads and validates the manifest of a build of a resource.
+func ReadManifest(stateDir, id, build string) (Manifest, error) {
+	return readManifest(stateDir, id, build)
+}
+
+// WriteManifest saves the manifest beside a build. A recipe calls it after
+// the check of the build passed.
+func WriteManifest(build string, manifest Manifest) error {
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		return err
+	}
+	return platform.SaveDocument(manifestPath(build), append(data, '\n'))
+}
+
+// SnapshotBuild returns the tree fingerprint of a build within the bounds of
+// one extracted payload.
+func SnapshotBuild(build string) (platform.Snapshot, error) { return snapshotBuild(build) }
+
+// NextBuild returns the folder of a new build of a resource: the version, the
+// first 12 characters of the digest and the next free serial number. It
+// creates nothing.
+func NextBuild(stateDir, id, version, digest string) (string, error) {
+	return nextBuild(ResourceDir(stateDir, id), version, digest)
+}
+
+// Candidates returns the build folders of a resource that have the name of
+// the version and the digest, oldest first.
+func Candidates(stateDir, id, version, digest string) ([]string, error) {
+	dir := ResourceDir(stateDir, id)
+	entries, err := platform.ReadPlainDirectory(dir)
+	if err != nil {
+		return nil, err
+	}
+	names := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), buildPrefix(version, digest)) {
+			names = append(names, entry.Name())
+		}
+	}
+	slices.Sort(names)
+	for i, name := range names {
+		names[i] = filepath.Join(dir, name)
+	}
+	return names, nil
+}

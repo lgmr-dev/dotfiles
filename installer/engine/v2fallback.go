@@ -18,14 +18,18 @@ var V2Folders = []string{"packages", "nvim-sync", "configuration", "profiles", "
 
 // FallbackNotice returns the line that a preview shows for the v2_restore
 // value of its plan. While the fallback is open, a confirmed apply or update
-// closes it before the first change. It is empty for a check and for a state
-// without a fallback.
+// closes it before its first step that applies or removes. It is empty for a
+// check, for a state without a fallback and for an open fallback when the plan
+// has no such step.
 func FallbackNotice(plan Plan) string {
 	if plan.Mode != "apply" && plan.Mode != "update" {
 		return ""
 	}
 	switch plan.V2Restore {
 	case "open":
+		if !slices.ContainsFunc(plan.Operations, func(op Operation) bool { return mutating(op.Action) }) {
+			return ""
+		}
 		return "This closes the v2 fallback: after you confirm this run, restore-v2 is not available. The v2 folders stay for your cleanup."
 	case "switching":
 		return switchingLine

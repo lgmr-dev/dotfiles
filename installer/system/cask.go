@@ -65,11 +65,11 @@ function run(argv) {
 }`
 
 type caskObservation struct {
-	Token, Source, Application            string
-	Installed, Present, Healthy, Recorded bool
-	Status                                engine.Status
-	Reason                                string
-	Notes                                 []string
+	Token, Source, Application                    string
+	Installed, Present, Healthy, Recorded, Orphan bool
+	Status                                        engine.Status
+	Reason                                        string
+	Notes                                         []string
 }
 
 func (s CaskSpec) destinations(reinstall bool) error {
@@ -152,8 +152,8 @@ func (s *brewSession) observeCask(ctx context.Context, spec CaskSpec, st state.S
 	case inInventory && o.Recorded:
 		o.Status, o.Reason = engine.Unhealthy, "the recorded native application is absent"
 	case inInventory:
-		o.Status = engine.Blocked
-		o.Reason = "your Homebrew " + spec.Token + " record has no app; use HOMEBREW_NO_AUTOREMOVE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew reinstall --cask " + spec.Token + " to restore it, or HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask " + spec.Token + " before installing it through setup"
+		o.Status, o.Orphan = engine.Blocked, true
+		o.Reason = "your Homebrew " + spec.Token + " record has no app; restore the app with the first command, or remove the cask with the second command before you install it through setup"
 	default:
 		o.Status = engine.Missing
 	}
@@ -201,7 +201,7 @@ func (s *brewSession) inspectCask(ctx context.Context, spec CaskSpec, want engin
 		}
 		f.Status, f.Reason = engine.Satisfied, ""
 		if o.Recorded {
-			block, note := brewRemovalBlock(spec.Token, true)
+			block, note := s.removalBlock(spec.Token, true)
 			f.Commands, f.Notes = []engine.CommandBlock{block}, append(f.Notes, note, "Personal data of "+spec.Name+" stays. Setup never runs zap.")
 		}
 		return f, nil
@@ -210,10 +210,15 @@ func (s *brewSession) inspectCask(ctx context.Context, spec CaskSpec, want engin
 	case engine.Missing:
 		f.Reason = "install the official native app through Homebrew; normal app updates remain enabled; personal data stays untouched"
 		f.Pending = true
-		f.Commands = []engine.CommandBlock{{Title: "Install " + spec.Name + " with Homebrew", By: "setup", Lines: []string{caskLine(append([]string{"brew"}, spec.arguments("install")...)...)}}}
+		f.Commands = []engine.CommandBlock{{Title: "Install " + spec.Name + " with Homebrew", By: "setup", Lines: []string{s.line(true, spec.arguments("install")...)}}}
 	case engine.Unhealthy:
 		f.Pending = true
-		f.Commands = []engine.CommandBlock{{Title: "Repair " + spec.Name + " with Homebrew", By: "setup", Lines: []string{caskLine(append([]string{"brew"}, spec.arguments("reinstall")...)...)}}}
+		f.Commands = []engine.CommandBlock{{Title: "Repair " + spec.Name + " with Homebrew", By: "setup", Lines: []string{s.line(true, spec.arguments("reinstall")...)}}}
+	case engine.Blocked:
+		if o.Orphan {
+			f.Commands = []engine.CommandBlock{{Title: "Restore or remove the " + spec.Name + " cask with Homebrew", By: "you",
+				Lines: []string{s.line(true, spec.arguments("reinstall")...), s.line(true, "uninstall", "--cask", spec.Token)}}}
+		}
 	}
 	return f, nil
 }

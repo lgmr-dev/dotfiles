@@ -98,7 +98,7 @@ func (o Options) details(plan engine.Plan, mapping *Mapping, deferred []string) 
 	for _, id := range deferred {
 		names = append(names, o.name(id))
 	}
-	section("Applications that stay on release v2 in this run. A later Choose tools or Update tools offers each cask install:", names)
+	section("Applications that stay on release v2 in this run. A later Update tools run offers each cask install, and Choose tools keeps the v2 payload. The first confirmed run that changes something closes the v2 fallback:", names)
 	section("Folders of release v2 that stay. Setup never deletes them:", existingV2Folders(o.Engine.StateDir))
 	if mapping != nil {
 		rows := []string{}

@@ -60,6 +60,8 @@ type fx struct {
 	units                       map[string]func() []targets.Desired
 	legacy                      []string
 	nl                          string
+	extraKinds                  map[string]targets.Kind
+	captureKinds                map[string]targets.Kind
 	inspected                   []string
 }
 
@@ -312,6 +314,7 @@ func (k fontKind) Baseline(before string) (string, error) {
 func (f *fx) kinds() map[string]targets.Kind {
 	kinds := hooks.ProfileKinds()
 	kinds["font"] = fontKind{targets.FileKind("font")}
+	maps.Copy(kinds, f.extraKinds)
 	return kinds
 }
 
@@ -511,7 +514,9 @@ func (f *fx) engine() *engine.Engine {
 }
 
 func (f *fx) options() v2import.Options {
-	return v2import.Options{Engine: f.engine(), Folders: f.folders(), Kinds: f.kinds(), KeyboardRule: f.keyboard}
+	kinds := f.kinds()
+	maps.Copy(kinds, f.captureKinds)
+	return v2import.Options{Engine: f.engine(), Folders: f.folders(), Kinds: kinds, KeyboardRule: f.keyboard}
 }
 
 func (f *fx) preview() (*v2import.Proposal, error) {

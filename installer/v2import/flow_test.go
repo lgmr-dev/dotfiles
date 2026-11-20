@@ -496,6 +496,16 @@ func TestTheNextConfirmedRunClosesTheFallback(t *testing.T) {
 	}
 	request := engine.Request{Mode: "update"}
 	plan, err := e.Preview(context.Background(), request)
+	if err != nil || engine.FallbackNotice(plan) != "" {
+		t.Fatalf("a run that changes nothing must not name the end of the fallback: %q %v", engine.FallbackNotice(plan), err)
+	}
+	if _, err := e.Apply(context.Background(), request, plan); err != nil || f.current().V2Restore != "open" {
+		t.Fatalf("a run that changes nothing must keep the fallback open: %v", err)
+	}
+	if err := os.Remove(f.fontPath()); err != nil {
+		t.Fatal(err)
+	}
+	plan, err = e.Preview(context.Background(), request)
 	if err != nil || !strings.Contains(engine.FallbackNotice(plan), "This closes the v2 fallback") {
 		t.Fatalf("the preview must name the end of the fallback: %q %v", engine.FallbackNotice(plan), err)
 	}
@@ -539,6 +549,9 @@ func TestTheMacImportKeepsTheDeferredApplicationsOnReleaseV2(t *testing.T) {
 	}
 	if !slices.Equal(f.legacy, []string{legacy}) {
 		t.Fatalf("the shell profile must get the legacy command folder before its inspection: %v", f.legacy)
+	}
+	if !strings.Contains(proposal.Details, "A later Update tools run offers each cask install, and Choose tools keeps the v2 payload. The first confirmed run that changes something closes the v2 fallback:") {
+		t.Fatalf("the review must name Update tools for the move and the end of the fallback:\n%s", proposal.Details)
 	}
 	if !strings.Contains(proposal.Details, "Applications that stay on release v2 in this run") || !strings.Contains(proposal.Details, "VS Code program (tool.vscode)") {
 		t.Fatalf("the review must name the deferred applications:\n%s", proposal.Details)

@@ -451,9 +451,10 @@ func (a *APT) run(ctx context.Context, c platform.Command) ([]byte, bool, error)
 
 // Apply installs a missing package, repairs a recorded package or updates a
 // recorded package. A pinned DEB goes to the reviewed pin, and never to an
-// older version. Apply writes the pending mark, and for a new install the
-// provisional system record, before apt-get starts. It clears the mark after
-// it verified the package.
+// older version. Apply writes the pending mark before the refresh of the
+// package lists, and for a new install the provisional system record before
+// the install command. It clears the mark after it verified the package, or
+// when a command did not start.
 func (a *APT) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) (result error) {
 	o, pin, err := a.observe(ctx, r, rec.State())
 	if err != nil {
@@ -497,26 +498,29 @@ func (a *APT) Apply(ctx context.Context, r catalog.Resource, approved engine.Fin
 			return err
 		}
 	}
-	if output, _, err := a.run(ctx, a.privileged(a.Location.APTGet, nil, aptRefreshArguments()...)); err != nil {
-		if strings.Contains(string(output), "sudo:") {
-			return fmt.Errorf("APT needs administrator authorization in the foreground; authorize sudo and run setup again: %w", err)
+	mark, provisional := aptMark(r, action), action == "install" && !o.Recorded
+	if err := rec.Update(func(s *state.State) error { s.Mark(mark); return nil }); err != nil {
+		return err
+	}
+	clear := func(s *state.State) error { s.Clear(mark); return nil }
+	if output, started, err := a.run(ctx, a.privileged(a.Location.APTGet, nil, aptRefreshArguments()...)); err != nil {
+		if !started {
+			return errors.Join(fmt.Errorf("APT did not start: %w", err), rec.Update(clear))
 		}
-		return fmt.Errorf("APT could not refresh its package lists; fix or disable the source named in the E: lines (`sudo apt-get update` lists it too), then run setup again: %w", err)
+		if strings.Contains(string(output), "sudo:") {
+			return fmt.Errorf("APT needs administrator authorization in the foreground; authorize sudo, run setup again and confirm that the command exited: %w", err)
+		}
+		return fmt.Errorf("APT could not refresh its package lists; fix or disable the source named in the E: lines (`sudo apt-get update` lists it too), then run setup again and confirm that the command exited: %w", err)
 	}
 	if o.Pin != "" {
 		if err := a.debVerify(pin); err != nil {
-			return err
+			return errors.Join(err, rec.Update(clear))
 		}
 	}
-	mark, provisional := aptMark(r, action), action == "install" && !o.Recorded
-	if err := rec.Update(func(s *state.State) error {
-		s.Mark(mark)
-		if provisional {
-			s.AddSystem("apt", o.Name)
+	if provisional {
+		if err := rec.Update(func(s *state.State) error { s.AddSystem("apt", o.Name); return nil }); err != nil {
+			return err
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
 	output, started, err := a.run(ctx, a.privileged(a.Location.APTGet, environment, aptInstallArguments(action, o.Package.Automatic, input)...))
 	if err != nil && !started {

@@ -367,11 +367,11 @@ func TestCaskInstallArgumentsMarkAndVerification(t *testing.T) {
 				t.Fatal(missing)
 			}
 			line := brewTestBlocks(missing, "setup")[0]
-			if !strings.HasPrefix(line, "brew install --cask --appdir=") || !strings.Contains(line, " --no-binaries --require-sha ") || !strings.HasSuffix(line, " "+f.spec.Token) {
-				t.Fatal("the review shows another command", line)
-			}
 			if err := f.d.Apply(context.Background(), f.r, missing, f.rec); err != nil {
 				t.Fatal(err)
+			}
+			if line != macTestLine(f.runner.commands[0]) {
+				t.Fatal("the approved line differs from the command that ran", line, macTestLine(f.runner.commands[0]))
 			}
 			if !reflect.DeepEqual(f.mutations(), [][]string{{"install", "--cask", "--appdir=" + f.d.appdir, "--no-binaries", "--require-sha", f.spec.Token}}) {
 				t.Fatal(f.mutations())
@@ -486,7 +486,7 @@ func TestCaskRunningApplicationGuardCoversAReinstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	unhealthy := f.inspect(f.r, engine.Want{Present: true})
-	if unhealthy.Status != engine.Unhealthy || !unhealthy.Pending || !strings.HasPrefix(brewTestBlocks(unhealthy, "setup")[0], "brew reinstall --cask ") {
+	if unhealthy.Status != engine.Unhealthy || !unhealthy.Pending || brewTestBlocks(unhealthy, "setup")[0] != f.line(true, "reinstall", "--cask", "--appdir="+f.d.appdir, "--no-binaries", "--require-sha", "ghostty") {
 		t.Fatal(unhealthy)
 	}
 	f.running = true
@@ -515,7 +515,7 @@ func TestCaskRunningApplicationGuardCoversAReinstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := f.inspect(f.r, engine.Want{Present: true})
-	if found.Status != engine.Blocked || !strings.Contains(found.Reason, "brew reinstall --cask ghostty") || len(found.Commands) != 0 {
+	if found.Status != engine.Blocked || !strings.Contains(found.Reason, "has no app") || !slices.Equal(brewTestBlocks(found, "you"), []string{f.line(true, "reinstall", "--cask", "--appdir="+f.d.appdir, "--no-binaries", "--require-sha", "ghostty"), f.line(true, "uninstall", "--cask", "ghostty")}) || len(brewTestBlocks(found, "setup")) != 0 {
 		t.Fatal("setup repaired a cask without a record", found)
 	}
 	for _, status := range []engine.Status{engine.Unhealthy, engine.Missing} {

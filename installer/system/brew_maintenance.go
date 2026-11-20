@@ -20,6 +20,20 @@ func brewClassificationOf(pkg brewPackage) brewClassification {
 	return brewClassification{Source: pkg.Source, Held: pkg.Held, Automatic: pkg.Automatic}
 }
 
+// BrewDependentError reports an installed formula that uses a formula that
+// setup changed and that now fails its linkage check. Setup has no record of
+// the formula, so setup does not repair it. Block holds the copy-ready
+// reinstall command for the operator.
+type BrewDependentError struct {
+	Name, Reason string
+	Block        engine.CommandBlock
+}
+
+func (err *BrewDependentError) Error() string {
+	return "Homebrew formula " + err.Name + " fails its linkage check after this change, and setup did not install it: " + err.Reason +
+		"\nRepair it with this command, then run setup again and confirm that the command exited:\n" + strings.Join(err.Block.Lines, "\n")
+}
+
 func brewAffected(root string, before, installed map[string]brewPackage) map[string]bool {
 	affected := map[string]bool{root: true}
 	for name, pkg := range installed {
@@ -108,6 +122,10 @@ func (d *Brew) maintainDependents(ctx context.Context, s *brewSession, rec engin
 			}
 			if old, existed := before[name]; existed && brewClassificationOf(old) != brewClassificationOf(pkg) {
 				return fmt.Errorf("pre-existing Homebrew maintenance package %s changed classification", pkg.Source)
+			}
+			if st := rec.State(); !st.HasSystem("brew", pkg.Source) && !st.HasSystem("brew", name) {
+				return &BrewDependentError{Name: name, Reason: strings.TrimSpace(linkErr.Error() + platform.Diagnostic(output)),
+					Block: engine.CommandBlock{Title: "Repair " + name + " with Homebrew", By: "you", Lines: []string{s.line(false, "reinstall", "--formula", pkg.Source)}}}
 			}
 			attempted[name] = true
 			if err := d.run(ctx, rec, s.command(false, "reinstall", "--formula", pkg.Source), mark, "", ""); err != nil {

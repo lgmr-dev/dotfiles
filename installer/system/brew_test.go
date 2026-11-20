@@ -168,6 +168,23 @@ func (f *brewFixture) mutations() [][]string {
 	return result
 }
 
+func (f *brewFixture) line(cask bool, args ...string) string {
+	environment := slices.Clone(brewProcessControls)
+	if cask {
+		environment = append(environment, "HOMEBREW_CASK_OPTS=", "HOMEBREW_NO_SUDO=1")
+	}
+	return macTestLine(platform.Command{Path: f.location.Program, Args: args, Env: environment})
+}
+
+func TestMacShownCommandLineQuotesEachWord(t *testing.T) {
+	got := macosShellLine(platform.Command{Path: "/opt/home brew/bin/brew", Env: []string{"LC_ALL=C", "EMPTY=", "NOTE=it's here"},
+		Args: []string{"install", "--cask", "--appdir=/Applications", "T3 Code (Beta)", "$HOME", ""}})
+	want := `LC_ALL=C EMPTY= NOTE='it'"'"'s here' '/opt/home brew/bin/brew' install --cask --appdir=/Applications 'T3 Code (Beta)' '$HOME' ''`
+	if got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
+	}
+}
+
 func brewTestBlocks(found engine.Finding, by string) []string {
 	lines := []string{}
 	for _, block := range found.Commands {
@@ -248,7 +265,7 @@ func TestBrewInstallsAMissingFormulaWithAPendingMarkAndARecord(t *testing.T) {
 	git := brewTestFormula("tool.git", "git")
 	f.installed["outside"] = brewPackage{Name: "outside", Source: "outside", Version: "1", Healthy: true}
 	missing := f.inspect(git, engine.Want{Present: true})
-	if missing.Status != engine.Missing || !missing.Pending || missing.Privileged || missing.Replan || !slices.Equal(brewTestBlocks(missing, "setup"), []string{"brew install --formula git"}) || len(brewTestBlocks(missing, "you")) != 0 {
+	if missing.Status != engine.Missing || !missing.Pending || missing.Privileged || missing.Replan || !slices.Equal(brewTestBlocks(missing, "setup"), []string{f.line(false, "install", "--formula", "git")}) || len(brewTestBlocks(missing, "you")) != 0 {
 		t.Fatal(missing)
 	}
 	f.onRun = func(args []string) error {
@@ -260,6 +277,9 @@ func TestBrewInstallsAMissingFormulaWithAPendingMarkAndARecord(t *testing.T) {
 	}
 	if !reflect.DeepEqual(f.mutations(), [][]string{{"install", "--formula", "git"}}) {
 		t.Fatal(f.mutations())
+	}
+	if shown := brewTestBlocks(missing, "setup"); len(shown) != 1 || shown[0] != macTestLine(f.runner.commands[0]) {
+		t.Fatal("the approved line differs from the command that ran", shown, macTestLine(f.runner.commands[0]))
 	}
 	for _, control := range brewProcessControls {
 		if !slices.Contains(f.runner.commands[0].Env, control) {
@@ -340,7 +360,7 @@ func TestBrewUsesAPresentFormulaWithoutARecordAndNeverRepairsIt(t *testing.T) {
 	}
 	f.checkErr = errors.New("dyld: library not loaded")
 	found = f.inspect(tmux, engine.Want{Present: true})
-	if found.Status != engine.Blocked || !strings.Contains(found.Reason, "setup did not install this package") || len(brewTestBlocks(found, "setup")) != 0 || !slices.Equal(brewTestBlocks(found, "you"), []string{"brew reinstall --formula tmux"}) {
+	if found.Status != engine.Blocked || !strings.Contains(found.Reason, "setup did not install this package") || len(brewTestBlocks(found, "setup")) != 0 || !slices.Equal(brewTestBlocks(found, "you"), []string{f.line(false, "reinstall", "--formula", "tmux")}) {
 		t.Fatal("direct repair of an unrecorded formula", found)
 	}
 	if err := f.d.Apply(context.Background(), tmux, engine.Finding{Status: engine.Unhealthy}, f.rec); err == nil || len(f.runner.commands) != 0 {
@@ -369,7 +389,7 @@ func TestBrewUpdatesAndRepairsOnlyARecordedFormula(t *testing.T) {
 		t.Fatal("an Apply request must not ask Homebrew for updates", found)
 	}
 	outdated := f.inspect(git, engine.Want{Present: true, Update: true})
-	if outdated.Status != engine.Outdated || !outdated.Pending || !slices.Equal(brewTestBlocks(outdated, "setup"), []string{"brew upgrade --formula git"}) || !strings.Contains(outdated.Reason, "2.51") {
+	if outdated.Status != engine.Outdated || !outdated.Pending || !slices.Equal(brewTestBlocks(outdated, "setup"), []string{f.line(false, "upgrade", "--formula", "git")}) || !strings.Contains(outdated.Reason, "2.51") {
 		t.Fatal(outdated)
 	}
 	f.onRun = func(args []string) error {
@@ -379,6 +399,9 @@ func TestBrewUpdatesAndRepairsOnlyARecordedFormula(t *testing.T) {
 	}
 	if err := f.d.Apply(context.Background(), git, outdated, f.rec); err != nil {
 		t.Fatal(err)
+	}
+	if shown := brewTestBlocks(outdated, "setup"); len(shown) != 1 || shown[0] != macTestLine(f.runner.commands[0]) {
+		t.Fatal("the approved line differs from the command that ran", shown)
 	}
 	if !reflect.DeepEqual(f.mutations(), [][]string{{"upgrade", "--formula", "git"}}) || !slices.Equal(f.states[0].Pending, []string{"tool.git:brew-update"}) || len(f.rec.State().Pending) != 0 {
 		t.Fatal(f.mutations(), f.states[0].Pending)
@@ -405,7 +428,7 @@ func TestBrewUpdatesAndRepairsOnlyARecordedFormula(t *testing.T) {
 		t.Fatal(err)
 	}
 	unhealthy := f.inspect(git, engine.Want{Present: true})
-	if unhealthy.Status != engine.Unhealthy || !slices.Equal(brewTestBlocks(unhealthy, "setup"), []string{"brew reinstall --formula git"}) {
+	if unhealthy.Status != engine.Unhealthy || !slices.Equal(brewTestBlocks(unhealthy, "setup"), []string{f.line(false, "reinstall", "--formula", "git")}) {
 		t.Fatal(unhealthy)
 	}
 	f.onRun = func(args []string) error {
@@ -416,6 +439,9 @@ func TestBrewUpdatesAndRepairsOnlyARecordedFormula(t *testing.T) {
 	}
 	if err := f.d.Apply(context.Background(), git, unhealthy, f.rec); err != nil {
 		t.Fatal(err)
+	}
+	if shown := brewTestBlocks(unhealthy, "setup"); len(shown) != 1 || shown[0] != macTestLine(f.runner.commands[0]) {
+		t.Fatal("the approved line differs from the command that ran", shown)
 	}
 	if !reflect.DeepEqual(f.mutations(), [][]string{{"reinstall", "--formula", "git"}, {"link", "--formula", "git"}}) || !slices.Equal(f.states[0].Pending, []string{"tool.git:brew-repair"}) || len(f.rec.State().Pending) != 0 {
 		t.Fatal("a keg that reinstall keeps unlinked needs one link command", f.mutations())
@@ -434,7 +460,7 @@ func TestBrewShowsTheRemovalBlockOnlyForARecordedItemAndNeverRemoves(t *testing.
 	}
 	absent := engine.Want{}
 	recorded := f.inspect(git, absent)
-	if recorded.Status != engine.Satisfied || !slices.Equal(brewTestBlocks(recorded, "you"), []string{"HOMEBREW_NO_AUTOREMOVE=1 brew uninstall git"}) || len(brewTestBlocks(recorded, "setup")) != 0 || len(recorded.Notes) == 0 {
+	if recorded.Status != engine.Satisfied || !slices.Equal(brewTestBlocks(recorded, "you"), []string{f.line(false, "uninstall", "git")}) || len(brewTestBlocks(recorded, "setup")) != 0 || len(recorded.Notes) == 0 {
 		t.Fatal(recorded)
 	}
 	if selected := f.inspect(git, engine.Want{Present: true}); len(selected.Commands) != 0 {
@@ -444,7 +470,7 @@ func TestBrewShowsTheRemovalBlockOnlyForARecordedItemAndNeverRemoves(t *testing.
 		t.Fatal("an unrecorded item shows a removal command", unrecorded)
 	}
 	cask := f.inspect(zen, absent)
-	if cask.Status != engine.Satisfied || !slices.Equal(brewTestBlocks(cask, "you"), []string{"HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask zen"}) {
+	if cask.Status != engine.Satisfied || !slices.Equal(brewTestBlocks(cask, "you"), []string{f.line(true, "uninstall", "--cask", "zen")}) {
 		t.Fatal(cask)
 	}
 	for _, r := range []catalog.Resource{git, zen} {
@@ -471,13 +497,18 @@ func TestBrewShowsTheRemovalBlockOnlyForARecordedItemAndNeverRemoves(t *testing.
 	}
 }
 
-func TestBrewMaintenanceReinstallsOnlyABrokenAffectedConsumer(t *testing.T) {
+func brewMaintenanceFixture(t *testing.T, recorded bool) *brewFixture {
+	t.Helper()
 	f := newBrewFixture(t)
-	git := brewTestFormula("tool.git", "git")
 	f.installed["shared"] = brewPackage{Name: "shared", Source: "shared", Version: "1.0", Automatic: true, Healthy: true}
 	f.installed["consumer"] = brewPackage{Name: "consumer", Source: "sample/tap/consumer", Version: "1.0", Healthy: true, Dependencies: []string{"shared"}}
 	f.installed["unrelated"] = brewPackage{Name: "unrelated", Source: "unrelated", Version: "1.0", Healthy: true}
 	f.installed["cask/app"] = brewPackage{Name: "cask/app", Source: "app", Version: "1.0", Healthy: true, Dependencies: []string{"shared"}}
+	if recorded {
+		if err := f.rec.Update(func(s *state.State) error { s.AddSystem("brew", "sample/tap/consumer"); return nil }); err != nil {
+			t.Fatal(err)
+		}
+	}
 	f.onRun = func(args []string) error {
 		switch {
 		case args[0] == "install":
@@ -493,6 +524,12 @@ func TestBrewMaintenanceReinstallsOnlyABrokenAffectedConsumer(t *testing.T) {
 		}
 		return nil
 	}
+	return f
+}
+
+func TestBrewMaintenanceReinstallsOnlyABrokenRecordedConsumer(t *testing.T) {
+	git := brewTestFormula("tool.git", "git")
+	f := brewMaintenanceFixture(t, true)
 	if err := f.apply(git, engine.Want{Present: true}); err != nil {
 		t.Fatal(err)
 	}
@@ -502,8 +539,8 @@ func TestBrewMaintenanceReinstallsOnlyABrokenAffectedConsumer(t *testing.T) {
 	if !slices.Equal(f.states[1].Pending, []string{"tool.git:brew-install"}) || len(f.rec.State().Pending) != 0 {
 		t.Fatal("the mark must cover the maintenance of the consumers", f.states[1].Pending)
 	}
-	if st := f.rec.State(); st.HasSystem("brew", "consumer") || st.HasSystem("brew", "shared") {
-		t.Fatal("a dependency or a consumer got a record", st.System)
+	if st := f.rec.State(); st.HasSystem("brew", "shared") {
+		t.Fatal("a dependency got a record", st.System)
 	}
 	checked := false
 	for _, query := range f.queries {
@@ -525,6 +562,9 @@ func TestBrewMaintenanceReinstallsOnlyABrokenAffectedConsumer(t *testing.T) {
 		f.installed["shared"] = brewPackage{Name: "shared", Source: "shared", Version: "1.0", Automatic: true, Healthy: true}
 		f.installed["consumer"] = brewPackage{Name: "consumer", Source: "consumer", Version: "1.0", Healthy: true, Held: change == "pinned", Dependencies: []string{"shared"}}
 		f.installed["cask/app"] = brewPackage{Name: "cask/app", Source: "app", Version: "1.0", Healthy: true, Dependencies: []string{"shared"}}
+		if err := f.rec.Update(func(s *state.State) error { s.AddSystem("brew", "consumer"); return nil }); err != nil {
+			t.Fatal(err)
+		}
 		f.onRun = func(args []string) error {
 			if args[0] == "install" {
 				f.installed["git"] = brewPackage{Name: "git", Source: "git", Version: "2.50", Healthy: true, Dependencies: []string{"shared"}}
@@ -547,6 +587,25 @@ func TestBrewMaintenanceReinstallsOnlyABrokenAffectedConsumer(t *testing.T) {
 		if len(f.runner.commands) != wantCommands {
 			t.Fatal(change, f.mutations(), err)
 		}
+	}
+}
+
+func TestBrewMaintenanceReportsABrokenUnrecordedConsumerAndNeverRepairsIt(t *testing.T) {
+	f := brewMaintenanceFixture(t, false)
+	err := f.apply(brewTestFormula("tool.git", "git"), engine.Want{Present: true})
+	line := f.line(false, "reinstall", "--formula", "sample/tap/consumer")
+	if err == nil || !strings.Contains(err.Error(), "consumer") || !strings.Contains(err.Error(), "broken linkage of sample/tap/consumer") || !strings.Contains(err.Error(), line) {
+		t.Fatal("the report must name the formula, the fault and the copy-ready command", err)
+	}
+	var report *BrewDependentError
+	if !errors.As(err, &report) || report.Name != "consumer" || report.Block.By != "you" || !slices.Equal(report.Block.Lines, []string{line}) {
+		t.Fatal("the report lacks its copy-ready command block for the operator", report)
+	}
+	if !reflect.DeepEqual(f.mutations(), [][]string{{"install", "--formula", "git"}}) {
+		t.Fatal("setup repaired a formula without a record", f.mutations())
+	}
+	if st := f.rec.State(); !slices.Equal(st.Pending, []string{"tool.git:brew-install"}) || st.HasSystem("brew", "sample/tap/consumer") || st.HasSystem("brew", "consumer") {
+		t.Fatal("the stopped step cleared its mark or recorded the consumer", st.Pending, st.System)
 	}
 }
 

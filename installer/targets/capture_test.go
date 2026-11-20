@@ -17,6 +17,8 @@ import (
 
 type noCopyKind struct{ targets.Kind }
 
+func (noCopyKind) CannotCopy() bool { return true }
+
 func (noCopyKind) Save(context.Context, targets.Desired, string) (string, error) {
 	return "", errors.New("this kind makes no copy")
 }

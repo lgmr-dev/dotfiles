@@ -146,7 +146,7 @@ func TestDeferredMacApplicationsPassCheckAndMoveToTheirCasksWithUpdate(t *testin
 	}
 	for _, application := range applications {
 		for _, name := range []string{application[2], application[2] + " launcher"} {
-			if note := "Note: " + name + " runs from the release v2 payload; Update tools moves it to the Homebrew cask."; !strings.Contains(check.Message, note) {
+			if note := "Note: " + name + " runs from the release v2 payload; Update tools moves it to the Homebrew cask. Choose tools keeps the v2 payload. The first confirmed run that changes something closes the v2 fallback."; !strings.Contains(check.Message, note) {
 				t.Fatalf("check lacks %q:\n%s", note, check.Message)
 			}
 		}

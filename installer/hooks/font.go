@@ -241,6 +241,8 @@ func (k fontKind) Baseline(before string) (string, error) {
 
 func (k fontKind) Recover(context.Context, targets.Desired, state.Record) error { return nil }
 
+func (k fontKind) CannotCopy() bool { return true }
+
 func (k fontKind) Save(_ context.Context, d targets.Desired, _ string) (string, error) {
 	return "", fmt.Errorf("setup makes no copy of the font registration of %s; resolve that exact value yourself", d.Path)
 }

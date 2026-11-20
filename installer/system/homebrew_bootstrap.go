@@ -128,12 +128,12 @@ func (d *HomebrewBootstrap) Inspect(ctx context.Context, r catalog.Resource, _ e
 	case "absent", "empty":
 		f.Status, f.Privileged, f.Pending, f.Replan = engine.Missing, true, true, true
 		f.Reason = "install Homebrew at " + o.Location.Prefix + " with the official installer at the reviewed commit; Homebrew and any installed Command Line Tools stay after a removal"
-		lines := []string{"sudo /bin/mkdir " + o.Location.Prefix}
+		lines := []string{macosShellLine(d.reserveCommand(o.Location.Prefix))}
 		if o.Kind == "empty" {
 			lines = nil
 		}
 		f.Commands = []engine.CommandBlock{{Title: "Install Homebrew (installer commit " + homebrewBootstrapCommit[:12] + ", SHA-256 " + d.sha256[:12] + ")", By: "setup",
-			Lines: append(lines, "NONINTERACTIVE=1 /bin/bash install.sh --path="+o.Location.Prefix)}}
+			Lines: append(lines, macosShellLine(d.installCommand(o.Location.Prefix, nil))+" < install.sh")}}
 	case "occupied":
 		f.Status, f.Reason = engine.Unknown, "the Homebrew prefix already exists without a working manager; preserve it and repair it explicitly"
 	case "broken":
@@ -170,22 +170,29 @@ func (d *HomebrewBootstrap) Apply(ctx context.Context, r catalog.Resource, appro
 		return err
 	}
 	prefix := o.Location.Prefix
-	if o.Kind == "absent" {
-		if _, _, err := macosRun(ctx, d.Runner, d.reserveCommand(prefix)); err != nil {
-			return fmt.Errorf("Homebrew infrastructure command failed; authorize administrator access in the foreground or resolve the reported native prerequisite, then retry: %w", err)
-		}
-	}
-	identity, err := homebrewPrefixIdentity(prefix)
-	if err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(prefix)
-	if err != nil || len(entries) != 0 || o.Kind == "empty" && identity != o.Identity {
-		return errors.Join(errors.New("the Homebrew prefix changed before the installer started; preserve it and review a new plan"), err)
-	}
 	mark := homebrewBootstrapMark(r)
 	if err := rec.Update(func(s *state.State) error { s.Mark(mark); return nil }); err != nil {
 		return err
+	}
+	if o.Kind == "absent" {
+		_, started, err := macosRun(ctx, d.Runner, d.reserveCommand(prefix))
+		if err != nil && !started {
+			return errors.Join(fmt.Errorf("the Homebrew prefix reservation did not start: %w", err), macosClearMark(rec, mark))
+		}
+		if err != nil {
+			return fmt.Errorf("Homebrew infrastructure command failed; authorize administrator access in the foreground or resolve the reported native prerequisite, run setup again and confirm that the command exited: %w", err)
+		}
+	}
+	identity, err := homebrewPrefixIdentity(prefix)
+	if err == nil {
+		var entries []os.DirEntry
+		entries, err = os.ReadDir(prefix)
+		if err == nil && (len(entries) != 0 || o.Kind == "empty" && identity != o.Identity) {
+			err = errors.New("the prefix has content or is another folder")
+		}
+	}
+	if err != nil {
+		return errors.Join(fmt.Errorf("the Homebrew prefix changed before the installer started; preserve it and review a new plan: %w", err), macosClearMark(rec, mark))
 	}
 	_, started, err := macosRun(ctx, d.Runner, d.installCommand(prefix, payload))
 	if err != nil && !started {

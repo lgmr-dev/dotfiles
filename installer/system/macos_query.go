@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -96,6 +97,31 @@ func macosRun(ctx context.Context, runner platform.Runner, c platform.Command) (
 	}
 	_, started = platform.ExitCode(err)
 	return output, started, err
+}
+
+var macosPlainWord = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+
+func macosShellWord(word string) string {
+	if macosPlainWord.MatchString(word) {
+		return word
+	}
+	return "'" + strings.ReplaceAll(word, "'", `'"'"'`) + "'"
+}
+
+func macosShellLine(c platform.Command) string {
+	words := []string{}
+	for _, assignment := range c.Env {
+		key, value, _ := strings.Cut(assignment, "=")
+		if value != "" {
+			value = macosShellWord(value)
+		}
+		words = append(words, key+"="+value)
+	}
+	words = append(words, macosShellWord(c.Path))
+	for _, argument := range c.Args {
+		words = append(words, macosShellWord(argument))
+	}
+	return strings.Join(words, " ")
 }
 
 func macosClearMark(rec engine.Records, mark string) error {

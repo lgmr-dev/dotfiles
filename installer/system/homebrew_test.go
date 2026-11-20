@@ -225,8 +225,7 @@ func (f *homebrewBootstrapFixture) apply() error {
 func TestHomebrewBootstrapFreshLifecycleUsesThePendingMarkAndReplans(t *testing.T) {
 	f := newHomebrewBootstrapFixture(t)
 	missing := f.inspect()
-	if missing.Status != engine.Missing || !missing.Replan || !missing.Pending || !missing.Privileged || len(missing.Commands) != 1 || missing.Commands[0].By != "setup" ||
-		!slices.Contains(missing.Commands[0].Lines, "sudo /bin/mkdir "+f.d.prefix) {
+	if missing.Status != engine.Missing || !missing.Replan || !missing.Pending || !missing.Privileged || len(missing.Commands) != 1 || missing.Commands[0].By != "setup" {
 		t.Fatal(missing)
 	}
 	if err := f.d.Apply(context.Background(), f.r, missing, f.rec); err != nil {
@@ -248,8 +247,11 @@ func TestHomebrewBootstrapFreshLifecycleUsesThePendingMarkAndReplans(t *testing.
 			t.Fatal("missing bootstrap environment boundary", required)
 		}
 	}
-	if len(f.pending[0]) != 0 || !slices.Equal(f.pending[1], []string{"infra.homebrew:install"}) || len(f.rec.State().Pending) != 0 {
-		t.Fatal("the pending mark did not cover exactly the installer", f.pending, f.rec.State().Pending)
+	if !slices.Equal(f.pending[0], []string{"infra.homebrew:install"}) || !slices.Equal(f.pending[1], []string{"infra.homebrew:install"}) || len(f.rec.State().Pending) != 0 {
+		t.Fatal("the pending mark must cover the prefix reservation and the installer", f.pending, f.rec.State().Pending)
+	}
+	if shown := missing.Commands[0].Lines; !slices.Equal(shown, []string{macTestLine(reserve), macTestLine(install) + " < install.sh"}) {
+		t.Fatal("the approved lines differ from the commands that ran", shown)
 	}
 	if len(f.rec.State().System) != 0 {
 		t.Fatal("retained Homebrew got a system record", f.rec.State().System)
@@ -303,15 +305,20 @@ func TestHomebrewBootstrapVerifiesThePayloadBeforeAnyCommand(t *testing.T) {
 func TestHomebrewBootstrapMarkLifecycleOnFailure(t *testing.T) {
 	f := newHomebrewBootstrapFixture(t)
 	f.fail = "reserve"
-	if err := f.apply(); err == nil || len(f.runner.commands) != 1 || len(f.rec.State().Pending) != 0 {
-		t.Fatal("a failed reservation reached the installer or left a mark", err, f.rec.State().Pending)
+	if err := f.apply(); err == nil || len(f.runner.commands) != 1 || !slices.Equal(f.pending[0], []string{"infra.homebrew:install"}) || !slices.Equal(f.rec.State().Pending, []string{"infra.homebrew:install"}) {
+		t.Fatal("a failed reservation reached the installer or ran without its mark", err, f.pending, f.rec.State().Pending)
+	}
+	f = newHomebrewBootstrapFixture(t)
+	f.fail = "reserve-not-started"
+	if err := f.apply(); err == nil || len(f.runner.commands) != 1 || !slices.Equal(f.pending[0], []string{"infra.homebrew:install"}) || len(f.rec.State().Pending) != 0 {
+		t.Fatal("a reservation that did not start kept its mark", err, f.pending, f.rec.State().Pending)
 	}
 	f = newHomebrewBootstrapFixture(t)
 	f.fail = "install-not-started"
 	if err := f.apply(); err == nil || !strings.Contains(err.Error(), "did not start") || len(f.rec.State().Pending) != 0 {
 		t.Fatal("an installer that did not start kept its mark", err, f.rec.State().Pending)
 	}
-	if found := f.inspect(); found.Status != engine.Missing || slices.Contains(found.Commands[0].Lines, "sudo /bin/mkdir "+f.d.prefix) {
+	if found := f.inspect(); found.Status != engine.Missing || len(found.Commands[0].Lines) != 1 || strings.Contains(found.Commands[0].Lines[0], "mkdir") {
 		t.Fatal("an empty reserved prefix must permit the installer without a second reservation", found)
 	}
 	f.fail = ""

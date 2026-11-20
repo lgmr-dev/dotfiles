@@ -125,10 +125,14 @@ func (s *brewSession) command(cask bool, args ...string) platform.Command {
 	return platform.Command{Path: s.location.Program, Args: args, Env: environment}
 }
 
-func brewRemovalBlock(name string, cask bool) (engine.CommandBlock, string) {
-	line := "HOMEBREW_NO_AUTOREMOVE=1 brew uninstall " + name
+func (s *brewSession) line(cask bool, args ...string) string {
+	return macosShellLine(s.command(cask, args...))
+}
+
+func (s *brewSession) removalBlock(name string, cask bool) (engine.CommandBlock, string) {
+	line := s.line(false, "uninstall", name)
 	if cask {
-		line = "HOMEBREW_NO_AUTOREMOVE=1 brew uninstall --cask " + name
+		line = s.line(true, "uninstall", "--cask", name)
 	}
 	return engine.CommandBlock{Title: "Remove " + name + " with Homebrew (setup never removes a system package)", By: "you", Lines: []string{line}},
 		"Examine what Homebrew proposes to remove before you confirm. Setup deletes its record of " + name + " after the package is absent."
@@ -196,7 +200,7 @@ func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b 
 			return f, nil
 		}
 		if o.Recorded {
-			block, note := brewRemovalBlock(b.full, false)
+			block, note := s.removalBlock(b.full, false)
 			f.Commands, f.Notes = []engine.CommandBlock{block}, []string{note}
 		}
 		return f, nil
@@ -204,8 +208,8 @@ func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b 
 	setup := func(verb string) {
 		f.Pending = true
 		f.Commands = []engine.CommandBlock{{Title: map[string]string{"install": "Install ", "reinstall": "Repair ", "upgrade": "Update "}[verb] + b.name + " with Homebrew", By: "setup",
-			Lines: []string{"brew " + verb + " --formula " + b.full}}}
-		f.Notes = append(f.Notes, "Homebrew can install or upgrade the formulae that "+b.name+" depends on. Setup then checks the linkage of the installed formulae that use them and reinstalls one that fails.")
+			Lines: []string{s.line(false, verb, "--formula", b.full)}}}
+		f.Notes = append(f.Notes, "Homebrew can install or upgrade the formulae that "+b.name+" depends on. Setup then checks the linkage of the installed formulae that use them. It reinstalls one that fails only when setup installed it, and stops with the repair command for each other one.")
 	}
 	foreign := o.Present && o.Source != b.full
 	switch {
@@ -216,7 +220,7 @@ func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b 
 		switch {
 		case !o.Recorded:
 			f.Status, f.Reason = engine.Blocked, o.Issue+"; setup did not install this package and does not change it: repair it yourself"
-			f.Commands = []engine.CommandBlock{{Title: "Repair " + b.name + " with Homebrew", By: "you", Lines: []string{"brew reinstall --formula " + o.Source}}}
+			f.Commands = []engine.CommandBlock{{Title: "Repair " + b.name + " with Homebrew", By: "you", Lines: []string{s.line(false, "reinstall", "--formula", o.Source)}}}
 		case o.Held:
 			f.Status, f.Reason = engine.Blocked, o.Issue+"; the Homebrew package is pinned, and setup keeps the pin: repair it yourself"
 		case foreign:
@@ -413,7 +417,7 @@ func (d *Brew) Remove(ctx context.Context, r catalog.Resource, _ engine.Finding,
 		provider, name = "cask", "cask/"+b.name
 	}
 	if _, present := installed[name]; present {
-		block, _ := brewRemovalBlock(b.full, b.cask != nil)
+		block, _ := s.removalBlock(b.full, b.cask != nil)
 		return fmt.Errorf("%s is installed, and setup never removes a system package; remove it with `%s` if nothing else needs it", b.full, block.Lines[0])
 	}
 	return rec.Update(func(st *state.State) error { st.RemoveSystem(provider, b.full); return nil })

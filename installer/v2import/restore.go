@@ -18,7 +18,10 @@ import (
 // target that already holds its saved value, "restore" for a target that
 // holds the value of release v3 and gets its saved value, "remove" for a
 // target that the switch created, "changed" for a target that you edited
-// after the switch, and "manual" for a target that setup cannot give back.
+// after the switch, "manual" for a target that has no copy by design, such
+// as a font registration, and "blocked" for a target that setup cannot
+// compare with its saved value. A blocked target stops the restore before
+// the publication of the schema-1 state.
 type RestoreItem struct {
 	Key, Resource, Action, Detail string
 
@@ -38,7 +41,7 @@ const afterRestore = "Release v2 is active again. Check out " + SourceCommit + "
 
 func (r *Restoration) classify(set *restoreSet, st state.State, key string) RestoreItem {
 	slot := set.manifest.Slots[key]
-	item := RestoreItem{Key: key, Resource: slot.Resource, Action: "manual"}
+	item := RestoreItem{Key: key, Resource: slot.Resource, Action: "blocked"}
 	inspect := func(before string) (targets.Live, error) {
 		live, err := set.writer.InspectRecord(key, &memory{state.State{Targets: map[string]state.Record{key: {Resource: slot.Resource, Kind: slot.Kind, Before: before}}}})
 		if err == nil && live.State == targets.StateUnreadable {
@@ -46,19 +49,23 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		}
 		return live, err
 	}
+	started, restoring := set.manifest.Restoring[key]
 	live, err := inspect(slot.Saved)
 	switch {
 	case err != nil:
 		item.Detail = "setup cannot compare it with its saved value: " + err.Error()
 		return item
-	case live.Fingerprint == live.Want:
+	case live.Fingerprint == live.Want && !restoring:
 		item.Action, item.Detail = "none", "it holds its value of release v2"
 		return item
 	case strings.HasPrefix(slot.Saved, "fp:"):
-		item.Detail = "setup has no copy of its value of release v2; Update tools of release v2 repairs it"
+		item.Action, item.Detail = "manual", "setup has no copy of its value of release v2; Update tools of release v2 repairs it"
 		return item
 	}
-	candidates := []string{targets.Absent}
+	candidates := []string{targets.Absent, live.Want}
+	if restoring {
+		candidates = append(candidates, started)
+	}
 	if record, has := st.Targets[key]; has {
 		candidates = append(candidates, record.Applied, record.Next)
 	} else if imported, had := set.manifest.Imported.Targets[key]; had && imported.Before != "" {
@@ -75,6 +82,9 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.Action, item.Detail = "restore", "it gets its value of release v2"
 	}
 	item.live = live.Fingerprint
+	if restoring && (live.Fingerprint == targets.Absent || live.Fingerprint == live.Want) {
+		item.live = started
+	}
 	return item
 }
 
@@ -182,37 +192,62 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	if r.Done {
 		return afterRestore, nil
 	}
-	notes, failures := []string{}, []string{}
+	notes, failures, kept := []string{}, []string{}, map[string]string{}
 	for _, item := range r.Items {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
 		slot := set.manifest.Slots[item.Key]
-		live, choice := item.live, targets.Preserve
+		applied, choice := item.live, targets.Preserve
 		switch item.Action {
-		case "none":
-			continue
-		case "manual":
-			notes = append(notes, "Not restored: "+item.Key+": "+item.Detail)
+		case "none", "manual", "blocked":
 			continue
 		case "changed":
 			if !slices.Contains(replace, item.Key) {
-				notes = append(notes, "Kept your changed content: "+item.Key)
+				kept[item.Key] = item.live
 				continue
 			}
-			choice, live = targets.Replace, "edited after the switch"
+			choice, applied = targets.Replace, "edited after the switch"
 		}
-		record := state.Record{Resource: slot.Resource, Kind: slot.Kind, Applied: live, Before: slot.Saved, Made: slices.Clone(slot.Made)}
+		if set.manifest.Restoring == nil {
+			set.manifest.Restoring = map[string]string{}
+		}
+		set.manifest.Restoring[item.Key] = item.live
+		if err := set.save(); err != nil {
+			return "", err
+		}
+		record := state.Record{Resource: slot.Resource, Kind: slot.Kind, Applied: applied, Before: slot.Saved, Made: slices.Clone(slot.Made)}
 		err := set.writer.Release(ctx, item.Key, &memory{state.State{Targets: map[string]state.Record{item.Key: record}}}, choice)
 		switch {
 		case errors.Is(err, targets.ErrChanged):
-			notes = append(notes, "Kept your changed content: "+item.Key)
 		case err != nil:
 			failures = append(failures, item.Key+": "+err.Error())
+		default:
+			delete(set.manifest.Restoring, item.Key)
+			if err := set.save(); err != nil {
+				return "", err
+			}
+		}
+	}
+	st, err := state.Peek(e.StateDir, e.Target)
+	if err != nil {
+		return "", err
+	}
+	for _, key := range slotOrder(set.manifest.Slots) {
+		after := r.classify(set, st, key)
+		preserved, decided := kept[key]
+		switch {
+		case after.Action == "none":
+		case after.Action == "manual":
+			notes = append(notes, "Not restored: "+key+": "+after.Detail)
+		case after.Action == "changed" && decided && after.live == preserved:
+			notes = append(notes, "Kept your changed content: "+key)
+		case !slices.ContainsFunc(failures, func(failure string) bool { return strings.HasPrefix(failure, key+": ") }):
+			failures = append(failures, key+": it does not hold its value of release v2: "+after.Detail)
 		}
 	}
 	if len(failures) != 0 {
-		return "", fmt.Errorf("restore-v2 stopped before it published the state of release v2. Release v3 stays active; resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
+		return "", fmt.Errorf("restore-v2 stopped before it published the state of release v2. Release v3 stays active. Resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
 	}
 	original, err := r.original()
 	if err != nil {

@@ -399,40 +399,24 @@ func (e *Engine) Run(ctx context.Context) (result Result, resultErr error) {
 	}
 }
 
-func (e *Engine) confirmPending(ctx context.Context, ui Interaction, session *menuSession) error {
-	marks := session.state.Pending
-	if len(marks) == 0 {
-		return nil
-	}
+func confirmPending(ctx context.Context, ui Interaction, marks []string) ([]string, error) {
 	options := []Choice{
-		{ID: "confirm", Label: "Yes, the command exited", Detail: "Clear the mark. Setup inspects the system again and repeats the step only if it is still necessary."},
+		{ID: "confirm", Label: "Yes, the command exited", Detail: "Setup clears the mark when the run that you approve starts. It inspects the system again and repeats the step only if it is still necessary."},
 		{ID: "back", Label: "No, go back", Detail: "Wait until the command exits, then open setup again. Nothing changes now."},
 	}
-	choice, err := ui.Choose(ctx, "An earlier step did not report its end: "+strings.Join(marks, ", ")+". Did its command exit?", options, []string{"back"}, false)
-	if err != nil {
-		return err
-	}
-	if err := validateChoice(choice, options, false); err != nil {
-		return err
-	}
-	if choice[0] != "confirm" {
-		return ErrBack
-	}
-	session.close()
-	store, err := state.Open(e.StateDir, e.Target)
-	if err != nil {
-		return err
-	}
-	err = store.Update(func(s *state.State) error {
-		for _, mark := range marks {
-			s.Clear(mark)
+	for _, mark := range marks {
+		choice, err := ui.Choose(ctx, "An earlier step did not report its end: "+mark+". Did its command exit?", options, []string{"back"}, false)
+		if err != nil {
+			return nil, err
 		}
-		return nil
-	})
-	if err = errors.Join(err, store.Close()); err != nil {
-		return err
+		if err := validateChoice(choice, options, false); err != nil {
+			return nil, err
+		}
+		if choice[0] != "confirm" {
+			return nil, ErrBack
+		}
 	}
-	return session.refresh()
+	return slices.Clone(marks), nil
 }
 
 func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSession, mode string) (Result, error) {
@@ -447,7 +431,8 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 		session.checkFailed = result.Status != "ready"
 		return result, ui.Report(result)
 	}
-	if err := e.confirmPending(ctx, ui, session); err != nil {
+	confirmed, err := confirmPending(ctx, ui, session.state.Pending)
+	if err != nil {
 		return result, err
 	}
 	if mode == "apply" {
@@ -503,7 +488,7 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 		if err != nil {
 			return result, err
 		}
-		result, err = e.Apply(applying, current, proposal.Plan)
+		result, err = e.apply(applying, current, proposal.Plan, confirmed)
 		if errors.Is(err, ErrPlanChanged) || errors.Is(err, ErrReplan) {
 			if refreshErr := session.refresh(); refreshErr != nil {
 				return result, refreshErr
@@ -518,7 +503,7 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 			if refreshErr := session.refresh(); refreshErr != nil {
 				return result, refreshErr
 			}
-			if err := e.confirmPending(ctx, ui, session); err != nil {
+			if confirmed, err = confirmPending(ctx, ui, session.state.Pending); err != nil {
 				return result, err
 			}
 			notice = ""

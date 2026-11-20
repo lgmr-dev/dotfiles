@@ -308,9 +308,6 @@ func TestAPTPendingMarkLifecycle(t *testing.T) {
 		seen := false
 		f.fail = func(c platform.Command) error {
 			if !isInstall(c) {
-				if st := f.rec.State(); len(st.Pending) != 0 || st.HasSystem("apt", "zsh") {
-					t.Fatal("the refresh of the package lists must not need a mark", st.Pending, st.System)
-				}
 				return nil
 			}
 			st := f.rec.State()
@@ -384,19 +381,59 @@ func TestAPTPendingMarkLifecycle(t *testing.T) {
 	})
 }
 
-func TestAPTFailedRefreshLeavesNoMark(t *testing.T) {
-	f := newAPTFixture(t)
+func TestAPTRefreshRunsUnderTheMarkAndBeforeTheProvisionalRecord(t *testing.T) {
 	ctx := context.Background()
 	r := aptFixtureResource("zsh")
-	f.fail = func(platform.Command) error { return aptFixtureExit(100) }
-	found, _ := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
-	err := f.apt.Apply(ctx, r, found, f.rec)
-	if err == nil || !strings.Contains(err.Error(), "could not refresh its package lists") || len(f.commands) != 1 {
-		t.Fatal(err, f.commands)
-	}
-	if st := f.rec.State(); len(st.Pending) != 0 || st.HasSystem("apt", "zsh") {
-		t.Fatal(st.Pending, st.System)
-	}
+	mark := []string{"tool.zsh:apt-install"}
+	isRefresh := func(c platform.Command) bool { return slices.Equal(c.Args[len(c.Args)-1:], []string{"update"}) }
+
+	t.Run("order", func(t *testing.T) {
+		f := newAPTFixture(t)
+		seen := []string{}
+		f.during = func(c platform.Command) {
+			st := f.rec.State()
+			if !slices.Equal(st.Pending, mark) {
+				t.Fatal("each privileged APT command must run under the pending mark", c.Args, st.Pending)
+			}
+			if st.HasSystem("apt", "zsh") == isRefresh(c) {
+				t.Fatal("the provisional record must come after the refresh and before the install", c.Args, st.System)
+			}
+			seen = append(seen, c.Args[len(c.Args)-1])
+		}
+		found, _ := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
+		if err := f.apt.Apply(ctx, r, found, f.rec); err != nil || !slices.Equal(seen, []string{"update", "zsh"}) {
+			t.Fatal(err, seen)
+		}
+		if st := f.rec.State(); len(st.Pending) != 0 || !st.HasSystem("apt", "zsh") {
+			t.Fatal(st.Pending, st.System)
+		}
+	})
+
+	t.Run("refresh did not start", func(t *testing.T) {
+		f := newAPTFixture(t)
+		f.fail = func(platform.Command) error { return errors.New("fork/exec /fake/sudo: no such file or directory") }
+		found, _ := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
+		err := f.apt.Apply(ctx, r, found, f.rec)
+		if err == nil || !strings.Contains(err.Error(), "did not start") || len(f.commands) != 1 {
+			t.Fatal(err, f.commands)
+		}
+		if st := f.rec.State(); len(st.Pending) != 0 || st.HasSystem("apt", "zsh") {
+			t.Fatal("a refresh that did not start left its mark or a record", st.Pending, st.System)
+		}
+	})
+
+	t.Run("refresh started and failed", func(t *testing.T) {
+		f := newAPTFixture(t)
+		f.fail = func(platform.Command) error { return aptFixtureExit(100) }
+		found, _ := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
+		err := f.apt.Apply(ctx, r, found, f.rec)
+		if err == nil || !strings.Contains(err.Error(), "could not refresh its package lists") || !strings.Contains(err.Error(), "confirm that the command exited") || len(f.commands) != 1 {
+			t.Fatal(err, f.commands)
+		}
+		if st := f.rec.State(); !slices.Equal(st.Pending, mark) || st.HasSystem("apt", "zsh") {
+			t.Fatal("a refresh that started and failed must keep its mark and add no record", st.Pending, st.System)
+		}
+	})
 }
 
 func TestAPTChangesAPresentPackageOnlyWithARecord(t *testing.T) {

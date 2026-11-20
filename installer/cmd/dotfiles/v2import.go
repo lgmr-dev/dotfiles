@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/builds"
@@ -185,35 +186,47 @@ func importMenu(ctx context.Context, s setup, options v2import.Options, setLegac
 	}
 }
 
-func restoreMenu(ctx context.Context, ui *terminal.Workflow, s setup, options v2import.Options) error {
+const restoreReplaceGroup = "Replace your changed content with the value of release v2 (setup saves your content first)"
+
+type restoreUI interface {
+	Review(ctx context.Context, c engine.Catalog, proposal engine.Proposal, revise engine.Revise) (bool, error)
+	Close() error
+}
+
+func restoreProposal(restoration *v2import.Restoration, replace []string) engine.Proposal {
+	proposal := engine.Proposal{Plan: engine.Plan{Mode: "restore-v2"}, Details: restoration.Text(),
+		Notice: fmt.Sprintf("Restore release v2: %d saved targets. Press d for the full list. Apply gives the targets back and then publishes the state of release v2.", len(restoration.Items))}
+	for _, item := range restoration.Changed() {
+		proposal.Choices = append(proposal.Choices, engine.ReviewChoice{Group: restoreReplaceGroup, ID: item.Key, Label: item.Key, Checked: slices.Contains(replace, item.Key),
+			Detail: "Checked: setup saves your changed content, then writes the value of release v2. Unchecked: your content stays."})
+	}
+	return proposal
+}
+
+func restoreMenu(ctx context.Context, ui restoreUI, s setup, options v2import.Options) error {
 	restoration, err := v2import.PreviewRestore(ctx, options)
 	if err != nil {
 		return err
 	}
-	confirm := []engine.Choice{
-		{ID: "restore", Label: "Restore release v2", Detail: strings.TrimSpace(restoration.Text())},
-		{ID: "back", Label: "Go back", Detail: "Nothing changes now."},
+	replace := []string{}
+	revise := func(_ context.Context, choices []engine.ReviewChoice) (engine.Proposal, error) {
+		replace = []string{}
+		for _, choice := range choices {
+			if !slices.ContainsFunc(restoration.Changed(), func(item v2import.RestoreItem) bool { return item.Key == choice.ID }) {
+				return engine.Proposal{}, fmt.Errorf("invalid restore choice %q", choice.ID)
+			}
+			if choice.Checked {
+				replace = append(replace, choice.ID)
+			}
+		}
+		return restoreProposal(restoration, replace), nil
 	}
-	choice, err := ui.Choose(ctx, "Restore release v2?", confirm, []string{"back"}, false)
-	if errors.Is(err, engine.ErrCancelled) || err == nil && (len(choice) != 1 || choice[0] != "restore") {
+	accepted, err := ui.Review(ctx, options.Engine.Catalog, restoreProposal(restoration, replace), revise)
+	if errors.Is(err, engine.ErrCancelled) || err == nil && !accepted {
 		return nil
 	}
 	if err != nil {
 		return err
-	}
-	replace := []string{}
-	if changed := restoration.Changed(); len(changed) != 0 {
-		choices := []engine.Choice{}
-		for _, item := range changed {
-			choices = append(choices, engine.Choice{ID: item.Key, Label: item.Key, Detail: "Checked: setup saves your changed content, then writes the value of release v2. Unchecked: your content stays."})
-		}
-		replace, err = ui.Choose(ctx, "These targets changed after the switch. Select the ones that restore-v2 replaces.", choices, nil, true)
-		if errors.Is(err, engine.ErrCancelled) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
 	}
 	if err := ui.Close(); err != nil {
 		return err

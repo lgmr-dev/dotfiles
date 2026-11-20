@@ -402,7 +402,10 @@ func TestBaselineWithoutAnAppliedValueGivesNoOwnership(t *testing.T) {
 			if record.Applied != "" || record.Next != "" || record.Before == "" || record.Before == targets.Absent {
 				t.Fatal("expected a record with a baseline only", record)
 			}
-			if live, err := e.writer.Inspect(d, e); err != nil || live.State != targets.StateBefore {
+			if live, err := e.writer.Inspect(d, e); err != nil || live.State != targets.StateChanged || live.Satisfied {
+				t.Fatal("a different desired content against a baseline only is changed content", live, err)
+			}
+			if live, err := e.writer.InspectRecord(targets.Key(d.Path, d.Slot), e); err != nil || live.State != targets.StateBefore {
 				t.Fatal(live, err)
 			}
 			e.mustRelease(d, targets.Preserve)
@@ -430,9 +433,12 @@ func TestContentThatEqualsTheDesiredContentGivesNoOwnership(t *testing.T) {
 			if err != nil || live.State != targets.StateChanged || live.Fingerprint != live.Want {
 				t.Fatal("equal content without a record must not look owned", live, err)
 			}
-			e.mustConverge(d, targets.Preserve)
-			if describe(t, e.root) != equal {
-				t.Fatal("equal content was changed")
+			if err := e.converge(d, targets.Preserve); err != nil || describe(t, e.root) != equal {
+				t.Fatal("equal content was changed", err)
+			}
+			e.unowned(d)
+			if live, err := e.writer.Inspect(d, e); err != nil || !live.Satisfied || live.State != targets.StateBefore {
+				t.Fatal("equal content that setup does not own needs no action", live, err)
 			}
 			e.mustRelease(d, targets.Preserve)
 			if describe(t, e.root) != equal || len(e.baselines()) != 0 {

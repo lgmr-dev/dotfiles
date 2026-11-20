@@ -28,7 +28,9 @@ const Absent = "absent"
 // StateApplied: the unit matches the applied value of its record.
 // StateNext: the unit matches the intended value of an unfinished write.
 // StateBefore: the unit matches the saved baseline, and setup does not own
-// it. StateChanged: other content, which stays without a decision.
+// it. StateChanged: other content, which stays without a decision; this
+// includes content that setup does not own and that differs from the desired
+// content.
 // StateUnreadable: setup cannot read the unit, which never proves absence.
 const (
 	StateAbsent     = "absent"
@@ -66,11 +68,15 @@ type Desired struct {
 }
 
 // Live is the inspection of one unit. Fingerprint is the live fingerprint
-// and Want is the fingerprint after a write of the desired unit. A unit is
-// satisfied when State is StateApplied and Fingerprint equals Want. Detail
-// gives the cause of StateUnreadable.
+// and Want is the fingerprint after a write of the desired unit. Satisfied
+// means that the unit needs no action: it equals the desired content, and
+// either setup wrote it and the record is complete (StateApplied), or setup
+// did not write it and the record holds it as a baseline only (StateBefore).
+// Equal content without a record is not satisfied: Converge records it as a
+// baseline, without ownership. Detail gives the cause of StateUnreadable.
 type Live struct {
 	State, Fingerprint, Want, Detail string
+	Satisfied                        bool
 }
 
 // Choice is the decision of the operator for changed content.
@@ -108,6 +114,14 @@ type Kind interface {
 	Write(ctx context.Context, d Desired, from string) error
 	Restore(ctx context.Context, d Desired, record state.Record, from string) error
 	Discard(before, dir string) error
+}
+
+// Uncopyable is an optional interface of a Kind. A kind whose CannotCopy
+// returns true declares that it cannot copy its unit, so Capture gives the
+// live fingerprint as "fp:<fingerprint>" in place of a copy. For each other
+// kind a failed Save is an error.
+type Uncopyable interface {
+	CannotCopy() bool
 }
 
 // Writer applies the write order to units. StateDir is the installer state
@@ -255,6 +269,15 @@ func (w *Writer) Inspect(d Desired, rec engine.Records) (Live, error) {
 	}
 	live := w.live(kind, d, record, has)
 	live.Want = want
+	unowned := has && record.Applied == "" && record.Next == "" && !record.Release
+	switch {
+	case live.State == StateApplied:
+		live.Satisfied = record.Applied == want && record.Next == "" && !record.Release
+	case live.State == StateBefore && record.Applied == "" && live.Fingerprint != want:
+		live.State = StateChanged
+	case live.State == StateBefore:
+		live.Satisfied = unowned
+	}
 	return live, nil
 }
 
@@ -319,13 +342,49 @@ func (w *Writer) keep(ctx context.Context, d Desired, saved string) error {
 	return nil
 }
 
+func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Records, record state.Record, has bool, fingerprint string) error {
+	before := ""
+	if has && record.Before != "" {
+		if baseline, err := kind.Baseline(record.Before); err == nil && baseline == fingerprint {
+			before = record.Before
+		}
+	}
+	unowned := state.Record{Resource: d.Resource, Kind: d.Kind, Before: before}
+	if before != "" && record.Kind == d.Kind && record.Applied == "" && record.Next == "" && !record.Release && len(record.Made) == 0 {
+		return nil
+	}
+	fresh := before == ""
+	if fresh {
+		var err error
+		if unowned.Before, err = w.save(ctx, kind, d); err != nil {
+			return err
+		}
+	}
+	if err := rec.Update(func(s *state.State) error { s.Targets[d.Key] = unowned; return nil }); err != nil {
+		if fresh {
+			err = errors.Join(err, kind.Discard(unowned.Before, w.baselines()))
+		}
+		return err
+	}
+	if path, isBackup := strings.CutPrefix(record.Before, "backup:"); has && isBackup && record.Before != unowned.Before {
+		platform.Detail(ctx, "Kept the earlier content of %s at %s", d.Key, path)
+	}
+	return nil
+}
+
 // Converge makes one unit equal to d through the write order. A unit that
-// matches its record, an absent unit and a unit that already equals d need
-// no decision. Other content stops with ErrChanged, or with Replace it is
-// saved first: as the first baseline when the unit has none, and otherwise as
-// a file in the baselines folder that the progress display names. Content
-// that equals d without a record becomes the baseline, so a release leaves
-// it. A run after an interruption completes or repeats the write.
+// matches the applied value of its record and an absent unit need no
+// decision. Other content stops with ErrChanged, or with Replace it is saved
+// first: as the first baseline when the unit has none, and otherwise as a
+// file in the baselines folder that the progress display names.
+//
+// Equal content never gives ownership. When the unit equals d and this write
+// order did not produce it, which means that it matches neither the applied
+// value nor the intended value of an unfinished write, the record becomes a
+// baseline only: the live unit is the baseline, there is no applied value,
+// and a release leaves the unit. A later different d against such a record
+// is changed content. A run after an interruption completes or repeats the
+// write.
 func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c Choice) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -363,29 +422,32 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 	if has && live.State == StateApplied && record.Applied == want && record.Next == "" && !record.Release {
 		return nil
 	}
+	if live.Fingerprint == want && live.State != StateApplied {
+		return w.disown(ctx, kind, d, rec, record, has, live.Fingerprint)
+	}
 	saved := ""
-	if live.State == StateChanged && live.Fingerprint != want {
+	held := has && record.Applied == "" && live.State == StateBefore
+	if live.State == StateChanged || held {
 		if c != Replace {
 			return fmt.Errorf("%s: %w", d.Key, ErrChanged)
 		}
-		if saved, err = w.save(ctx, kind, d); err != nil {
-			return err
-		}
-		if has {
-			if err := w.keep(ctx, d, saved); err != nil {
+		if !held {
+			if saved, err = w.save(ctx, kind, d); err != nil {
 				return err
+			}
+			if has {
+				if err := w.keep(ctx, d, saved); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	if !has {
 		first := state.Record{Resource: d.Resource, Kind: d.Kind, Before: Absent}
-		switch {
-		case live.Fingerprint == Absent:
+		if live.Fingerprint == Absent {
 			first.Made, err = created(d)
-		case saved != "":
+		} else {
 			first.Before = saved
-		default:
-			first.Before, err = w.save(ctx, kind, d)
 		}
 		if err != nil {
 			return err

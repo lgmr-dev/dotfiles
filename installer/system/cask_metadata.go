@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/platform"
 )
@@ -225,13 +224,4 @@ func (s CaskSpec) InstalledRecipe() error {
 		return errors.New("native app receipt has an unverified source or executable uninstall hooks")
 	}
 	return validateCaskArtifacts(receipt.Artifacts, s)
-}
-
-func caskLine(parts ...string) string {
-	for i, part := range parts {
-		if strings.ContainsAny(part, " ()") {
-			parts[i] = "'" + part + "'"
-		}
-	}
-	return strings.Join(parts, " ")
 }

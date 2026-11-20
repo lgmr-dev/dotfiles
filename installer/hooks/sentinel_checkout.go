@@ -162,6 +162,8 @@ func (sentinelCheckoutKind) Baseline(before string) (string, error) {
 
 func (sentinelCheckoutKind) Recover(context.Context, targets.Desired, state.Record) error { return nil }
 
+func (sentinelCheckoutKind) CannotCopy() bool { return true }
+
 func (sentinelCheckoutKind) Save(_ context.Context, d targets.Desired, _ string) (string, error) {
 	return "", fmt.Errorf("setup makes no copy of %s; move it away yourself", d.Path)
 }

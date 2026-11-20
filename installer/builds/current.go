@@ -12,8 +12,12 @@ import (
 	"github.com/luisgui1757/dotfiles/installer/state"
 )
 
-func (p *Provider) publish(id, build string, rec engine.Records) error {
-	current := CurrentDir(p.StateDir, id)
+// Publish makes the current link of a resource point at build and records
+// the link as a link target of the resource: the intended build before the
+// switch, the applied build after it. It then removes the staged links of a
+// finished switch.
+func Publish(stateDir, id, build string, rec engine.Records) error {
+	current := CurrentDir(stateDir, id)
 	record, recorded := rec.State().Targets[current]
 	link, err := linkTarget(current)
 	if err != nil {
@@ -25,7 +29,7 @@ func (p *Provider) publish(id, build string, rec engine.Records) error {
 		}); err != nil {
 			return err
 		}
-		if err := switchLink(ResourceDir(p.StateDir, id), build); err != nil {
+		if err := switchLink(ResourceDir(stateDir, id), build); err != nil {
 			return err
 		}
 		link, err = linkTarget(current)
@@ -36,7 +40,42 @@ func (p *Provider) publish(id, build string, rec engine.Records) error {
 			return err
 		}
 	}
-	return removeStagedLinks(p.StateDir, id)
+	return removeStagedLinks(stateDir, id)
+}
+
+// Unpublish removes the current link of a resource and its record. The link
+// goes only while it is the one that setup published. A resource without a
+// record stays as it is. The builds stay for Sweep.
+func Unpublish(stateDir, id string, rec engine.Records) error {
+	current := CurrentDir(stateDir, id)
+	record, recorded := rec.State().Targets[current]
+	if !recorded {
+		return nil
+	}
+	link, err := linkTarget(current)
+	if err != nil {
+		return err
+	}
+	if link != "" && link != record.Applied && link != record.Next {
+		return fmt.Errorf("the link %s is not the one that setup published; it stays", current)
+	}
+	if record.Applied != "" && !record.Release {
+		if err := rec.Update(func(s *state.State) error { return s.BeginRelease(current) }); err != nil {
+			return err
+		}
+	}
+	if link != "" {
+		if err := os.Remove(current); err != nil {
+			return err
+		}
+	}
+	if err := removeStagedLinks(stateDir, id); err != nil {
+		return err
+	}
+	if err := platform.SyncDirectory(ResourceDir(stateDir, id)); err != nil {
+		return err
+	}
+	return rec.Update(func(s *state.State) error { s.Drop(current); return nil })
 }
 
 func stagedLink(dir, kind, build string) string {

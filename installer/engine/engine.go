@@ -26,7 +26,8 @@ import (
 // the run of the import that completes the switch from release v2: that run
 // is permitted while v2_restore is "switching", and it does not close the v2
 // fallback. Each other confirmed apply or update closes an open fallback
-// before its first change.
+// immediately before its first step that applies or removes; a run without
+// such a step leaves the fallback open.
 type Engine struct {
 	Catalog  Catalog
 	Router   Router
@@ -169,9 +170,15 @@ func (e *Engine) checkResult(ctx context.Context, plan Plan) Result {
 	for _, mark := range plan.Pending {
 		reasons = append(reasons, pendingLine(mark))
 	}
+	retainedNotes := []string{}
 	for _, op := range plan.Operations {
-		if op.Action != "keep" && op.Action != "retain" {
-			r, _ := e.Catalog.Resource(op.Resource)
+		r, _ := e.Catalog.Resource(op.Resource)
+		switch {
+		case op.Action == "retain" && (op.Finding.Status == Unknown || op.Finding.Status == Blocked):
+			reasons = append(reasons, r.Name+" ("+r.ID+"): "+withReason("setup could not inspect this resource", op.Finding.Reason))
+		case op.Action == "retain" && op.Finding.Status == Changed:
+			retainedNotes = append(retainedNotes, "\nNote: "+r.Name+" ("+r.ID+") stays without a selected tool and has changed content"+withReason("", op.Finding.Reason))
+		case op.Action != "keep" && op.Action != "retain":
 			reasons = append(reasons, r.Name+" ("+r.ID+"): "+op.Reason)
 		}
 	}
@@ -179,7 +186,7 @@ func (e *Engine) checkResult(ctx context.Context, plan Plan) Result {
 	if len(reasons) > 0 {
 		status, message = "needs-action", strings.Join(reasons, "\n")
 	}
-	message += e.disclosures(plan)
+	message += strings.Join(retainedNotes, "") + e.disclosures(plan)
 	if e.Leftovers != nil {
 		left, err := e.Leftovers(ctx)
 		if err != nil {
@@ -203,7 +210,11 @@ func sameSelection(plan Plan, request Request) bool {
 // token returns ErrPlanChanged. A step that makes a provider available ends
 // the pass with ErrReplan when work remains. After a pass without a failure it
 // runs the sweep.
-func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (result Result, resultErr error) {
+func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (Result, error) {
+	return e.apply(ctx, request, approved, nil)
+}
+
+func (e *Engine) apply(ctx context.Context, request Request, approved Plan, confirmed []string) (result Result, resultErr error) {
 	result = Result{Status: "failed", Plan: approved}
 	if err := e.validate(); err != nil {
 		return result, err
@@ -225,7 +236,7 @@ func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (res
 		}
 	}()
 	st := store.View()
-	if len(st.Pending) != 0 {
+	if slices.ContainsFunc(st.Pending, func(mark string) bool { return !slices.Contains(confirmed, mark) }) {
 		lines := []string{}
 		for _, mark := range st.Pending {
 			lines = append(lines, pendingLine(mark))
@@ -244,11 +255,17 @@ func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (res
 	if !sameSelection(approved, effective) || approved.V2Restore != st.V2Restore {
 		return result, ErrPlanChanged
 	}
-	if st.V2Restore == "open" && !e.Switch {
-		if err := store.Update(func(s *state.State) error { s.V2Restore = ""; return nil }); err != nil {
+	if len(st.Pending) != 0 {
+		if err := store.Update(func(s *state.State) error {
+			for _, mark := range st.Pending {
+				s.Clear(mark)
+			}
+			return nil
+		}); err != nil {
 			return result, err
 		}
 	}
+	closeFallback := st.V2Restore == "open" && !e.Switch
 	if e.Selection != nil {
 		wanted, err := e.Catalog.Closure(slices.Concat(effective.Selected, effective.Keep), e.Context)
 		if err != nil {
@@ -358,6 +375,10 @@ func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (res
 			ReportStep(ctx, "[%d/%d] %s changed after approval", step, total, r.Name)
 			result.Message = strings.Join(append(failures, r.Name+" changed after approval; review a new plan"), "\n")
 			return result, ErrPlanChanged
+		}
+		if err == nil && closeFallback {
+			err = store.Update(func(s *state.State) error { s.V2Restore = ""; return nil })
+			closeFallback = false
 		}
 		if err == nil {
 			if removal {

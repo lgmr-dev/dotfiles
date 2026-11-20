@@ -173,7 +173,7 @@ func (p *ConfigProvider) Inspect(ctx context.Context, r catalog.Resource, want e
 			unreadable = append(unreadable, live.Detail)
 		case live.State == StateChanged && live.Fingerprint != live.Want:
 			changed = append(changed, d.Path)
-		case live.State == StateApplied && record.Applied == live.Want && record.Kind == d.Kind && record.Next == "" && !record.Release:
+		case live.Satisfied && record.Kind == d.Kind:
 		default:
 			work++
 		}

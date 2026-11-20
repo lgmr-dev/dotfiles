@@ -1,6 +1,7 @@
 package v2import
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -211,18 +212,19 @@ func (m *mapper) configuration(id string, receipt Receipt) error {
 			continue
 		}
 		record := state.Record{Resource: id, Kind: kind, Before: targets.Absent, Made: slices.Clone(target.Created)}
+		unitOwned := owned
 		if target.Original.Kind != "absent" {
 			record.Made = nil
 			record.Before = "backup:" + target.Backup
 			if backup, err := platform.SnapshotTree(target.Backup); err != nil || backup != target.Original {
-				record.Before = "fp:" + target.Original.Kind + ":" + target.Original.Hash
-				m.note("%s: the saved earlier content %s is missing or changed; setup keeps only its fingerprint and cannot give it back.", id, target.Backup)
+				record.Before, unitOwned = "fp:"+target.Original.Kind+":"+target.Original.Hash, false
+				m.note("%s: the earlier content of %s, which release v2 saved at %s, is missing or changed. Setup cannot give it back, so it takes no ownership of %s and asks before it replaces it.", id, target.Destination, target.Backup, target.Destination)
 			}
 		}
-		if owned {
+		if unitOwned {
 			record.Applied = live.Kind + ":" + live.Hash
 		}
-		m.record(target.Destination, record, owned)
+		m.record(target.Destination, record, unitOwned)
 	}
 	if id == hooks.FontResource && owned {
 		m.fontRegistrations(id, baseline)
@@ -273,13 +275,14 @@ func (m *mapper) profile(id string, receipt Receipt) error {
 }
 
 func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) error {
-	blocks, readable := [][]byte{}, true
+	blocks, exact, readable := [][]byte{}, []bool{}, true
 	for _, entry := range baseline.Entries {
 		data, _, err := readProfileFile(entry.Path)
 		var block []byte
 		if err == nil {
 			block, err = liveBlock(data, id)
 		}
+		exact = append(exact, block != nil && bytes.Equal(bytes.TrimPrefix(data, []byte{0xef, 0xbb, 0xbf}), block))
 		if err != nil {
 			readable = false
 			m.note("%s: cannot read the managed block in %s: %v. Setup takes no ownership of this resource.", id, entry.Path, err)
@@ -294,6 +297,11 @@ func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) er
 	for i, entry := range baseline.Entries {
 		if within(filepath.Join(m.dir, "shells"), entry.Path) {
 			snapshot, err := platform.SnapshotTree(entry.Path)
+			if owned && entry.Absent && err == nil && snapshot.Kind == "file" && !exact[i] {
+				m.row(id, entry.Path, "generated file with content outside the block of release v2: no record, and setup asks before it replaces the file")
+				m.note("%s: %s holds lines outside the block that release v2 wrote. Setup keeps the file. It saves the file before a replacement that you approve.", id, entry.Path)
+				continue
+			}
 			if !owned || !entry.Absent || err != nil || snapshot.Kind != "file" {
 				m.row(id, entry.Path, "generated file without proof of ownership: no record")
 				continue

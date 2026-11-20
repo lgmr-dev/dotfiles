@@ -310,7 +310,7 @@ func (p *Profiles) Inspect(ctx context.Context, r catalog.Resource, want engine.
 			unreadable = append(unreadable, live.Detail)
 		case live.State == targets.StateChanged && live.Fingerprint != live.Want:
 			changed = append(changed, d.Key)
-		case live.State == targets.StateApplied && record.Applied == live.Want && record.Kind == d.Kind && record.Next == "" && !record.Release:
+		case live.Satisfied && record.Kind == d.Kind:
 		default:
 			work++
 		}

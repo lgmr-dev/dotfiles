@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/luisgui1757/dotfiles/installer/platform"
@@ -62,6 +64,10 @@ func macTestSkipWithoutPOSIXPaths(t *testing.T) {
 	if os.PathSeparator != '/' {
 		t.Skip("the macOS providers use POSIX paths")
 	}
+}
+
+func macTestLine(c platform.Command) string {
+	return strings.Join(slices.Concat(c.Env, []string{c.Path}, c.Args), " ")
 }
 
 func macTestRoot(t *testing.T) string {

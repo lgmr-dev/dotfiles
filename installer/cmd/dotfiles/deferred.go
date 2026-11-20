@@ -41,7 +41,7 @@ func (d deferredProvider) Inspect(ctx context.Context, r catalog.Resource, want 
 	if d.desktop {
 		f.Status, f.Reason = engine.Satisfied, ""
 	}
-	f.Notes = append(f.Notes, r.Name+" "+deferredReason+".")
+	f.Notes = append(f.Notes, r.Name+" "+deferredReason+". Choose tools keeps the v2 payload. The first confirmed run that changes something closes the v2 fallback.")
 	return f, nil
 }
 

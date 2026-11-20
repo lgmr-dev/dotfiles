@@ -245,7 +245,7 @@ func (p *Provider) Apply(ctx context.Context, r catalog.Resource, approved engin
 			return err
 		}
 	}
-	return p.publish(r.ID, candidate, rec)
+	return Publish(p.StateDir, r.ID, candidate, rec)
 }
 
 func (p *Provider) verified(id string, pin catalog.ArchivePin, digest, build string) bool {
@@ -258,23 +258,15 @@ func (p *Provider) verified(id string, pin catalog.ArchivePin, digest, build str
 }
 
 func (p *Provider) reusable(id string, pin catalog.ArchivePin, digest string) (string, error) {
-	dir := ResourceDir(p.StateDir, id)
-	entries, err := platform.ReadPlainDirectory(dir)
+	candidates, err := Candidates(p.StateDir, id, pin.Version, digest)
 	if err != nil {
 		return "", err
 	}
-	names := []string{}
-	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), buildPrefix(pin.Version, digest)) {
-			names = append(names, entry.Name())
-		}
-	}
-	if link, err := linkTarget(CurrentDir(p.StateDir, id)); err == nil && slices.Contains(names, filepath.Base(link)) && p.verified(id, pin, digest, link) {
+	if link, err := linkTarget(CurrentDir(p.StateDir, id)); err == nil && slices.Contains(candidates, link) && p.verified(id, pin, digest, link) {
 		return link, nil
 	}
-	slices.Sort(names)
-	for _, name := range slices.Backward(names) {
-		if build := filepath.Join(dir, name); p.verified(id, pin, digest, build) {
+	for _, build := range slices.Backward(candidates) {
+		if p.verified(id, pin, digest, build) {
 			return build, nil
 		}
 	}
@@ -302,12 +294,7 @@ func (p *Provider) build(ctx context.Context, id string, pin catalog.ArchivePin,
 	if err != nil {
 		return "", err
 	}
-	manifest := Manifest{Schema: manifestSchema, Resource: id, Version: pin.Version, Digest: digest, Tree: tree, Uses: uses}
-	data, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	if err := platform.SaveDocument(manifestPath(build), append(data, '\n')); err != nil {
+	if err := WriteManifest(build, Manifest{Schema: manifestSchema, Resource: id, Version: pin.Version, Digest: digest, Tree: tree, Uses: uses}); err != nil {
 		return "", err
 	}
 	return build, nil
@@ -323,33 +310,5 @@ func (p *Provider) Remove(ctx context.Context, r catalog.Resource, approved engi
 	if _, err := p.pin(r.ID); err != nil {
 		return err
 	}
-	current := CurrentDir(p.StateDir, r.ID)
-	record, recorded := rec.State().Targets[current]
-	if !recorded {
-		return nil
-	}
-	link, err := linkTarget(current)
-	if err != nil {
-		return err
-	}
-	if link != "" && link != record.Applied && link != record.Next {
-		return fmt.Errorf("the link %s is not the one that setup published; it stays", current)
-	}
-	if record.Applied != "" && !record.Release {
-		if err := rec.Update(func(s *state.State) error { return s.BeginRelease(current) }); err != nil {
-			return err
-		}
-	}
-	if link != "" {
-		if err := os.Remove(current); err != nil {
-			return err
-		}
-	}
-	if err := removeStagedLinks(p.StateDir, r.ID); err != nil {
-		return err
-	}
-	if err := platform.SyncDirectory(ResourceDir(p.StateDir, r.ID)); err != nil {
-		return err
-	}
-	return rec.Update(func(s *state.State) error { s.Drop(current); return nil })
+	return Unpublish(p.StateDir, r.ID, rec)
 }

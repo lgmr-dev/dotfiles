@@ -39,15 +39,19 @@ type Slot struct {
 // Manifest describes the restore set. Folder names the subfolder with the
 // copies. Imported is the schema-2 state that the import published: a target
 // whose record still equals its imported record has no change yet. Deferred
-// and Legacy keep the macOS applications that stay on release v2.
+// and Legacy keep the macOS applications that stay on release v2. Restoring
+// holds, for each slot that restore-v2 started to give back, the fingerprint
+// of the value that it replaces: a later run of restore-v2 completes that
+// slot also when the first run stopped in the middle of its write.
 type Manifest struct {
-	Schema   int             `json:"schema"`
-	Source   string          `json:"source"`
-	Folder   string          `json:"folder"`
-	Deferred []string        `json:"deferred,omitempty"`
-	Legacy   []string        `json:"legacy,omitempty"`
-	Imported state.State     `json:"imported"`
-	Slots    map[string]Slot `json:"slots"`
+	Schema    int               `json:"schema"`
+	Source    string            `json:"source"`
+	Folder    string            `json:"folder"`
+	Deferred  []string          `json:"deferred,omitempty"`
+	Legacy    []string          `json:"legacy,omitempty"`
+	Imported  state.State       `json:"imported"`
+	Slots     map[string]Slot   `json:"slots"`
+	Restoring map[string]string `json:"restoring,omitempty"`
 }
 
 type restoreSet struct {

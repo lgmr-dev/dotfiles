@@ -382,7 +382,7 @@ func (i *desktopInspection) unit(w *targets.Writer, rec engine.Records, d target
 		if !has || record.Applied == "" {
 			i.changed = append(i.changed, d.Path)
 		}
-	case live.State == targets.StateApplied && record.Applied == live.Want && record.Kind == d.Kind && record.Next == "" && !record.Release:
+	case live.Satisfied && record.Kind == d.Kind:
 	default:
 		i.work++
 	}

@@ -15,6 +15,7 @@ import (
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -42,7 +43,10 @@ type Slot struct {
 // and Legacy keep the macOS applications that stay on release v2. Restoring
 // holds, for each slot that restore-v2 started to give back, the fingerprint
 // of the value that it replaces: a later run of restore-v2 completes that
-// slot also when the first run stopped in the middle of its write.
+// slot also when the first run stopped in the middle of its write. Edited
+// holds the verified copy of each slot that you changed after the switch and
+// whose replacement you approved: restore-v2 saves that copy before it
+// records the slot in Restoring.
 type Manifest struct {
 	Schema    int               `json:"schema"`
 	Source    string            `json:"source"`
@@ -52,6 +56,7 @@ type Manifest struct {
 	Imported  state.State       `json:"imported"`
 	Slots     map[string]Slot   `json:"slots"`
 	Restoring map[string]string `json:"restoring,omitempty"`
+	Edited    map[string]string `json:"edited,omitempty"`
 }
 
 type restoreSet struct {
@@ -181,24 +186,38 @@ func (c captureRecords) Update(edit func(*state.State) error) error {
 
 type captureProvider struct {
 	engine.Provider
-	set *restoreSet
+	set     *restoreSet
+	context platform.Context
+}
+
+func outsideSwitch(r catalog.Resource, ctx platform.Context) error {
+	if targetResource(r) || buildResource(r, ctx) {
+		return nil
+	}
+	return fmt.Errorf("%s needs a system change or the Sentinel installer, and the switch does not do that while the v2 fallback is open. Run restore-v2 and finish this work with the %s checkout, then import again", r.ID, SourceRelease)
 }
 
 func (c captureProvider) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
+	if err := outsideSwitch(r, c.context); err != nil {
+		return err
+	}
 	return c.Provider.Apply(ctx, r, approved, captureRecords{rec, ctx, c.set})
 }
 
 func (c captureProvider) Remove(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
+	if r.Action == "sentinel" || r.ID == hooks.SentinelResource {
+		return outsideSwitch(r, c.context)
+	}
 	return c.Provider.Remove(ctx, r, approved, captureRecords{rec, ctx, c.set})
 }
 
-func (s *restoreSet) router(inner engine.Router) engine.Router {
+func (s *restoreSet) router(inner engine.Router, ctx platform.Context) engine.Router {
 	return func(r catalog.Resource) (engine.Provider, error) {
 		provider, err := inner(r)
 		if err != nil || provider == nil {
 			return provider, err
 		}
-		return captureProvider{provider, s}, nil
+		return captureProvider{provider, s, ctx}, nil
 	}
 }
 
@@ -215,7 +234,7 @@ func (c deferCatalog) Closure(roots []string, ctx platform.Context) ([]string, e
 func (o Options) switchEngine(set *restoreSet) *engine.Engine {
 	e := *o.Engine
 	e.Catalog = deferCatalog{o.Engine.Catalog, set.manifest.Deferred}
-	e.Router = set.router(o.Engine.Router)
+	e.Router = set.router(o.Engine.Router, o.Engine.Context)
 	e.Switch, e.UI = true, nil
 	return &e
 }

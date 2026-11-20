@@ -8,130 +8,9 @@ import (
 	"io"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/targets"
 )
-
-type terminalProperty struct {
-	name            string
-	key, value, end int
-}
-
-func terminalJSONProperties(data []byte) ([]terminalProperty, error) {
-	if !utf8.Valid(data) || len(data) > platform.MaxProfileBytes {
-		return nil, errors.New("JSON settings must be bounded UTF-8")
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	opening, err := decoder.Token()
-	if err != nil || opening != json.Delim('{') {
-		return nil, errors.New("settings must contain a JSON object")
-	}
-	properties := []terminalProperty{}
-	seen := map[string]bool{}
-	for decoder.More() {
-		key := int(decoder.InputOffset())
-		for key < len(data) && strings.ContainsRune(" \t\r\n,", rune(data[key])) {
-			key++
-		}
-		token, err := decoder.Token()
-		name, ok := token.(string)
-		if err != nil || !ok || seen[name] {
-			return nil, errors.New("settings contain an invalid or duplicate JSON property")
-		}
-		seen[name] = true
-		value := int(decoder.InputOffset())
-		for value < len(data) && strings.ContainsRune(" \t\r\n:", rune(data[value])) {
-			value++
-		}
-		var raw json.RawMessage
-		if err := decoder.Decode(&raw); err != nil {
-			return nil, err
-		}
-		properties = append(properties, terminalProperty{name, key, value, int(decoder.InputOffset())})
-	}
-	if closing, err := decoder.Token(); err != nil || closing != json.Delim('}') {
-		return nil, errors.New("settings contain an incomplete JSON object")
-	}
-	if _, err := decoder.Token(); err != io.EOF {
-		return nil, errors.New("settings contain trailing content")
-	}
-	return properties, nil
-}
-
-func terminalMask(data []byte) (clean, lexical []byte, err error) {
-	if len(data) > platform.MaxProfileBytes || !utf8.Valid(data) || bytes.IndexByte(data, 0) >= 0 {
-		return nil, nil, errors.New("JSONC settings must be bounded UTF-8")
-	}
-	lexical = bytes.Clone(data)
-	if bytes.HasPrefix(lexical, []byte{0xef, 0xbb, 0xbf}) {
-		copy(lexical, "   ")
-	}
-	for i := 0; i < len(lexical); i++ {
-		switch lexical[i] {
-		case '"':
-			for i++; i < len(lexical); i++ {
-				if lexical[i] == '\\' {
-					i++
-				} else if lexical[i] == '"' {
-					break
-				}
-			}
-		case '/':
-			if i+1 == len(lexical) {
-				continue
-			}
-			start := i
-			if lexical[i+1] == '/' {
-				for i += 2; i < len(lexical) && lexical[i] != '\n' && lexical[i] != '\r'; i++ {
-				}
-			} else if lexical[i+1] == '*' {
-				end := bytes.Index(lexical[i+2:], []byte("*/"))
-				if end < 0 {
-					return nil, nil, errors.New("unterminated JSONC comment")
-				}
-				i += end + 4
-			} else {
-				continue
-			}
-			for j := start; j < i; j++ {
-				if lexical[j] != '\r' && lexical[j] != '\n' {
-					lexical[j] = ' '
-				}
-			}
-			i--
-		}
-	}
-	clean = bytes.Clone(lexical)
-	for i := 0; i < len(clean); i++ {
-		if clean[i] == '"' {
-			for i++; i < len(clean); i++ {
-				if clean[i] == '\\' {
-					i++
-				} else if clean[i] == '"' {
-					break
-				}
-			}
-		} else if clean[i] == ',' {
-			previous := i - 1
-			for previous >= 0 && bytes.ContainsRune([]byte(" \t\r\n"), rune(clean[previous])) {
-				previous--
-			}
-			if previous < 0 || bytes.ContainsRune([]byte("{[:,"), rune(clean[previous])) {
-				continue
-			}
-			j := i + 1
-			for j < len(clean) && bytes.ContainsRune([]byte(" \t\r\n"), rune(clean[j])) {
-				j++
-			}
-			if j < len(clean) && (clean[j] == '}' || clean[j] == ']') {
-				clean[i] = ' '
-			}
-		}
-	}
-	return clean, lexical, nil
-}
 
 func terminalSorted(values []string) []string {
 	result := append([]string{}, values...)
@@ -139,12 +18,12 @@ func terminalSorted(values []string) []string {
 	return slices.Compact(result)
 }
 
-func terminalProperties(data []byte) ([]terminalProperty, error) {
-	clean, _, err := terminalMask(data)
+func terminalProperties(data []byte) ([]targets.JSONProperty, error) {
+	clean, _, err := targets.JSONCMask(data)
 	if err != nil {
 		return nil, err
 	}
-	return terminalJSONProperties(clean)
+	return targets.JSONProperties(clean)
 }
 
 func (r *terminalReader) rejectLegacyBindings(data []byte) error {
@@ -170,18 +49,18 @@ func terminalGet(data []byte, path string) ([]byte, bool, error) {
 	return terminalLookup(data, path, terminalProperties)
 }
 
-func terminalLookup(data []byte, path string, propertiesOf func([]byte) ([]terminalProperty, error)) ([]byte, bool, error) {
+func terminalLookup(data []byte, path string, propertiesOf func([]byte) ([]targets.JSONProperty, error)) ([]byte, bool, error) {
 	for _, part := range strings.Split(path, "/") {
 		properties, err := propertiesOf(data)
 		if err != nil {
 			return nil, false, err
 		}
-		index := slices.IndexFunc(properties, func(p terminalProperty) bool { return p.name == part })
+		index := slices.IndexFunc(properties, func(p targets.JSONProperty) bool { return p.Name == part })
 		if index < 0 {
 			return nil, false, nil
 		}
 		p := properties[index]
-		data = data[p.value:p.end]
+		data = data[p.Value:p.End]
 	}
 	return data, true, nil
 }
@@ -204,18 +83,18 @@ func terminalSet(data []byte, path string, value []byte) ([]byte, error) {
 			return nil, err
 		}
 	}
-	clean, _, err := terminalMask(data)
+	clean, _, err := targets.JSONCMask(data)
 	if err != nil {
 		return nil, err
 	}
-	properties, err := terminalJSONProperties(clean)
+	properties, err := targets.JSONProperties(clean)
 	if err != nil {
 		return nil, err
 	}
-	index := slices.IndexFunc(properties, func(p terminalProperty) bool { return p.name == parts[0] })
+	index := slices.IndexFunc(properties, func(p targets.JSONProperty) bool { return p.Name == parts[0] })
 	if index >= 0 && value != nil {
 		p := properties[index]
-		a, err := terminalValue(data[p.value:p.end])
+		a, err := terminalValue(data[p.Value:p.End])
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +105,7 @@ func terminalSet(data []byte, path string, value []byte) ([]byte, error) {
 		if bytes.Equal(a, b) {
 			return data, nil
 		}
-		return append(append(bytes.Clone(data[:p.value]), value...), data[p.end:]...), nil
+		return append(append(bytes.Clone(data[:p.Value]), value...), data[p.End:]...), nil
 	}
 	field := targets.Field{JSONC: func(string) bool { return true }}
 	if value == nil {
@@ -240,18 +119,18 @@ func terminalSet(data []byte, path string, value []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	index = slices.IndexFunc(properties, func(p terminalProperty) bool { return p.name == parts[0] })
+	index = slices.IndexFunc(properties, func(p targets.JSONProperty) bool { return p.Name == parts[0] })
 	if index < 0 {
 		return nil, errors.New("Windows Terminal field publication lost its key")
 	}
 	p := properties[index]
-	return append(append(bytes.Clone(result[:p.value]), value...), result[p.end:]...), nil
+	return append(append(bytes.Clone(result[:p.Value]), value...), result[p.End:]...), nil
 }
 
 type terminalElement struct{ start, end int }
 
 func terminalElements(data []byte) ([]terminalElement, []byte, error) {
-	clean, lexical, err := terminalMask(data)
+	clean, lexical, err := targets.JSONCMask(data)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -391,7 +270,7 @@ func terminalReplaceElement(array []byte, index int, value []byte) ([]byte, erro
 }
 
 func terminalEmpty(data []byte, array bool) (bool, error) {
-	_, lexical, err := terminalMask(data)
+	_, lexical, err := targets.JSONCMask(data)
 	if err != nil {
 		return false, err
 	}

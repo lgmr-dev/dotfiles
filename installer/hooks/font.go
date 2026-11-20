@@ -457,11 +457,24 @@ func (p *Fonts) Inspect(ctx context.Context, r catalog.Resource, want engine.Wan
 	return i.wanted(o.waiting, reason), nil
 }
 
-// Apply implements engine.Provider. On Windows it first releases the
-// registrations that setup recorded, so the font files can change. It
-// converges the twelve font files, publishes the intended value of each
-// registration record, activates the faces in one native command and
-// promotes each record whose face the native font engine then selects. A
+func fontClearMark(rec engine.Records, mark string) error {
+	return rec.Update(func(s *state.State) error { s.Clear(mark); return nil })
+}
+
+func fontNativeFailure(rec engine.Records, mark string, err error) error {
+	if _, started := platform.ExitCode(err); started {
+		return fmt.Errorf("%w; run setup again and confirm that the command exited", err)
+	}
+	return errors.Join(err, fontClearMark(rec, mark))
+}
+
+// Apply implements engine.Provider. Before the first native command it
+// publishes, in one state update, the intended value of each registration
+// record and the pending mark "<resource>:activate". On Windows it then
+// releases the registrations that setup recorded, so the font files can
+// change. It converges the twelve font files, activates the faces in one
+// native command, clears the mark and promotes each record whose face the
+// native font engine then selects. A
 // failed activation leaves the registration records unfinished, and the
 // next apply completes them.
 func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
@@ -485,30 +498,35 @@ func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.F
 		all[i] = i
 	}
 	values := fontRegistrations(o.probe)
-	if p.Context.OS == "windows" && slices.ContainsFunc(values, func(value string) bool { return value != "" }) {
-		if err := p.activate(ctx, all, o.paths, values, false); err != nil {
-			return err
-		}
-		values = make([]string, len(values))
-	}
-	w := p.writer(nil)
-	for _, d := range o.units {
-		if err := w.Converge(ctx, d, rec, desktopChoice(approved)); err != nil {
-			return err
-		}
-	}
 	faces := fontFaces()
+	mark := r.ID + ":activate"
 	if err := rec.Update(func(s *state.State) error {
 		for i, path := range o.paths {
 			if err := s.BeginTarget(targets.Key(path, FontSlot), state.Record{Resource: r.ID, Kind: "font", Next: p.want(faces[i], path, o.hashes[i]), Before: targets.Absent}); err != nil {
 				return err
 			}
 		}
+		s.Mark(mark)
 		return nil
 	}); err != nil {
 		return err
 	}
+	if p.Context.OS == "windows" && slices.ContainsFunc(values, func(value string) bool { return value != "" }) {
+		if err := p.activate(ctx, all, o.paths, values, false); err != nil {
+			return fontNativeFailure(rec, mark, err)
+		}
+		values = make([]string, len(values))
+	}
+	w := p.writer(nil)
+	for _, d := range o.units {
+		if err := w.Converge(ctx, d, rec, desktopChoice(approved)); err != nil {
+			return errors.Join(err, fontClearMark(rec, mark))
+		}
+	}
 	if err := p.activate(ctx, all, o.paths, values, true); err != nil {
+		return fontNativeFailure(rec, mark, err)
+	}
+	if err := fontClearMark(rec, mark); err != nil {
 		return err
 	}
 	probe, err := p.query(ctx, o.paths)
@@ -573,6 +591,7 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 			owned = append(owned, i)
 		}
 	}
+	mark := r.ID + ":release"
 	if err := rec.Update(func(s *state.State) error {
 		for _, i := range owned {
 			if record := s.Targets[keys[i]]; record.Applied != "" && !record.Release {
@@ -581,11 +600,15 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 				}
 			}
 		}
+		s.Mark(mark)
 		return nil
 	}); err != nil {
 		return err
 	}
 	if err := p.activate(ctx, owned, paths, fontRegistrations(probe), false); err != nil {
+		return fontNativeFailure(rec, mark, err)
+	}
+	if err := fontClearMark(rec, mark); err != nil {
 		return err
 	}
 	w := p.writer(nil)

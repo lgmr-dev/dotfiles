@@ -90,6 +90,8 @@ func (o Options) details(plan engine.Plan, mapping *Mapping, deferred []string) 
 	}
 	if mapping != nil {
 		section("Items that need work first. The import stops before the switch, and release v2 stays active:", blockers)
+	} else {
+		section("Items that the switch does not change while the v2 fallback is open. Run restore-v2 and finish this work with the "+SourceRelease+" checkout, then import again:", blockers)
 	}
 	section("Private tools that setup builds under "+filepath.Join(o.Engine.StateDir, "tools")+", beside the payloads of release v2:", builds)
 	section("Targets that the switch changes, after each build passed its check:", switched)

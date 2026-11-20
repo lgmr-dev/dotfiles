@@ -349,16 +349,31 @@ func aptPinLabel(name string) string {
 	return name
 }
 
-func (a *APT) setupCommands(o aptObservation, pin debPin, action string) engine.CommandBlock {
-	input := o.Name
+func (a *APT) planned(o aptObservation, pin debPin, action string) (refresh, change platform.Command) {
+	input, environment := o.Name, []string{}
 	if o.Pin != "" {
 		input = a.debFile(pin)
 	}
+	if o.Name == "code" {
+		environment = []string{debCodeOverride(debCodeDirectory(a.Temporary))}
+	}
+	return a.privileged(a.Location.APTGet, nil, aptRefreshArguments()...),
+		a.privileged(a.Location.APTGet, environment, aptInstallArguments(action, o.Package.Automatic, input)...)
+}
+
+func (a *APT) setupCommands(o aptObservation, pin debPin, action string) engine.CommandBlock {
 	titles := map[string]string{"install": "Install ", "update": "Update ", "repair": "Repair "}
-	return engine.CommandBlock{Title: titles[action] + o.Name + " with APT", By: "setup", Lines: []string{
-		a.display(a.Location.APTGet, aptRefreshArguments()...),
-		a.display(a.Location.APTGet, aptInstallArguments(action, o.Package.Automatic, input)...),
-	}}
+	block := engine.CommandBlock{Title: titles[action] + o.Name + " with APT", By: "setup"}
+	if o.Pin != "" {
+		block.Lines = append(block.Lines, "# Setup first downloads "+pin.URL+" to "+a.debFile(pin)+" and verifies its SHA-256 "+pin.SHA256+".")
+	}
+	if o.Name == "code" {
+		block.Lines = append(block.Lines, "# Setup first writes the debconf answers to "+debCodeAnswers(debCodeDirectory(a.Temporary))+
+			": code/add-copilot-command=false, code/add-microsoft-repo=false. It deletes the file after the command.")
+	}
+	refresh, change := a.planned(o, pin, action)
+	block.Lines = append(block.Lines, aptShellLine(refresh), aptShellLine(change))
+	return block
 }
 
 // Inspect reads the package database and the health of the package. It
@@ -470,7 +485,6 @@ func (a *APT) Apply(ctx context.Context, r catalog.Resource, approved engine.Fin
 		}
 		return nil
 	}
-	input, environment := o.Name, []string{}
 	if o.Pin != "" {
 		if err := a.debCollisions(ctx, o.Name, !o.Present); err != nil {
 			return err
@@ -479,7 +493,6 @@ func (a *APT) Apply(ctx context.Context, r catalog.Resource, approved engine.Fin
 		if err := a.debPrepare(ctx, pin); err != nil {
 			return err
 		}
-		input = a.debFile(pin)
 	}
 	if o.Name == "code" {
 		code, err := newDebCodeInput(a.Temporary)
@@ -491,19 +504,19 @@ func (a *APT) Apply(ctx context.Context, r catalog.Resource, approved engine.Fin
 				engine.ReportDetail(ctx, "Note: the Code temporary input %s stays for inspection: %v", code.Directory, err)
 			}
 		}()
-		environment = []string{code.override()}
 	}
 	if !a.Location.Root && a.Authenticate != nil {
 		if err := a.Authenticate(ctx); err != nil {
 			return err
 		}
 	}
+	refresh, change := a.planned(o, pin, action)
 	mark, provisional := aptMark(r, action), action == "install" && !o.Recorded
 	if err := rec.Update(func(s *state.State) error { s.Mark(mark); return nil }); err != nil {
 		return err
 	}
 	clear := func(s *state.State) error { s.Clear(mark); return nil }
-	if output, started, err := a.run(ctx, a.privileged(a.Location.APTGet, nil, aptRefreshArguments()...)); err != nil {
+	if output, started, err := a.run(ctx, refresh); err != nil {
 		if !started {
 			return errors.Join(fmt.Errorf("APT did not start: %w", err), rec.Update(clear))
 		}
@@ -522,7 +535,7 @@ func (a *APT) Apply(ctx context.Context, r catalog.Resource, approved engine.Fin
 			return err
 		}
 	}
-	output, started, err := a.run(ctx, a.privileged(a.Location.APTGet, environment, aptInstallArguments(action, o.Package.Automatic, input)...))
+	output, started, err := a.run(ctx, change)
 	if err != nil && !started {
 		return errors.Join(fmt.Errorf("APT did not start: %w", err), rec.Update(func(s *state.State) error {
 			s.Clear(mark)

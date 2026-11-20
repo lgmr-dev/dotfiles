@@ -270,12 +270,12 @@ func TestAPersonalEditAfterTheSwitchSurvivesRestore(t *testing.T) {
 			t.Fatalf("an approved replacement must give back the value of release v2:\n%s", text)
 		}
 		saved := ""
-		entries, err := os.ReadDir(filepath.Join(f.state, "baselines"))
+		entries, err := os.ReadDir(filepath.Join(f.state, "v2-restore", "edited"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, entry := range entries {
-			saved += read(t, filepath.Join(f.state, "baselines", entry.Name()))
+			saved += read(t, filepath.Join(f.state, "v2-restore", "edited", entry.Name()))
 		}
 		if !strings.Contains(saved, "# my edit in the block") || !strings.Contains(saved, "# my edit of a generated file") {
 			t.Fatalf("restore must save the edited content before it replaces it: %q", saved)

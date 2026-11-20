@@ -1,11 +1,13 @@
 .agents/**
 .azure/**
+.bash_profile
 .cache/**
 .claude/**
 .codex/**
 .config
 .config/glab-cli/**
 .config/opencode/**
+.config/superfile
 .config/superfile/theme/**
 .copilot/**
 .kiro/**
@@ -17,6 +19,8 @@
 .local/state/gh/**
 .local/state/nvim/**
 .local/state/opencode/**
+.zprofile
+.zshenv
 Library/Application Support/Microsoft/**
 Library/Application Support/superfile/**
 Library/Caches/**

@@ -6,6 +6,7 @@
 .config
 .config/glab-cli/**
 .config/opencode/**
+.config/superfile
 .config/superfile/theme/**
 .copilot/**
 .kiro/**

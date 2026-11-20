@@ -564,3 +564,80 @@ func TestFontWithoutFcMatchIsMissingOnlyWhenNothingOfSetupIsInstalled(t *testing
 		t.Fatal("the apply after the install of fc-match did not verify the fonts", finding)
 	}
 }
+
+type fontCountedRecords struct {
+	engine.Records
+	updates int
+}
+
+func (c *fontCountedRecords) Update(edit func(*state.State) error) error {
+	c.updates++
+	return c.Records.Update(edit)
+}
+
+type fontOrderedRunner struct {
+	platform.Runner
+	before func()
+}
+
+func (r fontOrderedRunner) Run(ctx context.Context, c platform.Command) ([]byte, error) {
+	r.before()
+	return r.Runner.Run(ctx, c)
+}
+
+func TestFontRecordsAnnounceTheNativeChangeBeforeTheNativeCommand(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	if err := os.Remove(f.path(face)); err != nil {
+		t.Fatal(err)
+	}
+	records := &fontCountedRecords{Records: f.sentinelEnv}
+	natives := 0
+	f.provider.Runner = fontOrderedRunner{Runner: f.engine, before: func() {
+		natives++
+		if natives != 1 {
+			return
+		}
+		if records.updates == 0 {
+			t.Fatal("a native font command ran before a record update")
+		}
+		st := f.State()
+		if !slices.Equal(st.Pending, []string{"tool.font:activate"}) {
+			t.Fatal("the native font command ran without its pending mark", st.Pending)
+		}
+		if len(f.engine.registry) != 12 {
+			t.Fatal("a registration changed before the first native command", len(f.engine.registry))
+		}
+		for _, item := range fontFixtureFaces() {
+			if record := st.Targets[targets.Key(f.path(item), hooks.FontSlot)]; record.Applied == "" || record.Next == "" {
+				t.Fatal("a registration record does not announce its replacement", item.file, record)
+			}
+		}
+	}}
+	finding, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f)
+	if err != nil || finding.Status != engine.Unhealthy {
+		t.Fatal(finding, err)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, records); err != nil {
+		t.Fatal(err)
+	}
+	if natives != 2 || len(f.State().Pending) != 0 || len(f.engine.registry) != 12 {
+		t.Fatal("the repair did not release and activate under its mark", natives, f.State().Pending)
+	}
+	natives = 0
+	records.updates = 0
+	f.provider.Runner = fontOrderedRunner{Runner: f.engine, before: func() {
+		natives++
+		if st := f.State(); records.updates == 0 || !slices.Equal(st.Pending, []string{"tool.font:release"}) || !st.Targets[targets.Key(f.path(face), hooks.FontSlot)].Release {
+			t.Fatal("the native release ran before its record update", records.updates, st.Pending)
+		}
+	}}
+	if err := f.provider.Remove(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false), records); err != nil {
+		t.Fatal(err)
+	}
+	if natives != 1 || len(f.State().Pending) != 0 || len(f.State().Targets) != 0 || len(f.engine.registry) != 0 {
+		t.Fatal("the removal left a mark, a record or a registration", f.State().Pending)
+	}
+}

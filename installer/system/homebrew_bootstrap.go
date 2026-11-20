@@ -135,7 +135,7 @@ func (d *HomebrewBootstrap) Inspect(ctx context.Context, r catalog.Resource, _ e
 		f.Commands = []engine.CommandBlock{{Title: "Install Homebrew (installer commit " + homebrewBootstrapCommit[:12] + ", SHA-256 " + d.sha256[:12] + ")", By: "setup",
 			Lines: append(lines, macosShellLine(d.installCommand(o.Location.Prefix, nil))+" < install.sh")}}
 	case "occupied":
-		f.Status, f.Reason = engine.Unknown, "the Homebrew prefix already exists without a working manager; preserve it and repair it explicitly"
+		f.Status, f.Reason = engine.Unknown, "the Homebrew prefix "+o.Location.Prefix+" already exists with content and without a working manager; setup keeps it. Examine it, then repair Homebrew there or move its content away, and run setup again. Setup installs into an absent or empty folder"
 	case "broken":
 		f.Status, f.Reason = engine.Blocked, "the existing Homebrew installation needs native repair before it can be reused: "+o.Issue
 	}
@@ -192,7 +192,7 @@ func (d *HomebrewBootstrap) Apply(ctx context.Context, r catalog.Resource, appro
 		}
 	}
 	if err != nil {
-		return errors.Join(fmt.Errorf("the Homebrew prefix changed before the installer started; preserve it and review a new plan: %w", err), macosClearMark(rec, mark))
+		return errors.Join(fmt.Errorf("the Homebrew prefix %s changed before the installer started, and the installer did not run: %w. Examine %s. If it holds nothing of yours, remove the empty folder that setup reserved (sudo /bin/rmdir %s), then run setup again. Setup also uses an empty folder there as it is", prefix, err, prefix, macosShellWord(prefix)), macosClearMark(rec, mark))
 	}
 	_, started, err := macosRun(ctx, d.Runner, d.installCommand(prefix, payload))
 	if err != nil && !started {

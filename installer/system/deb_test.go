@@ -358,3 +358,41 @@ func TestTailscalePinnedPackageChecks(t *testing.T) {
 		t.Fatal("accepted the Code package on another resource", err)
 	}
 }
+
+func TestCodeShownCommandsAreTheCommandsThatRunWithTheDebconfInput(t *testing.T) {
+	ctx := context.Background()
+	f := newDebFixture(t)
+	found, err := f.apt.Inspect(ctx, debFixtureCode, engine.Want{Present: true}, f.rec)
+	if err != nil || len(found.Commands) != 1 {
+		t.Fatal(found, err)
+	}
+	shown := aptFixtureShellLines(found.Commands[0])
+	if len(shown) != 2 || !strings.Contains(shown[1], "DEBCONF_DB_OVERRIDE=File{filename:") || !strings.Contains(shown[1], "DEBIAN_FRONTEND=noninteractive") {
+		t.Fatal("the shown Code install must carry the debconf override that setup uses", shown)
+	}
+	answers := ""
+	for _, line := range found.Commands[0].Lines {
+		if strings.HasPrefix(line, "# ") && strings.Contains(line, "debconf answers") {
+			answers = line
+		}
+	}
+	database := ""
+	f.during = func(c platform.Command) {
+		if slices.Contains(c.Args, "install") {
+			database = strings.TrimSuffix(strings.TrimPrefix(strings.Fields(c.Args[3])[0], "DEBCONF_DB_OVERRIDE=File{filename:"), "")
+		}
+	}
+	if err := f.apt.Apply(ctx, debFixtureCode, found, f.rec); err != nil {
+		t.Fatal(err)
+	}
+	ran := []string{}
+	for _, c := range f.commands {
+		ran = append(ran, aptFixtureLine(c))
+	}
+	if !slices.Equal(ran, shown) {
+		t.Fatal("the shown lines differ from the commands that ran", ran, shown)
+	}
+	if database == "" || !strings.Contains(answers, database) || !strings.Contains(answers, "code/add-microsoft-repo=false") || !strings.Contains(answers, "code/add-copilot-command=false") {
+		t.Fatal("the block must say where setup writes the debconf answers and what they are", answers, database)
+	}
+}

@@ -153,7 +153,7 @@ func (s *brewSession) observeCask(ctx context.Context, spec CaskSpec, st state.S
 		o.Status, o.Reason = engine.Unhealthy, "the recorded native application is absent"
 	case inInventory:
 		o.Status, o.Orphan = engine.Blocked, true
-		o.Reason = "your Homebrew " + spec.Token + " record has no app; restore the app with the first command, or remove the cask with the second command before you install it through setup"
+		o.Reason = "your Homebrew " + spec.Token + " record has no app; use the Restore command, or use the Remove command and then install the app through setup. Use only one of them"
 	default:
 		o.Status = engine.Missing
 	}
@@ -216,8 +216,10 @@ func (s *brewSession) inspectCask(ctx context.Context, spec CaskSpec, want engin
 		f.Commands = []engine.CommandBlock{{Title: "Repair " + spec.Name + " with Homebrew", By: "setup", Lines: []string{s.line(true, spec.arguments("reinstall")...)}}}
 	case engine.Blocked:
 		if o.Orphan {
-			f.Commands = []engine.CommandBlock{{Title: "Restore or remove the " + spec.Name + " cask with Homebrew", By: "you",
-				Lines: []string{s.line(true, spec.arguments("reinstall")...), s.line(true, "uninstall", "--cask", spec.Token)}}}
+			f.Commands = []engine.CommandBlock{
+				{Title: "Restore " + spec.Name + " with Homebrew", By: "you", Lines: []string{s.line(true, spec.arguments("reinstall")...)}},
+				{Title: "Remove " + spec.Name + " with Homebrew", By: "you", Lines: []string{s.line(true, "uninstall", "--cask", spec.Token)}},
+			}
 		}
 	}
 	return f, nil

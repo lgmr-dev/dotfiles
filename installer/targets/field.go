@@ -21,9 +21,11 @@ import (
 // because they give no clear baseline.
 type Field struct{ JSONC func(path string) bool }
 
-type jsonProperty struct {
-	name            string
-	key, value, end int
+// JSONProperty is one property of a JSON object: its name, and the byte
+// offsets of its key, of its value and of the end of its value.
+type JSONProperty struct {
+	Name            string
+	Key, Value, End int
 }
 
 func validFieldName(field string) error {
@@ -33,7 +35,10 @@ func validFieldName(field string) error {
 	return nil
 }
 
-func jsonProperties(data []byte) ([]jsonProperty, error) {
+// JSONProperties returns the properties of the JSON object in data, in
+// order. A root that is not an object, a duplicate property and content after
+// the object fail.
+func JSONProperties(data []byte) ([]JSONProperty, error) {
 	if !utf8.Valid(data) || len(data) > platform.MaxProfileBytes {
 		return nil, errors.New("JSON settings must be bounded UTF-8")
 	}
@@ -42,7 +47,7 @@ func jsonProperties(data []byte) ([]jsonProperty, error) {
 	if err != nil || opening != json.Delim('{') {
 		return nil, errors.New("settings must contain a JSON object")
 	}
-	properties := []jsonProperty{}
+	properties := []JSONProperty{}
 	seen := map[string]bool{}
 	for decoder.More() {
 		key := int(decoder.InputOffset())
@@ -63,7 +68,7 @@ func jsonProperties(data []byte) ([]jsonProperty, error) {
 		if err := decoder.Decode(&raw); err != nil {
 			return nil, err
 		}
-		properties = append(properties, jsonProperty{name, key, value, int(decoder.InputOffset())})
+		properties = append(properties, JSONProperty{name, key, value, int(decoder.InputOffset())})
 	}
 	if closing, err := decoder.Token(); err != nil || closing != json.Delim('}') {
 		return nil, errors.New("settings contain an incomplete JSON object")
@@ -93,22 +98,22 @@ func replaceJSONField(data []byte, field string, value []byte, keep bool) ([]byt
 	if len(result) == 0 {
 		result = []byte("{}\n")
 	}
-	properties, err := jsonProperties(result)
+	properties, err := JSONProperties(result)
 	if err != nil {
 		return nil, err
 	}
-	index := slices.IndexFunc(properties, func(p jsonProperty) bool { return p.name == field })
+	index := slices.IndexFunc(properties, func(p JSONProperty) bool { return p.Name == field })
 	start, end := 0, 0
 	switch {
 	case index >= 0:
 		property := properties[index]
-		start, end = property.value, property.end
+		start, end = property.Value, property.End
 		if !keep {
-			start = property.key
+			start = property.Key
 			if index+1 < len(properties) {
-				end = properties[index+1].key
+				end = properties[index+1].Key
 			} else if index > 0 {
-				start = properties[index-1].end
+				start = properties[index-1].End
 			}
 		}
 	case keep:
@@ -118,7 +123,7 @@ func replaceJSONField(data []byte, field string, value []byte, keep bool) ([]byt
 		}
 		value = append(append(name, ':'), value...)
 		if len(properties) > 0 {
-			start = properties[len(properties)-1].end
+			start = properties[len(properties)-1].End
 			value = append([]byte{','}, value...)
 		} else {
 			start = bytes.IndexByte(result, '{') + 1
@@ -131,13 +136,16 @@ func replaceJSONField(data []byte, field string, value []byte, keep bool) ([]byt
 		value = nil
 	}
 	result = append(append(bytes.Clone(result[:start]), value...), result[end:]...)
-	if _, err := jsonProperties(result); err != nil {
+	if _, err := JSONProperties(result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
-func jsoncMask(data []byte) (clean, lexical []byte, err error) {
+// JSONCMask returns two copies of JSONC data with the same length. In
+// lexical, spaces replace the comments and a byte order mark. In clean,
+// spaces also replace the trailing commas, so clean is strict JSON.
+func JSONCMask(data []byte) (clean, lexical []byte, err error) {
 	if len(data) > platform.MaxProfileBytes || !utf8.Valid(data) || bytes.IndexByte(data, 0) >= 0 {
 		return nil, nil, errors.New("JSONC settings must be bounded UTF-8")
 	}
@@ -211,7 +219,7 @@ func jsoncMask(data []byte) (clean, lexical []byte, err error) {
 }
 
 func replaceJSONCField(data []byte, field string, value []byte, keep bool) ([]byte, error) {
-	if _, _, err := jsoncMask(data); err != nil {
+	if _, _, err := JSONCMask(data); err != nil {
 		return nil, err
 	}
 	result := bytes.Clone(data)
@@ -221,34 +229,34 @@ func replaceJSONCField(data []byte, field string, value []byte, keep bool) ([]by
 		}
 		result = []byte("{}\n")
 	}
-	clean, lexical, err := jsoncMask(result)
+	clean, lexical, err := JSONCMask(result)
 	if err != nil {
 		return nil, err
 	}
-	properties, err := jsonProperties(clean)
+	properties, err := JSONProperties(clean)
 	if err != nil {
 		return nil, err
 	}
-	index := slices.IndexFunc(properties, func(p jsonProperty) bool { return p.name == field })
+	index := slices.IndexFunc(properties, func(p JSONProperty) bool { return p.Name == field })
 	if index < 0 && !keep {
 		return result, nil
 	}
 	start, end := 0, 0
 	if index >= 0 {
 		p := properties[index]
-		start, end = p.value, p.end
+		start, end = p.Value, p.End
 		if !keep {
-			start, value = p.key, nil
+			start, value = p.Key, nil
 			right := len(lexical)
 			if index+1 < len(properties) {
-				right = properties[index+1].key
+				right = properties[index+1].Key
 			}
-			comma := bytes.IndexByte(lexical[p.end:right], ',')
+			comma := bytes.IndexByte(lexical[p.End:right], ',')
 			if comma >= 0 {
-				comma += p.end
+				comma += p.End
 			} else if index > 0 {
-				left := properties[index-1].end
-				comma = left + bytes.IndexByte(lexical[left:p.key], ',')
+				left := properties[index-1].End
+				comma = left + bytes.IndexByte(lexical[left:p.Key], ',')
 			}
 			if comma >= 0 {
 				result = append(result[:comma], result[comma+1:]...)
@@ -266,15 +274,15 @@ func replaceJSONCField(data []byte, field string, value []byte, keep bool) ([]by
 		value = append(append(name, ':'), value...)
 		start = bytes.IndexByte(clean, '{') + 1
 		if len(properties) != 0 {
-			start = properties[len(properties)-1].end
+			start = properties[len(properties)-1].End
 			value = append([]byte{','}, value...)
 		}
 		end = start
 	}
 	result = append(append(bytes.Clone(result[:start]), value...), result[end:]...)
-	clean, _, err = jsoncMask(result)
+	clean, _, err = JSONCMask(result)
 	if err == nil {
-		_, err = jsonProperties(clean)
+		_, err = JSONProperties(clean)
 	}
 	return result, err
 }
@@ -293,17 +301,17 @@ func (f Field) Extract(data []byte, d Desired) ([]byte, bool, error) {
 	clean := data
 	if f.jsonc(d) {
 		var err error
-		if clean, _, err = jsoncMask(data); err != nil {
+		if clean, _, err = JSONCMask(data); err != nil {
 			return nil, false, err
 		}
 	}
-	properties, err := jsonProperties(clean)
+	properties, err := JSONProperties(clean)
 	if err != nil {
 		return nil, false, err
 	}
 	for _, property := range properties {
-		if property.name == d.Slot {
-			value, err := compactJSON(clean[property.value:property.end])
+		if property.Name == d.Slot {
+			value, err := compactJSON(clean[property.Value:property.End])
 			return value, err == nil, err
 		}
 	}
@@ -342,13 +350,13 @@ func (f Field) Empty(data []byte, d Desired) (bool, error) {
 		return true, nil
 	}
 	if f.jsonc(d) {
-		clean, lexical, err := jsoncMask(data)
+		clean, lexical, err := JSONCMask(data)
 		if err != nil {
 			return false, err
 		}
-		properties, err := jsonProperties(clean)
+		properties, err := JSONProperties(clean)
 		return len(properties) == 0 && bytes.Equal(lexical, data), err
 	}
-	properties, err := jsonProperties(data)
+	properties, err := JSONProperties(data)
 	return len(properties) == 0, err
 }

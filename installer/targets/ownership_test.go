@@ -97,12 +97,18 @@ func TestEqualContentAgainstABaselineOnlyRecordStaysUnowned(t *testing.T) {
 			if err := e.converge(d, targets.Preserve); err != nil {
 				t.Fatal(err)
 			}
-			if record := e.unowned(d); record.Before == earlier {
-				t.Fatal("the record kept a baseline that is not the live content", record)
+			if record := e.unowned(d); record.Before != earlier {
+				t.Fatal("the first baseline must stay the first baseline", record)
+			}
+			if live, err := e.writer.Inspect(d, e); err != nil || !live.Satisfied {
+				t.Fatal("unowned content that equals the desired content needs no action", live, err)
 			}
 			e.mustRelease(d, targets.Preserve)
 			if describe(t, e.root) != equal {
 				t.Fatal("the release restored an old baseline over content that setup did not write")
+			}
+			if !holds(e, "earlier") {
+				t.Fatal("the first baseline is gone without a copy", e.baselines())
 			}
 		})
 	}
@@ -119,13 +125,22 @@ func TestOwnerEditThatEqualsANewDesiredContentStaysUnowned(t *testing.T) {
 			ownerWrites(e, d, values[2])
 			equal := describe(t, e.root)
 			later := f.second(e)
+			first := e.State().Targets[targets.Key(d.Path, d.Slot)].Before
 			if err := e.converge(later, targets.Preserve); err != nil {
 				t.Fatal(err)
 			}
-			e.unowned(later)
+			if record := e.unowned(later); record.Before != first {
+				t.Fatal("the first baseline must stay the first baseline", record)
+			}
+			if live, err := e.writer.Inspect(later, e); err != nil || !live.Satisfied {
+				t.Fatal("unowned content that equals the desired content needs no action", live, err)
+			}
 			e.mustRelease(later, targets.Preserve)
 			if describe(t, e.root) != equal {
 				t.Fatal("the release restored the first baseline over the edit of the owner")
+			}
+			if !holds(e, "earlier") {
+				t.Fatal("the first baseline is gone without a copy", e.baselines())
 			}
 		})
 	}
@@ -183,6 +198,44 @@ func TestRecoveryNeverMovesAnUnverifiedEntryToTheDestination(t *testing.T) {
 				if err := change(); err == nil || !strings.Contains(err.Error(), aside) || describe(t, e.root) != before {
 					t.Fatal("recovery moved or deleted an entry that the record cannot verify", err)
 				}
+			}
+		})
+	}
+}
+
+func holds(e *env, text string) bool {
+	for _, saved := range e.baselines() {
+		if strings.Contains(describe(e.t, saved), text) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestReplacementOfContentWithAFingerprintBaselineSavesItFirst(t *testing.T) {
+	for _, name := range []string{"file", "tree", "link"} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			f := fixtureNamed(name)
+			f.personal(e)
+			origin := describe(t, e.root)
+			d := f.first(e)
+			live, err := e.writer.Inspect(d, e)
+			noError(t, err)
+			noError(t, e.Update(func(s *state.State) error {
+				s.Targets[d.Path] = state.Record{Resource: d.Resource, Kind: d.Kind, Before: "fp:" + live.Fingerprint}
+				return nil
+			}))
+			if err := e.converge(d, targets.Preserve); !errors.Is(err, targets.ErrChanged) || describe(t, e.root) != origin {
+				t.Fatal("content without a copy was replaced without approval", err)
+			}
+			e.mustConverge(d, targets.Replace)
+			if !holds(e, "personal") {
+				t.Fatal("the approved replacement left no copy of the content", e.baselines())
+			}
+			e.mustRelease(d, targets.Preserve)
+			if describe(t, e.root) != origin {
+				t.Fatalf("the release did not give the content back:\n%s", describe(t, e.root))
 			}
 		})
 	}

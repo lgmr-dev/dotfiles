@@ -19,7 +19,7 @@ import (
 
 var keyboardFixtureResource = catalog.Resource{ID: "system.keyboard-access", Name: "Keyboard access", Action: "keyboard-access", Scope: "user"}
 
-const keyboardFixtureMark = "system.keyboard-access:reload"
+const keyboardFixtureMark = "system.keyboard-access:rule"
 
 var keyboardFixtureReload = []string{
 	"udevadm control --reload-rules",
@@ -33,6 +33,7 @@ type keyboardFixture struct {
 	rec            *aptFixtureRecords
 	log            []string
 	authentication int
+	commands       []platform.Command
 	fail           map[string]error
 	during         func(name string)
 }
@@ -58,6 +59,7 @@ func (f *keyboardFixture) Run(ctx context.Context, c platform.Command) ([]byte, 
 	if c.Path != "/fake/sudo" || len(c.Args) < 3 || c.Args[0] != "-n" || c.Args[1] != "--" || !slices.Equal(c.Env, []string{"LC_ALL=C"}) {
 		f.t.Fatal("each command must use the non-interactive sudo line", c)
 	}
+	f.commands = append(f.commands, c)
 	name, args := filepath.Base(c.Args[2]), c.Args[3:]
 	if filepath.Dir(c.Args[2]) != "/usr/bin" {
 		f.t.Fatal("the recipe must use the fixed system programs", c.Args[2])
@@ -145,8 +147,9 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 	ctx := context.Background()
 	r := keyboardFixtureResource
 	found := f.inspect(true)
-	if found.Status != engine.Missing || !found.Privileged || !found.Pending || len(found.Commands) != 1 || found.Commands[0].By != "setup" || len(found.Commands[0].Lines) != 6 ||
-		!strings.HasPrefix(found.Commands[0].Lines[0], "sudo install -m 0644 -o root -g root -T ") || found.Commands[0].Lines[3] != "sudo udevadm control --reload-rules" {
+	if found.Status != engine.Missing || !found.Privileged || !found.Pending || len(found.Commands) != 1 || found.Commands[0].By != "setup" || len(found.Commands[0].Lines) != 7 ||
+		!strings.HasPrefix(found.Commands[0].Lines[0], "# Setup first writes the rule to ") ||
+		!strings.HasPrefix(found.Commands[0].Lines[1], "LC_ALL=C /fake/sudo -n -- /usr/bin/install -m 0644 -o root -g root -T ") || found.Commands[0].Lines[4] != "LC_ALL=C /fake/sudo -n -- /usr/bin/udevadm control --reload-rules" {
 		t.Fatal("an absent rule must be installable with administrator rights", found)
 	}
 	fingerprint := KeyboardRuleFingerprint(KeyboardRule())
@@ -156,8 +159,8 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 		if record.Resource != r.ID || record.Kind != "file" || record.Next != fingerprint || record.Applied != "" || record.Before != "absent" {
 			t.Fatal("the record must hold the intended value before the first command", name, record)
 		}
-		if marked := slices.Contains(st.Pending, keyboardFixtureMark); marked != (name == "udevadm") {
-			t.Fatal("the pending mark must cover the reload and the triggers only", name, st.Pending)
+		if !slices.Equal(st.Pending, []string{keyboardFixtureMark}) {
+			t.Fatal("the pending mark must cover the write, the reload and the triggers", name, st.Pending)
 		}
 	}
 	if err := f.k.Apply(ctx, r, found, f.rec); err != nil {
@@ -213,7 +216,7 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 	}
 
 	found = f.inspect(false)
-	if found.Status != engine.Satisfied || len(found.Commands) != 1 || !strings.HasPrefix(found.Commands[0].Lines[0], "sudo mv -T ") {
+	if found.Status != engine.Satisfied || len(found.Commands) != 1 || !strings.HasPrefix(found.Commands[0].Lines[0], "LC_ALL=C /fake/sudo -n -- /usr/bin/mv -T ") {
 		t.Fatal(found)
 	}
 	f.during = func(name string) {
@@ -221,7 +224,7 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 		if record := st.Targets[f.k.Rules]; !record.Release || record.Next != "absent" || record.Applied != fingerprint {
 			t.Fatal("the record must hold the unfinished removal before the first command", name, record)
 		}
-		if marked := slices.Contains(st.Pending, keyboardFixtureMark); marked != (name == "udevadm") {
+		if !slices.Equal(st.Pending, []string{keyboardFixtureMark}) {
 			t.Fatal(name, st.Pending)
 		}
 	}
@@ -400,5 +403,51 @@ func TestKeyboardAccessReportsMissingAdministratorTools(t *testing.T) {
 	root := NewKeyboardAccess(&APTLocation{Root: true}, "", "/state/keyboard-access")
 	if c := root.reloadCommands()[0]; c.Path != "/usr/bin/udevadm" || !slices.Equal(c.Args, []string{"control", "--reload-rules"}) {
 		t.Fatal("root must run the recipe without sudo", c)
+	}
+}
+
+func TestKeyboardAccessMarksBeforeTheFirstPrivilegedCommand(t *testing.T) {
+	f := newKeyboardFixture(t)
+	ctx := context.Background()
+	r := keyboardFixtureResource
+	seen := []string{}
+	f.during = func(name string) {
+		if st := f.rec.State(); len(st.Pending) != 1 {
+			t.Fatal("each privileged command of the step must run under the pending mark", name, st.Pending)
+		}
+		seen = append(seen, name)
+	}
+	found := f.inspect(true)
+	if err := f.k.Apply(ctx, r, found, f.rec); err != nil || !slices.Equal(seen, []string{"install", "ln", "rm", "udevadm", "udevadm", "udevadm"}) || len(f.rec.State().Pending) != 0 {
+		t.Fatal(err, seen, f.rec.State().Pending)
+	}
+	if shown := aptFixtureShellLines(found.Commands[0]); len(shown) != len(f.commands) {
+		t.Fatal(shown)
+	} else {
+		for i, c := range f.commands {
+			if shown[i] != aptFixtureLine(c) {
+				t.Fatal("the shown line differs from the command that ran", shown[i], aptFixtureLine(c))
+			}
+		}
+	}
+	seen, f.commands = nil, nil
+	found = f.inspect(false)
+	if err := f.k.Remove(ctx, r, found, f.rec); err != nil || !slices.Equal(seen, []string{"mv", "rm", "udevadm", "udevadm", "udevadm"}) || len(f.rec.State().Pending) != 0 {
+		t.Fatal(err, seen, f.rec.State().Pending)
+	}
+	for i, c := range f.commands {
+		if found.Commands[0].Lines[i] != aptFixtureLine(c) {
+			t.Fatal("the shown line differs from the command that ran", found.Commands[0].Lines[i], aptFixtureLine(c))
+		}
+	}
+
+	f = newKeyboardFixture(t)
+	f.fail["install"] = errors.New("fork/exec /fake/sudo: no such file or directory")
+	if err := f.k.Apply(ctx, r, f.inspect(true), f.rec); err == nil || len(f.rec.State().Pending) != 0 {
+		t.Fatal("a write that did not start must clear its mark", err, f.rec.State().Pending)
+	}
+	f.fail["install"] = aptFixtureExit(1)
+	if err := f.k.Apply(ctx, r, f.inspect(true), f.rec); err == nil || len(f.rec.State().Pending) != 1 {
+		t.Fatal("a write that started and failed must keep its mark", err, f.rec.State().Pending)
 	}
 }

@@ -103,14 +103,15 @@ type fakeResource struct {
 }
 
 type world struct {
-	mutex     sync.Mutex
-	home      string
-	resources map[string]*fakeResource
-	log       []string
-	replaced  []string
-	swept     int
-	elevated  int
-	released  int
+	writableInspections int
+	mutex               sync.Mutex
+	home                string
+	resources           map[string]*fakeResource
+	log                 []string
+	replaced            []string
+	swept               int
+	elevated            int
+	released            int
 }
 
 func (w *world) resource(id string) *fakeResource {
@@ -134,11 +135,14 @@ func (w *world) calls(prefix string) []string {
 	return result
 }
 
-func (w *world) Inspect(_ context.Context, r catalog.Resource, want engine.Want, _ engine.Records) (engine.Finding, error) {
+func (w *world) Inspect(_ context.Context, r catalog.Resource, want engine.Want, rec engine.Records) (engine.Finding, error) {
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	f := w.resource(r.ID)
 	w.log = append(w.log, "inspect:"+r.ID)
+	if rec.Update(func(*state.State) error { return nil }) == nil {
+		w.writableInspections++
+	}
 	if f.inspectErr != nil {
 		return engine.Finding{}, f.inspectErr
 	}

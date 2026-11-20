@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
 	"github.com/luisgui1757/dotfiles/installer/v2import"
@@ -196,4 +197,176 @@ func TestTheSwitchStopsBeforeASlotWhoseRestoreCopyFailed(t *testing.T) {
 	f.captureKinds = nil
 	mustRestore(t, f)
 	before.restored(t, f)
+}
+
+func editedFingerprint(t *testing.T, path string) string {
+	t.Helper()
+	snapshot, err := platform.SnapshotTree(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return snapshot.Kind + ":" + snapshot.Hash
+}
+
+func setRestoring(t *testing.T, f *fx, restoring map[string]any) {
+	t.Helper()
+	path := filepath.Join(f.state, "v2-restore", "manifest.json")
+	var manifest map[string]any
+	if err := json.Unmarshal([]byte(read(t, path)), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest["restoring"] = restoring
+	data, err := json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, path, string(data)+"\n", 0600)
+}
+
+func editedCopies(t *testing.T, f *fx) string {
+	t.Helper()
+	copies := ""
+	entries, err := os.ReadDir(filepath.Join(f.state, "v2-restore", "edited"))
+	if errors.Is(err, os.ErrNotExist) {
+		return ""
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		copies += read(t, filepath.Join(f.state, "v2-restore", "edited", entry.Name()))
+	}
+	return copies
+}
+
+func TestARestoreRetryNeverReplacesAnEditWithoutItsVerifiedCopy(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	const personal = "# v3 env\n# my edit of a generated file\n"
+	t.Run("progress without a copy", func(t *testing.T) {
+		f := linuxFixture(t)
+		f.save()
+		f.mustImport()
+		env := filepath.Join(f.state, "shells", "env.sh")
+		write(t, env, personal, 0644)
+		setRestoring(t, f, map[string]any{env: editedFingerprint(t, env)})
+		_, message := mustRestore(t, f)
+		if read(t, env) != personal || !strings.Contains(message, "Kept your changed content: "+env) {
+			t.Fatalf("a retry replaced an edit that has no saved copy: %q\n%s", read(t, env), message)
+		}
+	})
+	t.Run("stop after the copy", func(t *testing.T) {
+		f := linuxFixture(t)
+		before := capture(t, f, f.save())
+		f.mustImport()
+		env := filepath.Join(f.state, "shells", "env.sh")
+		write(t, env, personal, 0644)
+		restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+		if err != nil {
+			t.Fatal(err)
+		}
+		v2import.SetFault(func(at string) error {
+			if at == "restore-slot:"+env {
+				return errors.New("interrupted before the replacement")
+			}
+			return nil
+		})
+		if _, err := restoration.Run(context.Background(), []string{env}); err == nil {
+			t.Fatal("the interruption did not stop the restore")
+		}
+		v2import.SetFault(nil)
+		if read(t, env) != personal || editedCopies(t, f) != personal {
+			t.Fatalf("at the stop the edit must be in place and in its verified copy: %q %q", read(t, env), editedCopies(t, f))
+		}
+		mustRestore(t, f)
+		if editedCopies(t, f) != personal {
+			t.Fatalf("the retry lost the copy of the edit: %q", editedCopies(t, f))
+		}
+		before.restored(t, f)
+	})
+}
+
+func TestARestoreRetryCompletesAfterAStopBetweenTheStageAndTheMove(t *testing.T) {
+	f := linuxFixture(t)
+	before := capture(t, f, f.save())
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	saved := ""
+	editManifest(t, f, func(slots map[string]any) {
+		saved = strings.TrimPrefix(slots[env].(map[string]any)["saved"].(string), "backup:")
+	})
+	setRestoring(t, f, map[string]any{env: editedFingerprint(t, env)})
+	staged := strings.TrimSuffix(aside(env), ".previous") + ".next"
+	if err := os.Link(saved, staged); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(env, aside(env)); err != nil {
+		t.Fatal(err)
+	}
+	mustRestore(t, f)
+	before.restored(t, f)
+}
+
+func TestAResumedSwitchNeverChangesASystemItemOrRunsSentinel(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	for _, id := range []string{"tool.zsh", "integration.sentinel-installer"} {
+		t.Run(id, func(t *testing.T) {
+			f := linuxFixture(t)
+			before := capture(t, f, f.save())
+			proposal, err := f.preview()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v2import.SetFault(func(at string) error {
+				if at == "published" {
+					return errors.New("interrupted after the publication")
+				}
+				return nil
+			})
+			if _, err := proposal.Run(context.Background()); err == nil {
+				t.Fatal("the interruption did not stop the import")
+			}
+			v2import.SetFault(nil)
+			f.present[id] = false
+			next, err := f.preview()
+			if err != nil || !next.Switching {
+				t.Fatalf("%+v %v", next, err)
+			}
+			if !strings.Contains(next.Details, "Items that the switch does not change while the v2 fallback is open") || !strings.Contains(next.Details, "("+id+")") {
+				t.Fatalf("the review of the resumed switch must name the blocker:\n%s", next.Details)
+			}
+			result, err := next.Run(context.Background())
+			if err == nil || len(f.systemChanges) != 0 {
+				t.Fatalf("the resumed switch changed %v: %v", f.systemChanges, err)
+			}
+			if !strings.Contains(result.Message, id+" needs a system change or the Sentinel installer") || !strings.Contains(result.Message, "Run restore-v2 and finish this work with the v2.3.0 checkout") {
+				t.Fatalf("the report must name the blocker and the way back:\n%s", result.Message)
+			}
+			if st := f.current(); st.V2Restore != "switching" {
+				t.Fatalf("the switch must stay unfinished: %+v", st)
+			}
+			mustRestore(t, f)
+			before.restored(t, f)
+		})
+	}
+}
+
+func TestRestoreStopsWhenAFileChangedAfterTheReview(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := filepath.Join(f.state, "shells", "env.sh")
+	write(t, env, "# v3 env\n# edited after the review\n", 0644)
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "the files changed after the review; run restore-v2 again") {
+		t.Fatalf("a plan that differs from the review must stop: %v", err)
+	}
+	if st := f.current(); st.V2Restore != "open" || read(t, env) != "# v3 env\n# edited after the review\n" {
+		t.Fatalf("the stop must change nothing: %+v", st)
+	}
+	if read(t, f.fontPath()) != "v3 font bytes\n" {
+		t.Fatal("the stop must come before the first write")
+	}
 }

@@ -515,8 +515,15 @@ func TestCaskRunningApplicationGuardCoversAReinstall(t *testing.T) {
 		t.Fatal(err)
 	}
 	found := f.inspect(f.r, engine.Want{Present: true})
-	if found.Status != engine.Blocked || !strings.Contains(found.Reason, "has no app") || !slices.Equal(brewTestBlocks(found, "you"), []string{f.line(true, "reinstall", "--cask", "--appdir="+f.d.appdir, "--no-binaries", "--require-sha", "ghostty"), f.line(true, "uninstall", "--cask", "ghostty")}) || len(brewTestBlocks(found, "setup")) != 0 {
+	if found.Status != engine.Blocked || !strings.Contains(found.Reason, "has no app") || len(brewTestBlocks(found, "setup")) != 0 {
 		t.Fatal("setup repaired a cask without a record", found)
+	}
+	wantBlocks := []engine.CommandBlock{
+		{Title: "Restore Ghostty with Homebrew", By: "you", Lines: []string{f.line(true, "reinstall", "--cask", "--appdir="+f.d.appdir, "--no-binaries", "--require-sha", "ghostty")}},
+		{Title: "Remove Ghostty with Homebrew", By: "you", Lines: []string{f.line(true, "uninstall", "--cask", "ghostty")}},
+	}
+	if !reflect.DeepEqual(found.Commands, wantBlocks) {
+		t.Fatalf("the two commands exclude each other and need one block each: %+v", found.Commands)
 	}
 	for _, status := range []engine.Status{engine.Unhealthy, engine.Missing} {
 		if err := f.d.Apply(context.Background(), f.r, engine.Finding{Status: status}, f.rec); err == nil || len(f.runner.commands) != 0 || len(f.rec.State().Pending) != 0 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,12 +16,17 @@ import (
 )
 
 // Sweep removes the unused private builds. The roots are the targets of the
-// current links and of unfinished link moves, the builds that a recorded
-// target names, and the builds that the manifests of those builds use. It
+// current links and of each staged link, the builds that a recorded target
+// names, and the builds that the manifests of those builds use. A recorded
+// target names a build in its record values, in the live target of a recorded
+// link and in the live content, up to 1 MiB, of a recorded file, block or
+// field. When Sweep cannot read a recorded target that exists, it removes no
+// build and returns the reason. It
 // removes an unused build only while its tree still equals its manifest, and
 // then the manifest and an empty resource folder. It leaves a changed build, a
-// folder without a valid manifest and each entry that it does not know, and
-// returns them in left. An entry that appears during the removal also stays.
+// folder without a valid manifest, a staged link that no unfinished
+// publication records and each entry that it does not know, and returns them
+// in left. An entry that appears during the removal also stays.
 func Sweep(ctx context.Context, stateDir string, st state.State) (removed, left []string, err error) {
 	return sweep(ctx, stateDir, st, true)
 }
@@ -72,7 +78,7 @@ func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (r
 					return nil, nil, fmt.Errorf("setup cannot read which build %s uses, so it removed no build: %w", path, err)
 				}
 				roots = append(roots, target)
-				if name != "current" && !ownBuild(stateDir, folder.id, target) {
+				if name != "current" && !recordedStagedLink(dir, path, st.Targets[CurrentDir(stateDir, folder.id)]) {
 					left = append(left, path)
 				}
 			case item.IsDir() && buildName.MatchString(name):
@@ -85,15 +91,18 @@ func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (r
 		}
 		folders = append(folders, folder)
 	}
-	prefix := tools + string(filepath.Separator)
-	for _, record := range st.Targets {
-		for _, value := range []string{record.Applied, record.Next, record.Before} {
-			for _, folder := range folders {
-				for _, build := range folder.builds {
-					if strings.Contains(value, prefix) && strings.Contains(value, build) {
-						roots = append(roots, build)
-					}
-				}
+	all := []string{}
+	for _, folder := range folders {
+		all = append(all, folder.builds...)
+	}
+	for key, record := range st.Targets {
+		text, err := recordedReferences(key, record)
+		if err != nil {
+			return nil, nil, fmt.Errorf("setup cannot read the recorded target %s, which can name a build, so it removed no build: %w", key, err)
+		}
+		for _, build := range all {
+			if slices.ContainsFunc(text, func(value string) bool { return namesBuild(value, build) }) {
+				roots = append(roots, build)
 			}
 		}
 	}
@@ -151,16 +160,85 @@ func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (r
 		if !remove {
 			continue
 		}
-		if record, recorded := st.Targets[CurrentDir(stateDir, folder.id)]; !recorded || record.Next == "" && !record.Release {
-			if err := removeStagedLinks(stateDir, folder.id); err != nil {
-				return removed, sortedUnique(left), err
-			}
-		}
 		if _, err := platform.RemoveEmptyDirectory(dir); err != nil {
 			return removed, sortedUnique(left), err
 		}
 	}
 	return removed, sortedUnique(left), nil
+}
+
+const maxReferenceBytes = 1 << 20
+
+func recordedReferences(key string, record state.Record) ([]string, error) {
+	text := []string{record.Applied, record.Next, record.Before}
+	if !slices.Contains([]string{"link", "file", "block", "field"}, record.Kind) {
+		return text, nil
+	}
+	path := key
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if cut := strings.LastIndex(key, "#"); cut > 0 {
+			path = key[:cut]
+			info, err = os.Lstat(path)
+		}
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return text, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if record.Kind == "link" || info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(path)
+		if err != nil {
+			return nil, err
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(path), target)
+		}
+		text = append(text, filepath.Clean(target))
+		if record.Kind == "link" {
+			return text, nil
+		}
+		info, err = os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return text, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("it is not a regular file")
+	}
+	if info.Size() > maxReferenceBytes {
+		return text, nil
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxReferenceBytes))
+	if err := errors.Join(err, file.Close()); err != nil {
+		return nil, err
+	}
+	return append(text, string(data)), nil
+}
+
+func namesBuild(text, build string) bool {
+	for _, spelling := range []string{build, filepath.ToSlash(build), strings.ReplaceAll(build, `\`, `\\`)} {
+		for rest := text; ; {
+			at := strings.Index(rest, spelling)
+			if at < 0 {
+				break
+			}
+			rest = rest[at+len(spelling):]
+			if rest == "" || !strings.ContainsRune("0123456789", rune(rest[0])) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func sortedUnique(values []string) []string {

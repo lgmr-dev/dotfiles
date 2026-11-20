@@ -427,3 +427,174 @@ func TestPortableDesktopBuildsDiscloseTheirRouteBeforeAnAction(t *testing.T) {
 		t.Fatal("a satisfied build repeats its route note", finding.Notes)
 	}
 }
+
+func record(t *testing.T, f *fixture, key, kind string) {
+	t.Helper()
+	if err := f.rec.Update(func(s *state.State) error {
+		if err := s.BeginTarget(key, state.Record{Resource: "config.fixture", Kind: kind, Next: "fp:0123456789abcdef", Before: "absent"}); err != nil {
+			return err
+		}
+		return s.Promote(key)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func threeBuilds(t *testing.T) (f *fixture, first, second, third string) {
+	t.Helper()
+	f = newFixture(t)
+	f.provider.Pins[shared] = f.tool("1.0", "version one")
+	first = f.mustApply(shared)
+	f.provider.Pins[shared] = f.tool("2.0", "version two")
+	second = f.mustApply(shared)
+	f.provider.Pins[shared] = f.tool("3.0", "version three")
+	third = f.mustApply(shared)
+	return f, first, second, third
+}
+
+func TestCleanupKeepsAStagedLinkThatNoRecordNames(t *testing.T) {
+	f := newFixture(t)
+	f.provider.Pins[shared] = f.tool("1.0", "version one")
+	first := f.mustApply(shared)
+	dir := builds.ResourceDir(f.provider.StateDir, shared)
+	notes := filepath.Join(dir, ".previous-notes")
+	staged := filepath.Join(dir, ".next-"+filepath.Base(first))
+	for _, link := range []string{notes, staged} {
+		if err := platform.CreateDirectoryLink(first, link); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.provider.Pins[shared] = f.tool("2.0", "version two")
+	f.mustApply(shared)
+	removed, left := f.sweep()
+	if len(removed) != 0 || !slices.Equal(left, []string{staged, notes}) {
+		t.Fatal("the sweep did not keep and report the personal links and their build", removed, left)
+	}
+	if err := f.remove(shared); err != nil {
+		t.Fatal(err)
+	}
+	f.sweep()
+	for _, link := range []string{notes, staged} {
+		if target, err := os.Readlink(link); err != nil || target != first {
+			t.Fatal("setup deleted a link that no record names", link, err)
+		}
+	}
+	if read(t, filepath.Join(first, "tool")) != "version one" {
+		t.Fatal("setup deleted the build of a personal link")
+	}
+}
+
+func TestApprovedReplacementKeepsAnEditedCurrentLinkToAnotherBuild(t *testing.T) {
+	f := newFixture(t)
+	f.provider.Pins[shared] = f.tool("1.0", "version one")
+	first := f.mustApply(shared)
+	f.provider.Pins[shared] = f.tool("2.0", "version two")
+	second := f.mustApply(shared)
+	current := builds.CurrentDir(f.provider.StateDir, shared)
+	if err := os.Remove(current); err != nil {
+		t.Fatal(err)
+	}
+	if err := platform.CreateDirectoryLink(first, current); err != nil {
+		t.Fatal(err)
+	}
+	finding := f.inspect(shared, true)
+	if finding.Status != engine.Changed {
+		t.Fatal("an edited current link is", finding.Status)
+	}
+	finding.Replace = true
+	if err := f.provider.Apply(t.Context(), catalog.Resource{ID: shared}, finding, f.rec); err != nil {
+		t.Fatal(err)
+	}
+	saved := filepath.Join(filepath.Dir(current), ".previous-"+filepath.Base(second))
+	if target, err := os.Readlink(saved); err != nil || target != first || f.build(shared) != second {
+		t.Fatal("the approved replacement deleted the edited link", target, err)
+	}
+	removed, left := f.sweep()
+	if len(removed) != 0 || !slices.Equal(left, []string{saved}) || read(t, filepath.Join(first, "tool")) != "version one" {
+		t.Fatal("the sweep did not keep and report the saved link and its build", removed, left)
+	}
+}
+
+func TestInterruptedMoveRemovesOnlyTheStagedLinksOfItsRecord(t *testing.T) {
+	f := newFixture(t)
+	f.provider.Pins[shared] = f.tool("1.0", "version one")
+	first := f.mustApply(shared)
+	f.provider.Pins[shared] = f.tool("2.0", "version two")
+	second := f.mustApply(shared)
+	dir := builds.ResourceDir(f.provider.StateDir, shared)
+	current := builds.CurrentDir(f.provider.StateDir, shared)
+	candidate := filepath.Join(dir, "9.0-0123456789ab-1")
+	if err := os.Rename(current, filepath.Join(dir, ".previous-"+filepath.Base(candidate))); err != nil {
+		t.Fatal(err)
+	}
+	if err := platform.CreateDirectoryLink(candidate, filepath.Join(dir, ".next-"+filepath.Base(candidate))); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.rec.Update(func(s *state.State) error {
+		return s.BeginTarget(current, state.Record{Resource: shared, Kind: "link", Next: candidate})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if build := f.mustApply(shared); build != second {
+		t.Fatal("the move did not complete with the verified build", build)
+	}
+	absent(t, filepath.Join(dir, ".previous-"+filepath.Base(candidate)))
+	absent(t, filepath.Join(dir, ".next-"+filepath.Base(candidate)))
+	if removed, left := f.sweep(); !slices.Equal(removed, []string{first}) || len(left) != 0 {
+		t.Fatal(removed, left)
+	}
+}
+
+func TestSweepKeepsABuildThatARecordedLinkPointsAt(t *testing.T) {
+	f, first, second, _ := threeBuilds(t)
+	link := filepath.Join(filepath.Dir(f.provider.StateDir), "runtime")
+	if err := platform.CreateDirectoryLink(first, link); err != nil {
+		t.Fatal(err)
+	}
+	record(t, f, link, "link")
+	record(t, f, filepath.Join(filepath.Dir(f.provider.StateDir), "absent-link"), "link")
+	removed, left := f.sweep()
+	if !slices.Equal(removed, []string{second}) || len(left) != 0 || read(t, filepath.Join(first, "tool")) != "version one" {
+		t.Fatal("the sweep did not keep exactly the build of the recorded link", removed, left)
+	}
+}
+
+func TestSweepKeepsABuildThatARecordedFileNames(t *testing.T) {
+	for _, test := range []struct{ kind, slot string }{{"file", ""}, {"block", "#dotfiles"}, {"field", "#terminal.path"}} {
+		t.Run(test.kind, func(t *testing.T) {
+			f, first, second, _ := threeBuilds(t)
+			file := filepath.Join(filepath.Dir(f.provider.StateDir), "settings.json")
+			write(t, file, `{"path": "`+filepath.ToSlash(filepath.Join(first, "tool"))+`"}`)
+			record(t, f, file+test.slot, test.kind)
+			record(t, f, filepath.Join(filepath.Dir(f.provider.StateDir), "absent.json")+test.slot, test.kind)
+			removed, left := f.sweep()
+			if !slices.Equal(removed, []string{second}) || len(left) != 0 || read(t, filepath.Join(first, "tool")) != "version one" {
+				t.Fatal("the sweep did not keep exactly the build that the file names", removed, left)
+			}
+		})
+	}
+}
+
+func TestSweepRemovesNoBuildWhenItCannotReadARecordedTarget(t *testing.T) {
+	for _, kind := range []string{"link", "file"} {
+		t.Run(kind, func(t *testing.T) {
+			f, first, second, _ := threeBuilds(t)
+			target := filepath.Join(filepath.Dir(f.provider.StateDir), "target")
+			if kind == "link" {
+				write(t, target, "a file in the place of the recorded link")
+			} else if err := os.Mkdir(target, 0700); err != nil {
+				t.Fatal(err)
+			}
+			record(t, f, target, kind)
+			removed, _, err := builds.Sweep(t.Context(), f.provider.StateDir, f.rec.State())
+			if err == nil || !strings.Contains(err.Error(), target) || len(removed) != 0 {
+				t.Fatal("the sweep continued without a readable recorded target", removed, err)
+			}
+			for build, text := range map[string]string{first: "version one", second: "version two"} {
+				if read(t, filepath.Join(build, "tool")) != text {
+					t.Fatal("the sweep removed a build")
+				}
+			}
+		})
+	}
+}

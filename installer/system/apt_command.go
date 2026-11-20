@@ -1,7 +1,6 @@
 package system
 
 import (
-	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -23,17 +22,17 @@ func (a *APT) privileged(program string, environment []string, args ...string) p
 	return platform.Command{Path: a.Location.Sudo, Args: slices.Concat([]string{"-n"}, environment, []string{program}, args), Elevated: true}
 }
 
-func (a *APT) display(program string, args ...string) string {
-	words := []string{}
-	if !a.Location.Root {
-		words = append(words, "sudo")
+func aptShellWord(word string) string {
+	if aptPlainWord.MatchString(word) {
+		return word
 	}
-	words = append(words, filepath.Base(program))
-	for _, argument := range args {
-		if !aptPlainWord.MatchString(argument) {
-			argument = aptShellLiteral(argument)
-		}
-		words = append(words, argument)
+	return aptShellLiteral(word)
+}
+
+func aptShellLine(c platform.Command) string {
+	words := []string{}
+	for _, word := range slices.Concat(c.Env, []string{c.Path}, c.Args) {
+		words = append(words, aptShellWord(word))
 	}
 	return strings.Join(words, " ")
 }

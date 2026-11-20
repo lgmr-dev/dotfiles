@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
@@ -219,8 +220,17 @@ var debCodeDatabaseFiles = []string{"answer.dat", "answer.dat-new", "answer.dat-
 
 type debCodeInput struct{ Parent, Directory, Identity string }
 
-func (input debCodeInput) override() string {
-	return "DEBCONF_DB_OVERRIDE=File{filename:" + filepath.Join(input.Directory, "answer.dat") + " accept_name:^code/add-(copilot-command|microsoft-repo)$ mode:0644 backup:no}"
+func debCodeDirectory(parent string) string {
+	if resolved, err := platform.ResolvePath(parent); err == nil {
+		parent = resolved
+	}
+	return filepath.Join(parent, "dotfiles-code-debconf-"+strconv.Itoa(os.Geteuid()))
+}
+
+func debCodeAnswers(directory string) string { return filepath.Join(directory, "answer.dat") }
+
+func debCodeOverride(directory string) string {
+	return "DEBCONF_DB_OVERRIDE=File{filename:" + debCodeAnswers(directory) + " accept_name:^code/add-(copilot-command|microsoft-repo)$ mode:0644 backup:no}"
 }
 
 func newDebCodeInput(parent string) (*debCodeInput, error) {
@@ -228,7 +238,18 @@ func newDebCodeInput(parent string) (*debCodeInput, error) {
 	if err != nil {
 		return nil, err
 	}
-	directory, err := os.MkdirTemp(parent, "dotfiles-code-debconf-")
+	directory := debCodeDirectory(parent)
+	err = os.Mkdir(directory, 0700)
+	if errors.Is(err, os.ErrExist) {
+		identity, identityErr := debTemporaryIdentity(directory)
+		if identityErr == nil {
+			identityErr = debCodeInput{Parent: parent, Directory: directory, Identity: identity}.cleanup()
+		}
+		if identityErr != nil {
+			return nil, fmt.Errorf("the Code temporary input %s of an earlier run is not as setup wrote it; examine it and delete it: %w", directory, identityErr)
+		}
+		err = os.Mkdir(directory, 0700)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +261,7 @@ func newDebCodeInput(parent string) (*debCodeInput, error) {
 	if err := input.validate(); err != nil {
 		return nil, errors.Join(err, os.Remove(directory))
 	}
-	file, err := os.OpenFile(filepath.Join(directory, "answer.dat"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	file, err := os.OpenFile(debCodeAnswers(directory), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
 		return nil, errors.Join(err, os.Remove(directory))
 	}

@@ -73,7 +73,9 @@ type Desired struct {
 // and Want is the fingerprint after a write of the desired unit. Satisfied
 // means that the unit needs no action: it equals the desired content, and
 // either setup wrote it and the record is complete (StateApplied), or setup
-// did not write it and the record holds it as a baseline only (StateBefore).
+// did not write it and the record has a baseline only. For such a record
+// State is StateBefore when the unit is that baseline and StateChanged
+// otherwise, because the first baseline stays the first baseline.
 // Equal content without a record is not satisfied: Converge records it as a
 // baseline, without ownership. Detail gives the cause of StateUnreadable.
 type Live struct {
@@ -271,14 +273,13 @@ func (w *Writer) Inspect(d Desired, rec engine.Records) (Live, error) {
 	}
 	live := w.live(kind, d, record, has)
 	live.Want = want
-	unowned := has && record.Applied == "" && record.Next == "" && !record.Release
 	switch {
 	case live.State == StateApplied:
 		live.Satisfied = record.Applied == want && record.Next == "" && !record.Release
+	case has && record.Applied == "" && record.Next == "" && !record.Release && live.Fingerprint == want:
+		live.Satisfied = true
 	case live.State == StateBefore && record.Applied == "" && live.Fingerprint != want:
 		live.State = StateChanged
-	case live.State == StateBefore:
-		live.Satisfied = unowned
 	}
 	return live, nil
 }
@@ -345,34 +346,36 @@ func (w *Writer) keep(ctx context.Context, d Desired, saved string) error {
 }
 
 func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Records, record state.Record, has bool, fingerprint string) error {
-	before := ""
-	if has && record.Before != "" {
-		if baseline, err := kind.Baseline(record.Before); err == nil && baseline == fingerprint {
-			before = record.Before
-		}
-	}
-	unowned := state.Record{Resource: d.Resource, Kind: d.Kind, Before: before}
-	if has {
-		unowned.Made = record.Made
-	}
-	if before != "" && record.Kind == d.Kind && record.Applied == "" && record.Next == "" && !record.Release {
-		return nil
-	}
-	fresh := before == ""
-	if fresh {
-		var err error
-		if unowned.Before, err = w.save(ctx, kind, d); err != nil {
+	if !has {
+		before, err := w.save(ctx, kind, d)
+		if err != nil {
 			return err
 		}
-	}
-	if err := rec.Update(func(s *state.State) error { s.Targets[d.Key] = unowned; return nil }); err != nil {
-		if fresh {
-			err = errors.Join(err, kind.Discard(unowned.Before, w.baselines()))
+		if err := rec.Update(func(s *state.State) error {
+			s.Targets[d.Key] = state.Record{Resource: d.Resource, Kind: d.Kind, Before: before}
+			return nil
+		}); err != nil {
+			return errors.Join(err, kind.Discard(before, w.baselines()))
 		}
+		return nil
+	}
+	if record.Kind == d.Kind && record.Applied == "" && record.Next == "" && !record.Release {
+		return nil
+	}
+	before := baselineOf(record)
+	if err := rec.Update(func(s *state.State) error {
+		s.Targets[d.Key] = state.Record{Resource: d.Resource, Kind: d.Kind, Before: before, Made: record.Made}
+		return nil
+	}); err != nil {
 		return err
 	}
-	if path, isBackup := strings.CutPrefix(record.Before, "backup:"); has && isBackup && record.Before != unowned.Before {
+	if baseline, err := kind.Baseline(before); err == nil && baseline == fingerprint {
+		return nil
+	}
+	if path, isBackup := strings.CutPrefix(before, "backup:"); isBackup {
 		platform.Detail(ctx, "Kept the earlier content of %s at %s", d.Key, path)
+	} else if strings.HasPrefix(before, "value:") {
+		platform.Detail(ctx, "Kept the earlier value of %s in the state; its release saves it in the baselines folder", d.Key)
 	}
 	return nil
 }
@@ -386,9 +389,12 @@ func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Re
 // Equal content never gives ownership. When the unit equals d and this write
 // order did not produce it, which means that it matches neither the applied
 // value nor the intended value of an unfinished write, the record becomes a
-// baseline only: the live unit is the baseline, there is no applied value,
-// and a release leaves the unit. A later different d against such a record
-// is changed content. A run after an interruption completes or repeats the
+// baseline only: there is no applied value, and a release leaves the unit.
+// The first baseline of a record stays as it is, and a unit without a record
+// gets the live unit as its baseline. A later different d against such a
+// record is changed content. A baseline that is a fingerprint only is never
+// a copy: an approved replacement saves the live unit first and records that
+// copy as the baseline, except for a kind that declares Uncopyable. A run after an interruption completes or repeats the
 // write.
 func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c Choice) error {
 	if err := ctx.Err(); err != nil {
@@ -431,8 +437,10 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 		return w.disown(ctx, kind, d, rec, record, has, live.Fingerprint)
 	}
 	saved := ""
-	held := has && record.Applied == "" && live.State == StateBefore
-	if live.State == StateChanged || held {
+	declared, _ := kind.(Uncopyable)
+	uncopied := has && strings.HasPrefix(record.Before, "fp:") && (declared == nil || !declared.CannotCopy())
+	held := has && record.Applied == "" && live.State == StateBefore && !uncopied
+	if live.State == StateChanged || held || live.State == StateBefore && uncopied {
 		if c != Replace {
 			return fmt.Errorf("%s: %w", d.Key, ErrChanged)
 		}
@@ -440,10 +448,20 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 			if saved, err = w.save(ctx, kind, d); err != nil {
 				return err
 			}
-			if has {
-				if err := w.keep(ctx, d, saved); err != nil {
-					return err
-				}
+		}
+		switch {
+		case held || !has:
+		case uncopied && (record.Applied == "" || live.State == StateBefore):
+			if err := rec.Update(func(s *state.State) error {
+				record.Before = saved
+				s.Targets[d.Key] = record
+				return nil
+			}); err != nil {
+				return errors.Join(err, kind.Discard(saved, w.baselines()))
+			}
+		default:
+			if err := w.keep(ctx, d, saved); err != nil {
+				return err
 			}
 		}
 	}
@@ -555,6 +573,14 @@ func (w *Writer) Release(ctx context.Context, key string, rec engine.Records, c 
 		return fmt.Errorf("baseline of %s: %w", key, err)
 	}
 	if record.Applied == "" {
+		if strings.HasPrefix(before, "value:") && live.Fingerprint != baseline {
+			if err := platform.PrepareDirectory(w.baselines()); err != nil {
+				return err
+			}
+			if err := w.keep(ctx, d, before); err != nil {
+				return err
+			}
+		}
 		if err := w.drop(ctx, rec, d, record); err != nil {
 			return err
 		}

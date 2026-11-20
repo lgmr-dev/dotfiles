@@ -84,7 +84,7 @@ func NewKeyboardAccess(location *APTLocation, issue, directory string) *Keyboard
 	return k
 }
 
-const keyboardReloadStep = "reload"
+const keyboardStep = "rule"
 
 func (k *KeyboardAccess) stage() string { return filepath.Join(k.Directory, "keyboard-access.rules") }
 
@@ -139,19 +139,7 @@ func (k *KeyboardAccess) reloadCommands() []platform.Command {
 func (k *KeyboardAccess) block(title string, commands ...platform.Command) engine.CommandBlock {
 	block := engine.CommandBlock{Title: title, By: "setup"}
 	for _, c := range commands {
-		words := []string{}
-		if k.Sudo != "" {
-			words = append(words, "sudo")
-			c.Path, c.Args = c.Args[2], c.Args[3:]
-		}
-		words = append(words, filepath.Base(c.Path))
-		for _, argument := range c.Args {
-			if !aptPlainWord.MatchString(argument) {
-				argument = aptShellLiteral(argument)
-			}
-			words = append(words, argument)
-		}
-		block.Lines = append(block.Lines, strings.Join(words, " "))
+		block.Lines = append(block.Lines, aptShellLine(c))
 	}
 	return block
 }
@@ -256,7 +244,9 @@ func (k *KeyboardAccess) Inspect(ctx context.Context, r catalog.Resource, want e
 		f.Status = engine.Satisfied
 	case !o.Present:
 		f.Status, f.Reason, f.Privileged, f.Pending = engine.Missing, detail, true, true
-		f.Commands = []engine.CommandBlock{k.block("Install the keyboard access rule", append(k.writeCommands(), k.reloadCommands()...)...)}
+		block := k.block("Install the keyboard access rule", append(k.writeCommands(), k.reloadCommands()...)...)
+		block.Lines = append([]string{"# Setup first writes the rule to " + k.stage() + ". It deletes the file after the step."}, block.Lines...)
+		f.Commands = []engine.CommandBlock{block}
 	case o.settled():
 		f.Status = engine.Satisfied
 	case o.owned():
@@ -284,26 +274,27 @@ func (k *KeyboardAccess) authenticate(ctx context.Context) error {
 	return nil
 }
 
-func (k *KeyboardAccess) reload(ctx context.Context, r catalog.Resource, rec engine.Records) (string, error) {
-	mark := r.ID + ":" + keyboardReloadStep
-	if err := rec.Update(func(s *state.State) error { s.Mark(mark); return nil }); err != nil {
-		return mark, err
-	}
-	for index, c := range k.reloadCommands() {
+func (k *KeyboardAccess) run(ctx context.Context, rec engine.Records, mark, failure string, commands ...platform.Command) error {
+	for _, c := range commands {
 		if _, err := k.Runner.Run(ctx, c); err != nil {
-			if _, started := platform.ExitCode(err); !started && index == 0 {
-				return mark, errors.Join(fmt.Errorf("the udev reload did not start: %w", err), rec.Update(func(s *state.State) error { s.Clear(mark); return nil }))
+			if _, started := platform.ExitCode(err); !started {
+				return errors.Join(fmt.Errorf("%s: the command did not start: %w", failure, err), keyboardClear(rec, mark))
 			}
-			return mark, fmt.Errorf("the udev reload of the keyboard access rule failed; run setup again and confirm that the command exited: %w", err)
+			return fmt.Errorf("%s; run setup again and confirm that the command exited: %w", failure, err)
 		}
 	}
-	return mark, nil
+	return nil
+}
+
+func keyboardClear(rec engine.Records, mark string) error {
+	return rec.Update(func(s *state.State) error { s.Clear(mark); return nil })
 }
 
 // Apply writes the rule when it is absent, reloads udev and triggers the
-// devices. The record gets the intended value before the write and the
-// applied value after the verified reload. A retry repeats the reload and
-// the triggers, also when the rule file already matches.
+// devices. The record gets the intended value and the pending mark before
+// the first privileged command, and the applied value after the verified
+// reload, which also clears the mark. A retry repeats the reload and the
+// triggers, also when the rule file already matches.
 func (k *KeyboardAccess) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	if err := k.validate(r); err != nil {
 		return err
@@ -325,7 +316,9 @@ func (k *KeyboardAccess) Apply(ctx context.Context, r catalog.Resource, approved
 	if err := k.authenticate(ctx); err != nil {
 		return err
 	}
+	mark := r.ID + ":" + keyboardStep
 	if err := rec.Update(func(s *state.State) error {
+		s.Mark(mark)
 		return s.BeginTarget(k.Rules, state.Record{Resource: r.ID, Kind: "file", Next: next, Before: "absent"})
 	}); err != nil {
 		return err
@@ -335,22 +328,16 @@ func (k *KeyboardAccess) Apply(ctx context.Context, r catalog.Resource, approved
 		commands = commands[2:]
 	} else {
 		if _, err := os.Lstat(k.Rules); !errors.Is(err, os.ErrNotExist) {
-			return errors.Join(errors.New(k.Rules+" changed since approval; review a fresh plan"), err)
+			return errors.Join(errors.New(k.Rules+" changed since approval; review a fresh plan"), err, keyboardClear(rec, mark))
 		}
-		if err := os.MkdirAll(k.Directory, 0700); err != nil {
-			return err
-		}
-		if err := os.WriteFile(k.stage(), content, 0600); err != nil {
-			return err
+		if err := errors.Join(os.MkdirAll(k.Directory, 0700), os.WriteFile(k.stage(), content, 0600)); err != nil {
+			return errors.Join(err, keyboardClear(rec, mark))
 		}
 	}
-	for _, c := range commands {
-		if _, err := k.Runner.Run(ctx, c); err != nil {
-			return fmt.Errorf("the keyboard access rule was not written; run setup again: %w", err)
-		}
+	if err := k.run(ctx, rec, mark, "the keyboard access rule was not written", commands...); err != nil {
+		return err
 	}
-	mark, err := k.reload(ctx, r, rec)
-	if err != nil {
+	if err := k.run(ctx, rec, mark, "the udev reload of the keyboard access rule failed", k.reloadCommands()...); err != nil {
 		return err
 	}
 	after := k.observe(rec.State())
@@ -370,7 +357,8 @@ func (k *KeyboardAccess) Apply(ctx context.Context, r catalog.Resource, approved
 }
 
 // Remove deletes the rule only while it matches its record, then reloads
-// udev and drops the record. A rule that changed stays, with its record.
+// udev and drops the record. The pending mark covers each privileged
+// command of the removal. A rule that changed stays, with its record.
 func (k *KeyboardAccess) Remove(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	if err := k.validate(r); err != nil {
 		return err
@@ -392,24 +380,31 @@ func (k *KeyboardAccess) Remove(ctx context.Context, r catalog.Resource, approve
 	if err := k.authenticate(ctx); err != nil {
 		return err
 	}
+	mark := r.ID + ":" + keyboardStep
 	expected, commands := o.Record.Applied, k.removeCommands()
 	if o.Present {
 		expected = o.Fingerprint
-		if err := rec.Update(func(s *state.State) error {
-			if record := s.Targets[k.Rules]; record.Applied != expected {
-				if err := s.Promote(k.Rules); err != nil {
-					return err
-				}
+	}
+	if err := rec.Update(func(s *state.State) error {
+		s.Mark(mark)
+		if !o.Present {
+			return nil
+		}
+		if record := s.Targets[k.Rules]; record.Applied != expected {
+			if err := s.Promote(k.Rules); err != nil {
+				return err
 			}
-			return s.BeginRelease(k.Rules)
-		}); err != nil {
-			return err
 		}
+		return s.BeginRelease(k.Rules)
+	}); err != nil {
+		return err
+	}
+	if o.Present {
 		if data, _, err := keyboardRead(k.Rules); err != nil || KeyboardRuleFingerprint(data) != expected {
-			return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+k.Rules), err)
+			return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+k.Rules), err, keyboardClear(rec, mark))
 		}
-		if _, err := k.Runner.Run(ctx, commands[0]); err != nil {
-			return fmt.Errorf("the keyboard access rule was not moved; run setup again: %w", err)
+		if err := k.run(ctx, rec, mark, "the keyboard access rule was not moved", commands[0]); err != nil {
+			return err
 		}
 	}
 	aside := k.sibling(".removing")
@@ -418,12 +413,11 @@ func (k *KeyboardAccess) Remove(ctx context.Context, r catalog.Resource, approve
 		return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+aside), err)
 	}
 	if err == nil {
-		if _, err := k.Runner.Run(ctx, commands[1]); err != nil {
-			return fmt.Errorf("the moved keyboard access rule %s was not deleted; run setup again: %w", aside, err)
+		if err := k.run(ctx, rec, mark, "the moved keyboard access rule "+aside+" was not deleted", commands[1]); err != nil {
+			return err
 		}
 	}
-	mark, err := k.reload(ctx, r, rec)
-	if err != nil {
+	if err := k.run(ctx, rec, mark, "the udev reload of the keyboard access rule failed", k.reloadCommands()...); err != nil {
 		return err
 	}
 	if _, err := os.Lstat(k.Rules); !errors.Is(err, os.ErrNotExist) {

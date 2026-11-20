@@ -365,7 +365,7 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 		provider, err := e.Router(r)
 		var fresh Finding
 		if err == nil {
-			fresh, err = provider.Inspect(ctx, r, want, rec)
+			fresh, err = provider.Inspect(ctx, r, want, viewRecords{rec.State()})
 		}
 		if err == nil && !removal && fresh.Token != op.Finding.Token && fresh.Status == Satisfied {
 			ReportStep(ctx, "[%d/%d] %s is already ready", step, total, r.Name)
@@ -441,7 +441,7 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 }
 
 func (e *Engine) verify(ctx context.Context, provider Provider, r catalog.Resource, op Operation, want Want, rec Records) error {
-	after, err := provider.Inspect(ctx, r, want, rec)
+	after, err := provider.Inspect(ctx, r, want, viewRecords{rec.State()})
 	if err != nil {
 		return fmt.Errorf("verification after the %s step failed: %w", op.Action, err)
 	}

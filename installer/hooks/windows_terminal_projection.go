@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/luisgui1757/dotfiles/installer/targets"
 )
 
 // TerminalSlot is the slot of the Windows Terminal settings projection: the
@@ -115,7 +116,7 @@ func terminalDecodeProjection(data []byte) (terminalProjection, error) {
 }
 
 func terminalValue(raw []byte) ([]byte, error) {
-	clean, _, err := terminalMask(raw)
+	clean, _, err := targets.JSONCMask(raw)
 	if err != nil {
 		return nil, err
 	}

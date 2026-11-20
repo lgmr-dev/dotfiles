@@ -284,6 +284,17 @@ func TestAStepThatAnEarlierStepCompletedIsDone(t *testing.T) {
 	}
 }
 
+func TestEveryInspectionOnlyReads(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	if _, err := e.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if w.writableInspections != 0 {
+		t.Fatalf("%d inspections could change the state", w.writableInspections)
+	}
+}
+
 func TestChangedTokenStopsTheStep(t *testing.T) {
 	e, w := fixture(t)
 	request := selection("editor")

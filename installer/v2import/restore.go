@@ -1,7 +1,10 @@
 package v2import
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,9 +24,12 @@ import (
 // after the switch, "manual" for a target that has no copy by design, such
 // as a font registration, and "blocked" for a target that setup cannot
 // compare with its saved value. A blocked target stops the restore before
-// the publication of the schema-1 state.
+// the publication of the schema-1 state. Replacement is "restore" or
+// "remove" for a changed target: the action that an approved replacement
+// does.
 type RestoreItem struct {
 	Key, Resource, Action, Detail string
+	Replacement                   string
 
 	live string
 }
@@ -34,7 +40,8 @@ type Restoration struct {
 	Items []RestoreItem
 	Done  bool
 
-	o Options
+	o        Options
+	reviewed bool
 }
 
 const afterRestore = "Release v2 is active again. Check out " + SourceCommit + " (" + SourceRelease + ") and run its setup."
@@ -49,23 +56,12 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		}
 		return live, err
 	}
-	started, restoring := set.manifest.Restoring[key]
 	live, err := inspect(slot.Saved)
-	switch {
-	case err != nil:
+	if err != nil {
 		item.Detail = "setup cannot compare it with its saved value: " + err.Error()
-		return item
-	case live.Fingerprint == live.Want && !restoring:
-		item.Action, item.Detail = "none", "it holds its value of release v2"
-		return item
-	case strings.HasPrefix(slot.Saved, "fp:"):
-		item.Action, item.Detail = "manual", "setup has no copy of its value of release v2; Update tools of release v2 repairs it"
 		return item
 	}
 	candidates := []string{targets.Absent, live.Want}
-	if restoring {
-		candidates = append(candidates, started)
-	}
 	if record, has := st.Targets[key]; has {
 		candidates = append(candidates, record.Applied, record.Next)
 	} else if imported, had := set.manifest.Imported.Targets[key]; had && imported.Before != "" {
@@ -73,13 +69,33 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 			candidates = append(candidates, released.Want)
 		}
 	}
+	started, restoring := set.manifest.Restoring[key]
+	if restoring && !slices.Contains(candidates, started) {
+		copied, err := inspect(set.manifest.Edited[key])
+		restoring = set.manifest.Edited[key] != "" && err == nil && copied.Want == started
+	}
+	switch {
+	case live.Fingerprint == live.Want && !restoring:
+		item.Action, item.Detail = "none", "it holds its value of release v2"
+		return item
+	case strings.HasPrefix(slot.Saved, "fp:"):
+		item.Action, item.Detail = "manual", "setup has no copy of its value of release v2; Update tools of release v2 repairs it"
+		return item
+	}
+	if restoring {
+		candidates = append(candidates, started)
+	}
+	item.Replacement = "restore"
+	if slot.Saved == targets.Absent {
+		item.Replacement = "remove"
+	}
 	switch {
 	case !slices.Contains(candidates, live.Fingerprint):
 		item.Action, item.Detail = "changed", "it changed after the switch; restore-v2 keeps it unless you choose its replacement"
 	case slot.Saved == targets.Absent:
-		item.Action, item.Detail = "remove", "the switch created it"
+		item.Action, item.Detail, item.Replacement = "remove", "the switch created it", ""
 	default:
-		item.Action, item.Detail = "restore", "it gets its value of release v2"
+		item.Action, item.Detail, item.Replacement = "restore", "it gets its value of release v2", ""
 	}
 	item.live = live.Fingerprint
 	if restoring && (live.Fingerprint == targets.Absent || live.Fingerprint == live.Want) {
@@ -143,6 +159,7 @@ func PreviewRestore(ctx context.Context, o Options) (*Restoration, error) {
 	}
 	r := &Restoration{o: o}
 	_, err := r.plan()
+	r.reviewed = err == nil
 	return r, err
 }
 
@@ -185,6 +202,7 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 		return "", err
 	}
 	defer func() { resultErr = errors.Join(resultErr, release()) }()
+	approved, reviewed := slices.Clone(r.Items), r.reviewed
 	set, err := r.plan()
 	if err != nil {
 		return "", err
@@ -192,13 +210,15 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	if r.Done {
 		return afterRestore, nil
 	}
+	if reviewed && !slices.EqualFunc(approved, r.Items, func(a, b RestoreItem) bool { return a.Key == b.Key && a.Action == b.Action && a.live == b.live }) {
+		return "", errors.New("the files changed after the review; run restore-v2 again. Nothing was changed")
+	}
 	notes, failures, kept := []string{}, []string{}, map[string]string{}
 	for _, item := range r.Items {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}
 		slot := set.manifest.Slots[item.Key]
-		applied, choice := item.live, targets.Preserve
 		switch item.Action {
 		case "none", "manual", "blocked":
 			continue
@@ -207,7 +227,12 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 				kept[item.Key] = item.live
 				continue
 			}
-			choice, applied = targets.Replace, "edited after the switch"
+			copied, err := set.saveEdited(ctx, item, slot)
+			if err != nil {
+				failures = append(failures, item.Key+": setup cannot save your changed content, so it stays: "+err.Error())
+				continue
+			}
+			notes = append(notes, "Saved your changed content of "+item.Key+" at "+copied)
 		}
 		if set.manifest.Restoring == nil {
 			set.manifest.Restoring = map[string]string{}
@@ -216,8 +241,11 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 		if err := set.save(); err != nil {
 			return "", err
 		}
-		record := state.Record{Resource: slot.Resource, Kind: slot.Kind, Applied: applied, Before: slot.Saved, Made: slices.Clone(slot.Made)}
-		err := set.writer.Release(ctx, item.Key, &memory{state.State{Targets: map[string]state.Record{item.Key: record}}}, choice)
+		if err := hit("restore-slot:" + item.Key); err != nil {
+			return "", err
+		}
+		record := state.Record{Resource: slot.Resource, Kind: slot.Kind, Applied: item.live, Next: slot.Saved, Release: true, Before: slot.Saved, Made: slices.Clone(slot.Made)}
+		err := set.writer.Release(ctx, item.Key, &memory{state.State{Targets: map[string]state.Record{item.Key: record}}}, targets.Preserve)
 		switch {
 		case errors.Is(err, targets.ErrChanged):
 		case err != nil:
@@ -260,4 +288,38 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 		return "", err
 	}
 	return strings.Join(append(notes, afterRestore), "\n"), nil
+}
+
+func (s *restoreSet) saveEdited(ctx context.Context, item RestoreItem, slot Slot) (string, error) {
+	directory := filepath.Join(s.dir, "edited")
+	record := state.Record{Resource: slot.Resource, Kind: slot.Kind}
+	saved, _, err := s.writer.Capture(ctx, item.Key, record, directory)
+	if err != nil {
+		return "", err
+	}
+	path, isBackup := strings.CutPrefix(saved, "backup:")
+	if !isBackup {
+		encoded, inline := strings.CutPrefix(saved, "value:")
+		value, err := base64.StdEncoding.DecodeString(encoded)
+		if !inline || err != nil {
+			return "", errors.Join(errors.New("this kind of target has no copy"), err)
+		}
+		path = filepath.Join(directory, "part-"+strings.ToLower(rand.Text()))
+		if err := platform.SaveDocument(path, value); err != nil {
+			return "", err
+		}
+		if written, err := platform.ReadDocument(path); err != nil || !bytes.Equal(written, value) {
+			return "", errors.Join(errors.New("the copy differs from your content"), err)
+		}
+	}
+	record.Before = saved
+	copied, err := s.writer.InspectRecord(item.Key, &memory{state.State{Targets: map[string]state.Record{item.Key: record}}})
+	if err != nil || copied.State == targets.StateUnreadable || copied.Want != item.live || copied.Fingerprint != item.live {
+		return "", errors.Join(errors.New("the copy differs from your content"), err)
+	}
+	if s.manifest.Edited == nil {
+		s.manifest.Edited = map[string]string{}
+	}
+	s.manifest.Edited[item.Key] = saved
+	return path, nil
 }

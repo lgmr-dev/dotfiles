@@ -347,8 +347,8 @@ func TestAPTPendingMarkLifecycle(t *testing.T) {
 		}
 		found, _ := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
 		if len(found.Commands) != 1 || found.Commands[0].By != "setup" || !slices.Equal(found.Commands[0].Lines, []string{
-			"sudo apt-get update",
-			"sudo apt-get --yes --no-remove --no-install-recommends -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=30 -o Dpkg::Options::=--force-confold --no-upgrade install zsh",
+			"/fake/sudo -n LC_ALL=C DEBIAN_FRONTEND=noninteractive /fake/apt-get update",
+			"/fake/sudo -n LC_ALL=C DEBIAN_FRONTEND=noninteractive /fake/apt-get --yes --no-remove --no-install-recommends -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=30 -o Dpkg::Options::=--force-confold --no-upgrade install zsh",
 		}) || !strings.Contains(strings.Join(found.Notes, " "), "depends on") {
 			t.Fatal("the preview must show the exact commands and explain the dependencies", found.Commands, found.Notes)
 		}
@@ -666,6 +666,62 @@ func TestAPTPathFilterGlobsFollowDpkg(t *testing.T) {
 	} {
 		if got := aptPathExcluded(filters, path); got != excluded {
 			t.Fatal(path, got)
+		}
+	}
+}
+
+func aptFixtureLine(c platform.Command) string {
+	quote := func(word string) string {
+		if word != "" && strings.Trim(word, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-") == "" {
+			return word
+		}
+		return "'" + strings.ReplaceAll(word, "'", `'"'"'`) + "'"
+	}
+	words := []string{}
+	for _, word := range slices.Concat(c.Env, []string{c.Path}, c.Args) {
+		words = append(words, quote(word))
+	}
+	return strings.Join(words, " ")
+}
+
+func aptFixtureShellLines(block engine.CommandBlock) []string {
+	lines := []string{}
+	for _, line := range block.Lines {
+		if !strings.HasPrefix(line, "# ") {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+func TestAPTShownCommandsAreTheCommandsThatRun(t *testing.T) {
+	ctx := context.Background()
+	r := aptFixtureResource("zsh")
+	for _, root := range []bool{false, true} {
+		f := newAPTFixture(t)
+		want := []string{
+			"/fake/sudo -n LC_ALL=C DEBIAN_FRONTEND=noninteractive /fake/apt-get update",
+			"/fake/sudo -n LC_ALL=C DEBIAN_FRONTEND=noninteractive /fake/apt-get --yes --no-remove --no-install-recommends -o Dpkg::Use-Pty=0 -o DPkg::Lock::Timeout=30 -o Dpkg::Options::=--force-confold --no-upgrade install zsh",
+		}
+		if root {
+			f.apt.Location.Root, f.apt.Location.Sudo = true, ""
+			for i := range want {
+				want[i] = strings.TrimPrefix(want[i], "/fake/sudo -n ")
+			}
+		}
+		found, err := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
+		if err != nil || len(found.Commands) != 1 || found.Commands[0].By != "setup" || !slices.Equal(found.Commands[0].Lines, want) {
+			t.Fatal("the preview must show the command line that setup runs, with its environment", found.Commands, err)
+		}
+		if err := f.apt.Apply(ctx, r, found, f.rec); err != nil {
+			t.Fatal(err)
+		}
+		ran := []string{}
+		for _, c := range f.commands {
+			ran = append(ran, aptFixtureLine(c))
+		}
+		if !slices.Equal(ran, found.Commands[0].Lines) {
+			t.Fatal("the shown lines differ from the commands that ran", ran, found.Commands[0].Lines)
 		}
 	}
 }

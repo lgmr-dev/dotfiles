@@ -194,7 +194,18 @@ type restoreUI interface {
 }
 
 func restoreProposal(restoration *v2import.Restoration, replace []string) engine.Proposal {
-	proposal := engine.Proposal{Plan: engine.Plan{Mode: "restore-v2"}, Details: restoration.Text(),
+	plan := engine.Plan{Mode: "restore-v2"}
+	for _, item := range restoration.Items {
+		action := map[string]string{"none": "keep", "restore": "repair", "remove": "remove"}[item.Action]
+		switch {
+		case item.Action == "changed" && slices.Contains(replace, item.Key):
+			action = map[string]string{"restore": "repair", "remove": "remove"}[item.Replacement]
+		case action == "":
+			action = "pending"
+		}
+		plan.Operations = append(plan.Operations, engine.Operation{Resource: item.Resource, Action: action, Reason: item.Key + ": " + item.Detail})
+	}
+	proposal := engine.Proposal{Plan: plan, Details: restoration.Text(),
 		Notice: fmt.Sprintf("Restore release v2: %d saved targets. Press d for the full list. Apply gives the targets back and then publishes the state of release v2.", len(restoration.Items))}
 	for _, item := range restoration.Changed() {
 		proposal.Choices = append(proposal.Choices, engine.ReviewChoice{Group: restoreReplaceGroup, ID: item.Key, Label: item.Key, Checked: slices.Contains(replace, item.Key),

@@ -201,7 +201,11 @@ func newHomebrewBootstrapFixture(t *testing.T) *homebrewBootstrapFixture {
 			return nil, macTestExit(1)
 		}
 		if kind == "reserve" {
-			return nil, os.Mkdir(f.d.prefix, 0755)
+			if err := os.Mkdir(f.d.prefix, 0755); err != nil || f.fail != "reserve-then-content" {
+				return nil, err
+			}
+			macTestWrite(t, filepath.Join(f.d.prefix, "other"), "content of another process", 0644)
+			return nil, nil
 		}
 		macTestWrite(t, location.Program, "fixture manager; never executed", 0755)
 		return nil, nil
@@ -329,6 +333,37 @@ func TestHomebrewBootstrapMarkLifecycleOnFailure(t *testing.T) {
 	f.fail = "install"
 	if err := f.apply(); err == nil || !strings.Contains(err.Error(), "confirm that the command exited") || !slices.Equal(f.rec.State().Pending, []string{"infra.homebrew:install"}) {
 		t.Fatal("a failed installer lost its pending mark", err, f.rec.State().Pending)
+	}
+}
+
+func TestHomebrewBootstrapNamesTheFolderWhenTheReservedPrefixChanged(t *testing.T) {
+	f := newHomebrewBootstrapFixture(t)
+	f.fail = "reserve-then-content"
+	err := f.apply()
+	if err == nil || len(f.runner.commands) != 1 || len(f.rec.State().Pending) != 0 {
+		t.Fatal("the installer ran in a prefix with content, or the mark stayed without a command", err, f.rec.State().Pending)
+	}
+	for _, part := range []string{f.d.prefix, "Examine", "remove the empty folder that setup reserved", "run setup again"} {
+		if !strings.Contains(err.Error(), part) {
+			t.Fatalf("the error lacks %q: %v", part, err)
+		}
+	}
+	found := f.inspect()
+	if found.Status != engine.Unknown || !strings.Contains(found.Reason, f.d.prefix) || !strings.Contains(found.Reason, "run setup again") {
+		t.Fatal("the next inspection gives no hint", found)
+	}
+	if err := os.Remove(filepath.Join(f.d.prefix, "other")); err != nil {
+		t.Fatal(err)
+	}
+	f.fail = ""
+	if found := f.inspect(); found.Status != engine.Missing || len(found.Commands[0].Lines) != 1 {
+		t.Fatal("an empty reserved prefix must permit a retry without a second reservation", found)
+	}
+	if err := f.apply(); err != nil || len(f.runner.commands) != 2 || f.runner.commands[1].Path != "/usr/bin/env" || len(f.rec.State().Pending) != 0 {
+		t.Fatal("the retry into the empty reserved prefix failed", err)
+	}
+	if found := f.inspect(); found.Status != engine.Satisfied {
+		t.Fatal(found)
 	}
 }
 

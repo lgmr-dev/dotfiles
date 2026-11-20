@@ -60,6 +60,7 @@ type fx struct {
 	units                       map[string]func() []targets.Desired
 	legacy                      []string
 	nl                          string
+	systemChanges               []string
 	extraKinds                  map[string]targets.Kind
 	captureKinds                map[string]targets.Kind
 	inspected                   []string
@@ -483,8 +484,10 @@ func (p systemProvider) Inspect(_ context.Context, r catalog.Resource, want engi
 	return engine.Finding{Status: engine.Absent, Token: "absent"}, nil
 }
 
-func (p systemProvider) Apply(context.Context, catalog.Resource, engine.Finding, engine.Records) error {
-	return errors.New("the import must never change a system item")
+func (p systemProvider) Apply(_ context.Context, r catalog.Resource, _ engine.Finding, _ engine.Records) error {
+	p.f.systemChanges = append(p.f.systemChanges, r.ID)
+	p.f.present[r.ID] = true
+	return nil
 }
 
 func (p systemProvider) Remove(context.Context, catalog.Resource, engine.Finding, engine.Records) error {

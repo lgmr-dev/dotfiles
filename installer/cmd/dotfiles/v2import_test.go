@@ -225,6 +225,22 @@ func TestTheRestoreMenuUsesTheReviewScreenWithTheFullListAndTheReplacementChoice
 	if len(first.Choices) != 2 || first.Choices[0].Group != restoreReplaceGroup || first.Choices[0].Checked || first.Choices[1].Checked || !strings.Contains(first.Notice, "2 saved targets") {
 		t.Fatalf("the review must offer each changed target, unchecked: %+v", first)
 	}
+	count := func(proposal engine.Proposal) map[string]int {
+		counts := map[string]int{}
+		for _, op := range proposal.Plan.Operations {
+			counts[op.Action]++
+		}
+		return counts
+	}
+	if got := count(first); len(first.Plan.Operations) != 2 || got["pending"] != 2 {
+		t.Fatalf("the review must count each saved target; two kept targets need action: %v", got)
+	}
+	if got := count(revised); len(revised.Plan.Operations) != 2 || got["remove"] != 1 || got["pending"] != 1 {
+		t.Fatalf("an approved replacement must count as the removal that it does: %v", got)
+	}
+	if !strings.Contains(revised.Plan.Operations[0].Reason, edited) {
+		t.Fatalf("each operation must name its target: %+v", revised.Plan.Operations[0])
+	}
 	if !revised.Choices[0].Checked || revised.Choices[1].Checked {
 		t.Fatalf("a toggle must give the revised choices: %+v", revised.Choices)
 	}
@@ -235,12 +251,12 @@ func TestTheRestoreMenuUsesTheReviewScreenWithTheFullListAndTheReplacementChoice
 		t.Fatalf("a target without a choice must stay: %q %v", data, err)
 	}
 	saved := ""
-	entries, err := os.ReadDir(filepath.Join(s.stateDir, "baselines"))
+	entries, err := os.ReadDir(filepath.Join(s.stateDir, "v2-restore", "edited"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
-		content, err := os.ReadFile(filepath.Join(s.stateDir, "baselines", entry.Name()))
+		content, err := os.ReadFile(filepath.Join(s.stateDir, "v2-restore", "edited", entry.Name()))
 		if err != nil {
 			t.Fatal(err)
 		}

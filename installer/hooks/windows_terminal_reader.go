@@ -1,5 +1,7 @@
 package hooks
 
+import "github.com/luisgui1757/dotfiles/installer/targets"
+
 type terminalReadKey struct {
 	start  *byte
 	length int
@@ -19,11 +21,11 @@ type terminalReadArray struct {
 }
 
 type terminalReader struct {
-	properties map[terminalReadKey][]terminalProperty
+	properties map[terminalReadKey][]targets.JSONProperty
 	arrays     map[terminalReadKey]terminalReadArray
 }
 
-func (r *terminalReader) propertiesOf(data []byte) ([]terminalProperty, error) {
+func (r *terminalReader) propertiesOf(data []byte) ([]targets.JSONProperty, error) {
 	key := terminalKeyOf(data)
 	if properties, ok := r.properties[key]; ok {
 		return properties, nil
@@ -33,7 +35,7 @@ func (r *terminalReader) propertiesOf(data []byte) ([]terminalProperty, error) {
 		return nil, err
 	}
 	if r.properties == nil {
-		r.properties = make(map[terminalReadKey][]terminalProperty)
+		r.properties = make(map[terminalReadKey][]targets.JSONProperty)
 	}
 	r.properties[key] = properties
 	return properties, nil

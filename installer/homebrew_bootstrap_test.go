@@ -200,8 +200,8 @@ func TestHomebrewBootstrapConstructorAndReleasedPins(t *testing.T) {
 	if err != nil || len(entries) != 0 {
 		t.Fatal("constructor performed IO", entries, err)
 	}
-	if homebrewBootstrapCommit != "e5b3c5834e3932c8aaa42deef4794076c9b0cbf0" ||
-		homebrewBootstrapSHA256 != "5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148" {
+	if homebrewBootstrapCommit != "3ef3676f8028811d38eae05d3b3b4f97d72a0f61" ||
+		homebrewBootstrapSHA256 != "8fd2f1a5287a7c2e3d7362924c677edcc04c5a0e16448c77132d056bc88cf1ed" {
 		t.Fatal("Homebrew bootstrap pins changed without updating reviewed evidence")
 	}
 }

@@ -307,7 +307,7 @@ registry mismatch disables its language-server/formatter setup until repair succ
   tools** moves the app to the reviewed release. The script also starts the
   app without Chromium's sandbox, because the sandbox needs user namespaces
   that Ubuntu restricts.
-- On Windows, setup downloads the official v0.1.7 installer and checks its
+- On Windows, setup downloads the official v0.1.8 installer and checks its
   SHA-256 and its `T3 Tools Inc` signature. Then it runs the installer silently
   for the current user, without an administrator prompt. The installer adds
   Start menu and desktop shortcuts, and T3 updates itself. Removal runs the

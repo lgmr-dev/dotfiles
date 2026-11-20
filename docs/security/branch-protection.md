@@ -1,16 +1,11 @@
 # Branch protection
 
-The reviewed policy protects `main` with three repository rulesets and a classic
-required-check fallback. This document describes the desired policy and the
-installer cutover. On 2026-10-11, after explicit owner authorization and all 23
-checks passing at `45b8b38`, both required-check lists were changed from 12 to 23.
-Independent readback confirmed strict mode and Actions app `15368` in both
-layers, with unrelated policy preserved. Release remains an owner action. The
-owner gives the merge of bot PRs, of the PRs that replace them and of the PRs
-for the Renovate dashboard items to the scheduled maintenance agent in
-[archive pin proposals](supply-chain.md#archive-pin-proposals).
-Historical rollout evidence and the former Nix/chezmoi procedure remain
-in the [pre-retirement guide at an immutable commit](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/branch-protection.md).
+The owner sets the protection of `main` in the GitHub settings. The
+repository has no checked-in ruleset, no check registry and no helper script
+for these settings. This document lists the policy and the required checks. A
+document does not prove the live settings: read them back.
+
+`main` has three repository rulesets and a classic required-check list.
 
 | Layer | Bypass | Purpose |
 | --- | --- | --- |
@@ -19,8 +14,7 @@ in the [pre-retirement guide at an immutable commit](https://github.com/luisgui1
 | `Protect main: owner updates` | Owner, on pull requests only | Only the owner can update `main`; branch/PR automation cannot merge. |
 
 Live state: since 2026-11-03 only `Protect main: integrity` is active. The
-review and owner-updates layers are disabled on GitHub. The files in
-`.github/rulesets/` keep the desired policy.
+review and owner-updates layers are disabled on GitHub.
 
 Keep these layers separate: review bypass must never bypass the integrity checks.
 Routine automation must use a separate GitHub App or bot identity without
@@ -30,153 +24,110 @@ them and the PRs for the Renovate dashboard items, with the owner's credentials
 only while the review and owner-updates
 layers are disabled. It never uses an administration action, `--admin` or a
 bypass. Branch protection does not prevent the personal-account owner from
-deleting the repository.
+deleting the repository. Release remains an owner action. See
+[archive pin proposals](supply-chain.md#archive-pin-proposals).
 
-The integrity and review payloads explicitly preserve the live API's
+The live integrity and review rulesets have
 `require_extra_approval_for_unattributed_changes: true`. GitHub documents the
-[additional approval setting for unattributed Copilot pull requests](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets#additional-approval-for-unattributed-copilot-pull-requests)
-as enabled by default on existing/new rulesets and ineffective at zero required
-approvals. The exact REST key is confirmed by live GET responses, but is absent
-from the current official OpenAPI/reference; its write acceptance still requires
-authorized apply/readback. Keep the observed restriction, and treat a missing or
-false live value as drift rather than ignoring the field. Historical recovery
-still compares against its original committed policy, including older payloads
-without this field.
+[additional approval setting for unattributed Copilot pull requests](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets#additional-approval-for-unattributed-copilot-pull-requests).
+Keep this value when you write a ruleset. A missing or false live value is a
+difference to correct.
 
-## Required checks and the completed cutover
+## Required checks
 
-[`.github/check-identities.json`](../../.github/check-identities.json) is the
-exact context-name source. Schema 3 has stage
-`installer-required-pending-apply` and records the former 12 names in
-`legacyEmitted` solely to validate the live transition and recovery. Retired
-workflows no longer emit compatibility jobs.
-The stage name identifies the checked-in transition format consumed by the
-safeguard/recovery validators; it is not a live-status indicator. The authorized
-initial apply and readback are complete. Subsequent heads still require all 25
-checks to pass; an earlier successful head never certifies later corrections.
-A later change to the required set uses the same steps as the cutover below.
+The integrity ruleset and the classic list require the same 18 jobs of
+[`ci.yml`](../../.github/workflows/ci.yml). Each check comes from GitHub
+Actions app `15368`, and strict mode is on in both layers.
 
-The new policy requires 25 real jobs from GitHub Actions app `15368`:
+| Group | Check names |
+| --- | --- |
+| `lint` | `lint (ubuntu-26.04)`, `lint (ubuntu-26.04-arm)`, `lint (macos-26)`, `lint (windows-2025)` |
+| `e2e` | `e2e (macOS arm64)`, `e2e (Windows amd64)`, `e2e (Ubuntu 24.04 amd64)`, `e2e (Ubuntu 24.04 arm64)`, `e2e (Ubuntu 26.04 arm64)`, `e2e (Debian 13 amd64)`, `e2e (Debian 13 arm64)` |
+| `clean` | `clean (fresh-homebrew)`, `clean (missing-apple-clt)`, `clean (vc-runtime)`, `clean (build-tools)` |
+| `migrate` | `migrate (ubuntu-26.04)`, `migrate (macos-26)`, `migrate (windows-2025)` |
 
-- `ubuntu`, `macos` and `windows` configuration/quality jobs in `test.yml`;
-- four `core` jobs, two `core packages` jobs (macOS and Windows), fresh
-  Homebrew and Apple developer tools, two Debian APT, two Ubuntu APT and two
-  Windows vendor jobs in `installer-engine.yml`;
-- four `Neovim lifecycle` and four `Desktop lifecycle` jobs in that same workflow.
+CodeQL is not in this list. The integrity ruleset blocks CodeQL error-level
+alerts and high or critical security alerts through its code scanning rule.
 
-The checked-in integrity ruleset and classic payload generated by the helper use
-this identical set. Static tests expand the actual workflow matrices and compare
-the emitted names against the policy. Native lifecycle jobs remain required;
-unit tests, cross-compilation or a successful job on an earlier commit cannot
-replace them.
+The native jobs stay required. Unit tests, cross-compilation or a job that
+passed on an earlier commit cannot replace them. When a job name in `ci.yml`
+changes, change this table and both live lists in the same way.
 
-The initial cutover required a separately authorized maintainer action **before
-merging the retirement PR**; that action is complete. Removing old workflows while retaining their
-live required names would block that PR. The safeguard helper cannot perform
-this first change because it deliberately requires the reviewed policy to be
-committed on exact live `main`.
+## Replace the required checks
 
-1. Finish review and require every new canonical check to pass on the exact PR
-   head. Verify each check's head SHA, successful conclusion and GitHub Actions
-   identity; moving the head invalidates that evidence.
-2. With explicit owner authorization, replace only the required-context sets in
-   both the integrity ruleset and classic protection with the reviewed new set.
-   Preserve strict checks, app IDs, review/owner restrictions, CodeQL and
-   `sha_pinning_required: true`. Retain the prior policy for recovery.
-3. Read back both layers and verify that the reviewed PR is gated by every new
-   check. The owner then decides whether to merge; this document grants no merge
-   authority. Do not use no-op compatibility jobs or temporarily disable checks.
-4. After merge, require successful `test.yml` and `installer-engine.yml` runs on
-   the exact merged `main` SHA, then use the helper below to audit/reconcile the
-   committed policy.
+Release v3.0.0 replaces the 25 checks of `test.yml` and
+`installer-engine.yml` with the 18 checks above. The old workflows do not
+exist in the v3.0.0 pull request, so the old names block its merge. The owner
+does these steps before the merge. They change only the two lists of required
+checks.
 
-The initial live policy write was a separately authorized owner action. Release
-certification also compares the live required set with the canonical policy and
-refuses the old set; see [RELEASING.md](../RELEASING.md).
+1. Finish the review. Make sure that each of the 18 new checks passed on the
+   exact head of the pull request, from GitHub Actions. A new commit makes
+   this evidence invalid.
+2. Save the two live lists to files outside the checkout, for a rollback:
 
-## Exact-main safeguard helper
+   ```bash
+   gh api repos/luisgui1757/dotfiles/rulesets \
+     --jq '.[] | {id,name,enforcement}'
+   gh api repos/luisgui1757/dotfiles/rulesets/INTEGRITY_ID > integrity-before.json
+   gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks \
+     > classic-before.json
+   ```
 
-From a clean checkout of exact live `main`, first run the read-only preflight.
-Run apply only when separately authorized:
+3. Copy `integrity-before.json` to `integrity-after.json`. In the rule with
+   the type `required_status_checks`, replace the `required_status_checks`
+   list with the 18 names. Each entry has the form
+   `{"context": "lint (ubuntu-26.04)", "integration_id": 15368}`. Keep
+   `strict_required_status_checks_policy: true` and each other rule. Keep
+   only the fields `name`, `target`, `enforcement`, `conditions`, `rules` and
+   `bypass_actors` in the file. Then write the ruleset:
 
-```bash
-scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
-scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
-```
+   ```bash
+   gh api -X PUT repos/luisgui1757/dotfiles/rulesets/INTEGRITY_ID \
+     --input integrity-after.json
+   ```
 
-The helper requires the matching GitHub origin, public repository, three unique
-active rulesets, reviewed merge/security policy, and unchanged review/owner
-payloads. It accepts a coherent former or new required-context stage; both stages
-must already have Actions SHA pinning enabled. Mixed or unexpected live policy
-fails before any write.
+4. Write `classic-after.json` with `"strict": true` and a `checks` list of
+   the same 18 names. Each entry has the form
+   `{"context": "lint (ubuntu-26.04)", "app_id": 15368}`. Then write the
+   classic list:
 
-Proof comes from successful push/manual `test.yml` and `installer-engine.yml`
-runs on exact live `main`, with all expected jobs bound to the selected run and
-GitHub Actions app `15368`. This is the main-policy proof boundary. Cache-free
-first-attempt native evidence of the release commit is a separate
-release-certification requirement.
+   ```bash
+   gh api -X PATCH \
+     repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks \
+     --input classic-after.json
+   ```
 
-Two complete live captures detect concurrent changes. After the second capture,
-the helper loads policy from exact committed Git objects, verifies matching local
-sources, builds and validates private transaction files, and makes them read-only.
-Only those frozen bytes supply its three writes: Actions permissions, integrity
-required checks and classic required checks. Other policy is verified unchanged.
-Postflight checks the readback and repeats the exact-main/source boundary.
+5. Read both layers back with the commands in [Readback](#readback). Compare
+   the names, the app ID and strict mode in each layer with the table. Make
+   sure that each other setting is the same as before.
+6. Make sure that the pull request shows each of the 18 checks as required
+   and passed. Then the owner decides about the merge.
+7. After the merge, make sure that the `ci` workflow passes on the merged
+   commit on `main`.
 
-The original state is saved with private permissions under
-`.git/dotfiles-safeguards/recovery.*` before mutation. Failed apply/readback
-attempts restore all three resources and verify the former state. Retain a
-successful apply's snapshot until independent readback is complete. For manual
-recovery, use the exact path printed by the command:
-
-```bash
-scripts/apply-repo-safeguards.sh --restore '/exact/snapshot/path' luisgui1757/dotfiles
-```
-
-Restore freezes every consumed snapshot file before validation or publication.
-It validates repository, unique ruleset ID, stage, app IDs, full and narrow
-classic policy, Actions policy and all cross-file identities against the exact
-captured commit, which must still be live `main`. Missing, altered, mixed-stage
-or unavailable source data fails before writes. It never substitutes current
-worktree metadata for the captured policy. New captures use schema 2 with
-`test`/`engine` run identities; historical schema-1 captures and their schema-2
-check metadata retain their original restore validation. A snapshot is not an
-authorization to overwrite policy after `main` has moved.
+Do not add jobs that only keep an old check name. Do not disable the required
+checks for the merge. To go back, write `integrity-before.json` and
+`classic-before.json` with the same two commands.
 
 `.github/settings.yml` deliberately has no `branches` key. Probot Settings must
-not independently change the classic check set during this transaction. The
-static guard parses YAML, including aliases, inline forms and `null`.
+not independently change the classic check set. The static guard parses YAML,
+including aliases, inline forms and `null`.
 
 ## GitHub security
 
-Security configuration has a separate fail-closed path:
-
-```bash
-scripts/apply-github-security.sh --preflight-only luisgui1757/dotfiles
-scripts/apply-github-security.sh luisgui1757/dotfiles
-```
-
-The desired posture enables private vulnerability reporting and immutable releases.
-CodeQL default setup scans exactly GitHub Actions, Go and Python with
-default queries. Shell, PowerShell and Lua remain covered by their focused gates.
-The integrity rule blocks CodeQL error-level alerts and high/critical security
+The repository keeps private vulnerability reporting and immutable releases
+on. CodeQL default setup scans GitHub Actions, Go and Python with the default
+queries. Shell, PowerShell and Lua remain covered by their focused gates. The
+integrity rule blocks CodeQL error-level alerts and high/critical security
 alerts, with no bypass.
-
-The security helper requires successful analyses for all three languages on
-exact live `main` before publishing that rule. If setup must change, it requests
-the analysis run and stops; rerun only after that exact-head proof succeeds.
-Resolve the required-check cutover first so the reviewed integrity payload
-matches live policy. Security apply snapshots its integrity change under
-`.git/dotfiles-github-security/recovery.*`, verifies readback and restores on
-failure. Its printed `--restore` command is the recovery entrypoint.
 
 ## Readback
 
-Run `make test-static` for local policy contracts. An authorized maintainer can
-inspect the live boundary without changing it:
+Run `make test-static` for the local policy checks. An authorized maintainer
+can inspect the live settings without changing them:
 
 ```bash
-jq '.stage, .required' .github/check-identities.json
 gh api repos/luisgui1757/dotfiles/rulesets \
   --jq '.[] | {id,name,enforcement}'
 # Use the unique integrity ID returned above.
@@ -193,4 +144,8 @@ Compare exact names and app IDs in both required-check layers, strict mode,
 Actions SHA pinning, bypass actors, unchanged review/owner rules and exact-head
 CodeQL analysis. A prior readback is historical evidence, not proof of current
 live state. Unexpected drift needs an independently reviewed correction; do not
-delete duplicates or overwrite unfamiliar policy to make preflight pass.
+delete duplicates or overwrite unfamiliar policy to make the lists match.
+
+Historical rollout evidence, the 23-check and 25-check cutovers and the former
+Nix/chezmoi procedure remain in the
+[guide at the last v2 commit](https://github.com/luisgui1757/dotfiles/blob/fb15ce5/docs/security/branch-protection.md).

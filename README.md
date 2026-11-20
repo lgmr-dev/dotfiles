@@ -4,8 +4,9 @@ Choose the tools you want. Setup installs their prerequisites, applies the share
 Rose Pine configuration, and records what it owns so update and removal can make
 precise changes.
 
-**v2.2.0** reads the installer states of v1.2.0 and later. Coming from an older
-release? Update to v1.2.0 first. Follow [the upgrade guide](docs/UPGRADING.md#from-a-release-before-v120).
+**v3.0.0** imports the installer state of v2.3.0. Coming from v2? Run
+**Update tools** with the v2.3.0 checkout first. Then follow
+[From v2 to v3.0.0](docs/UPGRADING.md#from-v2-to-v300).
 
 ## Supported platforms
 
@@ -25,8 +26,8 @@ Clone this repository to a location you intend to keep: managed configuration
 points back to the checkout. Run setup as your normal user, without `sudo`. It
 requests native administrator access (a `sudo` password prompt on Linux/macOS)
 only for the changes you approve. If a legacy Windows profile
-is owned by Administrators, preserving that owner may need a one-resource
-elevated recovery. Follow [the ownership recovery steps](docs/UPGRADING.md#windows-legacy-profile-ownership),
+is owned by Administrators, preserving that owner may need one elevated run
+of setup. Follow [the ownership steps](docs/UPGRADING.md#windows-legacy-profile-ownership),
 then return to your normal terminal for remaining work.
 
 ```bash
@@ -89,6 +90,31 @@ could not exercise, which are not failures, and the path of the full log. A
 failure is shown once, in that report. Open a new terminal after changing shell
 integration so it receives the new PATH.
 
+Automation uses commands in place of the menu. On Windows, give the same
+arguments to `.\setup.ps1`.
+
+| Command | Result |
+|---|---|
+| `./setup.sh` | Opens the menu. |
+| `./setup.sh plan [--select=<ids>] [--remove-shared=<ids>] [--replace=<ids>]` | Prints the plan and changes nothing. |
+| `./setup.sh apply --yes [--select=<ids>] [--remove-shared=<ids>] [--replace=<ids>]` | Applies the selection. |
+| `./setup.sh update --yes [--replace=<ids>]` | Applies the reviewed versions of the checkout to the saved selection. |
+| `./setup.sh check` | Inspects the installation and changes nothing. |
+| `./setup.sh restore-v2 --yes` | Gives release v2 back after an import. Read [the upgrade guide](docs/UPGRADING.md#from-v2-to-v300). |
+
+- `--select=<ids>` lists the tool IDs, with a comma between them, for example
+  `--select=neovim,ripgrep`. `--select=` with no ID unticks each tool. Without
+  `--select`, `apply` uses the saved selection.
+- `--remove-shared=<ids>` names the unused shared dependencies that setup
+  removes.
+- `--replace=<ids>` names the resources whose changed content setup replaces.
+  Setup saves the changed content first. Without it, changed content stays.
+- Without `--yes`, `apply`, `update` and `restore-v2` print the preview and
+  change nothing. End of input never approves.
+- Exit code 0: done. Exit code 1: a failure, or `check` found a difference.
+  Exit code 3: a provider became available or the system changed after the
+  preview. Run the same command again.
+
 After the first build, setup starts in well under a second while nothing under
 `installer/` has changed: it reuses the verified build without unpacking the Go
 toolchain. Any change there rebuilds or reverifies as before.
@@ -97,13 +123,17 @@ To move to a newer repository revision, first preserve your local changes, then
 update your checkout (for a branch, `git pull --ff-only`) and open setup again.
 The update menu uses that checkout's reviewed pins; it does not update Git or
 fetch arbitrary latest package versions. Sentinel is the one exception: Update
-installs its latest published and immutable release. Native providers update only the
-selected, proven-owned packages, never the entire machine.
+installs its latest published and immutable release. System providers update
+only the packages that setup recorded, never the whole system.
 
-Coming from a release before v1.2.0? Check out `v1.2.0`, open setup and choose
-**Update tools**. Then update to `main` and choose **Update tools** again. A
-v0.4.x installation first runs migrate from the `v1.0.1` checkout. Read
-[the upgrade guide](docs/UPGRADING.md#from-a-release-before-v120) for the steps.
+Setup never removes a system package or a vendor application. When you untick
+a tool, the review shows the removal command for its recorded package under
+**Run these commands yourself:**. Read [Ownership and removal](#ownership-and-removal).
+
+Coming from v2? Check out `v2.3.0`, open setup and choose **Update tools**.
+Then update to `main` and open setup: it shows the import for your approval.
+Read [the upgrade guide](docs/UPGRADING.md#from-v2-to-v300) for the steps. A
+release before v2.3.0 updates to v2.3.0 first.
 
 ## Selectable tools
 
@@ -222,12 +252,22 @@ system AppArmor profile; those packages are not used.
 On macOS, Zen uses [Homebrew's official `zen` cask](https://formulae.brew.sh/cask/zen)
 and its normal signed application in `/Applications`. Existing authentic copies
 in `/Applications` or `~/Applications` are reused. Browser updates stay enabled;
-setup's unchanged Update leaves them alone. Removal requires the separate
-machine-wide removal choice and rechecks the developer signature. Personal
-profiles, settings and caches remain. Quit all copies of Zen before Repair or
-Remove. A missing owned app can be repaired; a changed or unverified app stays
-protected. The GUI installation does not claim a shared `zen` shell command.
-Zen-only installation also requires Homebrew and Apple's command-line tools.
+setup's unchanged Update leaves them alone. Setup never removes the app. When
+you untick Zen, the review shows the Homebrew removal command, and you run it.
+Setup never runs `zap`. Personal profiles, settings and caches remain. Quit all
+copies of Zen before Repair. A missing recorded app can be repaired; a changed
+or unverified app stays protected. The GUI installation does not claim a shared
+`zen` shell command. Zen-only installation also requires Homebrew and Apple's
+command-line tools.
+
+On macOS, VS Code, Ghostty and OpenWhispr also come from Homebrew casks:
+`visual-studio-code`, `ghostty` and `openwhispr`. Setup installs each signed
+app in `/Applications` with `--require-sha` and `--no-binaries`, and checks its
+developer signature. A real signed app in `/Applications` or `~/Applications`
+satisfies the selection. These apps update themselves, and Check compares no
+version. Setup links the `code` and `ghostty` commands to the app. Quit the app
+before setup changes it. An installation that comes from v2 keeps its v2 app
+until a later run moves it. Read [the upgrade guide](docs/UPGRADING.md#from-v2-to-v300).
 
 On Linux, Zen uses Mozilla's legacy profile selection to retain the same personal
 profile across managed generations. Its application policy disables self-updates;
@@ -238,10 +278,10 @@ service. Run `sudo tailscale up` to sign in. On macOS the existing Homebrew form
 channel installs the CLI and daemon; start it with `sudo brew services start tailscale`,
 then run `sudo tailscale up`. The macOS menu-bar app is not installed.
 Homebrew warns that starting this root service changes ownership of its formula
-paths. Stop the service before Remove. If native removal fails on those paths,
-preserve the failure evidence, follow Homebrew's exact-path cleanup guidance,
-then use the installer's Retry; do not change ownership of the whole prefix.
-Removing Tailscale uses normal package removal, preserving its state. Existing
+paths. Setup never removes Tailscale: when you untick it, the review shows the
+removal command. Stop the service before you run that command. If the removal
+fails on those paths, follow Homebrew's exact-path cleanup guidance. Do not
+change ownership of the whole prefix. Existing
 installations remain unowned. OpenWhispr's microphone/model setup, Obsidian vaults
 and browser profiles remain personal; installation does not import accounts,
 create a vault or change the default browser.
@@ -249,9 +289,10 @@ create a vault or change the default browser.
 On Ubuntu/Debian, VS Code uses the pinned official Debian package through APT
 and requires administrator approval when absent. A healthy existing native Code
 installation is reused. The package supplies its standard system launcher; no
-private launcher or shell profile is needed for Linux Code. Update reconciles an
-owned installation to the reviewed checkout pin, including a disclosed downgrade.
-A healthy owned installation already recorded at that pin is kept without another
+private launcher or shell profile is needed for Linux Code. Update moves a
+recorded installation to the reviewed checkout pin. It refuses a downgrade and
+reports the installed and the pinned version.
+A healthy recorded installation at that pin is kept without another
 DEB download. Setup preserves existing Microsoft repository settings and keys.
 It declines the package's `/usr/bin/copilot` link: the Copilot CLI selection
 supplies `copilot`. Install, Update and Repair also remove that link when it
@@ -262,8 +303,11 @@ Changed temporary inputs are preserved and reported after successful package
 completion; they do not block readiness or removal.
 
 The VS Code selection manages theme, font and update preferences together.
-It sets the supported `update.mode` preference to `none`;
+On Linux and Windows, it sets the supported `update.mode` preference to `none`;
 use the installer's Update action to change the managed application version.
+On macOS, the cask app updates itself, and setup does not set `update.mode`.
+After a v2 app moves to the cask, setup releases the field and restores its
+earlier value. Check on macOS reports an `update.mode: none` that remains.
 This application-wide user setting also affects other stable Code installations
 using the same settings, and Settings Sync can propagate it to other machines.
 Exclude `update.mode` from sync when those machines should update separately.
@@ -281,7 +325,7 @@ path policy. Native working-directory and launcher limits still apply to unusual
 deep account paths.
 Windows may retain an older VC++ runtime registry entry alongside the current
 bundle and DLLs. Setup reuses the corroborated current runtime and reports the
-older entry; that entry prevents removing the shared runtime.
+older entry. Setup never removes the shared runtime.
 Mason's registry and selected tool versions come from the reviewed checkout.
 Windows gets Gersemi and clang-format from pinned standalone archives at the
 same versions, avoiding Mason's Python venv path limit. Their CMake and C/C++
@@ -310,8 +354,9 @@ registry mismatch disables its language-server/formatter setup until repair succ
 - On Windows, setup downloads the official v0.1.8 installer and checks its
   SHA-256 and its `T3 Tools Inc` signature. Then it runs the installer silently
   for the current user, without an administrator prompt. The installer adds
-  Start menu and desktop shortcuts, and T3 updates itself. Removal runs the
-  signed T3 uninstaller. Quit T3 Code before setup changes or removes it.
+  Start menu and desktop shortcuts, and T3 updates itself. Setup never removes
+  the app: the review names the Windows uninstall route for you. Quit T3 Code
+  before setup changes it.
 - An app that you installed yourself, for example with
   `winget install T3Tools.T3Code`, stays yours. Setup uses it, applies only
   the settings and the theme, and never removes it.
@@ -490,7 +535,8 @@ reads `~/.agents/skills` also when you set `COPILOT_HOME`.
 Check runs the Sentinel check. When a file changed, Check reports it and
 Repair installs Sentinel again. When you untick Sentinel, setup removes the
 Sentinel files from each agent that it installed them for. Then it deletes
-its Sentinel checkout. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
+its Sentinel checkout when the checkout matches its record. Setup keeps a
+checkout with other content, and Check reports it. Setup records `CODEX_HOME`, `CLAUDE_CONFIG_DIR`,
 `COPILOT_HOME`, `XDG_CONFIG_HOME` and `KIRO_HOME` at the install. Check, update
 and removal use these recorded values, and setup shows a note when they changed.
 
@@ -500,8 +546,8 @@ shows a note when a newer release exists, and **Update tools** installs it.
 Update refuses an older release and a tag that names another commit. An
 installed older commit moves only with **Update tools**. When
 setup cannot reach GitHub, Check and Update keep the installed release and show
-a note. A first install then stops. Repair, removal and an interrupted
-operation use the commit of the install. An install older than v0.4.0 fails
+a note. A first install then stops. Repair, removal and a run after an
+interruption use the commit of the install. An install older than v0.4.0 fails
 Check, and repair installs the latest release, or v0.4.0 when the release
 lookup fails. Repair still needs Git access to GitHub.
 
@@ -530,7 +576,8 @@ enables the notes integration only when its vault exists; `NOTES_VAULT` can sele
 
 ## Ownership and removal
 
-Portable tools live in private, checksum-pinned generations. APT, Homebrew and
+Portable tools live in private, checksum-pinned builds in the installer state
+folder. APT, Homebrew and
 Microsoft installers handle the resources that need native installation.
 There is no Nix, Home Manager, nix-darwin or chezmoi runtime. The installer
 does not change the account login shell; launch the selected shell explicitly or
@@ -538,25 +585,39 @@ change that account preference through your operating system.
 
 Removal follows the dependency graph. A dependency used by another selected tool
 stays installed. Folders that setup created for a configuration file are removed
-with it while they are still empty; anything you added keeps its folder. Pre-existing tools remain unowned. Removing an unused owned
-machine-wide dependency needs a separate choice; native outside consumers can
-still prevent removal. There is no global autoremove or forced dependency bypass.
+with it while they are still empty; anything you added keeps its folder. Pre-existing tools remain unowned. Removing an unused shared
+dependency needs a separate choice. There is no global autoremove or forced dependency bypass.
 Manager/compiler infrastructure explicitly marked retained stays in place and
 is disclosed in the preview.
+
+Setup never removes a system package or a vendor application: an APT package,
+a Homebrew formula or cask, or an application from a Windows vendor installer.
+The package manager owns the dependency data, and a recorded name does not
+prove who installed the package that is there now. When no selected, kept or
+retained tool needs a recorded package, the review shows its removal command
+in a block under **Run these commands yourself:**. Copy the command, examine
+what the package manager proposes to remove, then run it. For a Windows
+application, the block names the uninstall route in Windows Settings.
+
+Until you remove it, the package stays as a retained resource. It keeps its
+requirements and its configuration, including its shell block. After the
+package is gone, open setup and confirm **Choose tools** again. Setup then
+drops the record and removes that configuration.
 
 Existing configuration requires explicit adoption. The installer preserves its
 baseline and restores it on removal. Edits outside managed settings/blocks remain
 untouched; changed owned content needs an explicit decision and is preserved
 before replacement. Personal histories, sessions, project files and credentials
-are not uninstall targets. Interrupted operations keep a recovery journal and
-appear in the menu; do not delete state to force a retry.
+are not uninstall targets. After an interruption, run setup again: it
+inspects the system and continues. When a native command did not report its
+end, setup names the step and asks you to confirm that the command exited. Do
+not delete state to force a retry.
 
 On Linux, setup refreshes APT's package lists before installing a package, the
 same way `sudo apt update` does. A source that fails with only a warning, such as
 a third-party repository whose signing key expired, keeps its older verified lists
 and setup continues. If the refresh fails with an error, fix or disable that
-source (`sudo apt update` names it), then run setup and choose **Resume
-interrupted operation**.
+source (`sudo apt update` names it), then run setup again.
 
 Bash integration keeps the login profile chosen during setup. If you later create
 a higher-priority `.bash_profile` or `.bash_login`, Bash follows its usual
@@ -1139,8 +1200,9 @@ terminal's OSC 52 support and permissions (`:help clipboard-osc52` in Neovim).
 
 ## Development and verification
 
-The contributor gate requires the Go version declared in `installer/go.mod` and
-Ruby for the repository-policy checks. The **Dotfiles development → Lint and benchmark tools**
+The contributor gate requires the Go version declared in `installer/go.mod`,
+Ruby for the repository-policy checks and Node 22 or later for the package
+boundary check. The **Dotfiles development → Lint and benchmark tools**
 selection supplies the lint and benchmark helpers.
 The real C++ project-isolation test also requires `clang++`. Linux process-inspection
 tests require `cc` with pthread support.
@@ -1156,35 +1218,38 @@ make ci
 ```
 
 The gate checks product configuration, formatting, catalog consistency, bootstrap
-boundaries and the Go engine. Opted-in GitHub runners additionally exercise native
-install/update/removal, fresh providers, configured applications and interruption
-recovery. A local unit pass is not proof of a fresh machine installation.
-Do not enable destructive native package fixtures on an everyday workstation.
+boundaries, the Go packages and their boundaries in `featuremap.json`.
+Disposable GitHub runners also install, run, update and remove each tool, and
+they import a v2.3.0 installation. A local pass is not proof of a fresh
+installation. `DOTFILES_TEST_NATIVE=1` enables the native tests. Do not set it
+on an everyday workstation.
 
-[CLAUDE.md](CLAUDE.md) is the coding guide. [Release maintenance](docs/RELEASING.md) defines
-publication evidence and review gates. The machine JSON entrypoint exists for
-these tests and automation; normal installation uses the menu.
+[CLAUDE.md](CLAUDE.md) is the coding guide. [Release maintenance](docs/RELEASING.md)
+describes the release action of the owner. The tests and automation use the
+`plan`, `apply`, `update` and `check` commands; normal installation uses the
+menu.
 
 ## Repository security
 
 The repository policy uses CodeQL, private vulnerability reporting and immutable releases.
-Report vulnerabilities through [SECURITY.md](SECURITY.md); branch protections and
-the completed, owner-authorized 23-check cutover are documented in
-[branch protection](docs/security/branch-protection.md). Checked-in policy and
+Report vulnerabilities through [SECURITY.md](SECURITY.md). The branch
+protection and the required checks are in
+[branch protection](docs/security/branch-protection.md). A document and
 successful local checks do not establish current live GitHub settings.
 
 ## Repository layout
 
 | Path | Purpose |
 |---|---|
-| `installer/` | Go CLI, dependency catalog, pinned artifacts, ownership and recovery |
+| `installer/` | Go CLI: engine, state, providers and the import of v2 |
+| `installer/tools/<name>/` | One folder for each tool: catalog entries, pinned artifacts and shell integration recipes |
 | `setup.sh`, `setup.ps1` | Public interactive entrypoints |
 | `scripts/installer-bootstrap.*` | Verified private Go bootstrap |
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
-| `installer/shells/` | Active shell integration recipes |
 | `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/` | Desktop configuration |
 | `git/`, `lazygit/config.yml`, `lazydocker/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/`, `t3/` | Tool configuration |
 | `tests/`, `.github/workflows/` | Local and native verification |
+| `featuremap.json`, `scripts/featuremap/` | Package boundaries and their check |
 | `docs/` | Upgrade, release and security guides, and release notes |
 
 ## License
@@ -1195,10 +1260,12 @@ the Rosé Pine Moon theme for T3 keep their own licenses.
 
 ## Acceptance coverage
 
-GitHub runs real native installation, application and preservation
-checks on the supported targets. The core jobs begin with keyboard-driven public
-setup, followed through Check, Update, Repair and Remove/Reinstall. Agent checks
-run the installed CLIs without model calls. Desktop checks use the VS Code editor
-to edit, save, close and open a document again. Actual reboots, first-time
-permission grants and visual usability remain manual checks. No dedicated CI
-Mac is necessary.
+GitHub runs real native installation and removal on the supported targets.
+Each `e2e` job installs each tool of its system and runs its version command,
+or checks the required files of an app. Then it runs Check, Update and Check
+again, unticks each tool, and compares the home folder with its baseline. The
+`clean` jobs start without Homebrew, without Apple developer tools and without
+the Microsoft runtimes. The `migrate` jobs import a v2.3.0 installation and
+restore it. No job opens a desktop app. Actual reboots, first-time permission
+grants and visual usability remain manual checks. No dedicated CI Mac is
+necessary.

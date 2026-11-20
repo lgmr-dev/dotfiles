@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Cross-cutting invariants. These catch regressions that aren't bound to a
-# single file's spec — bugs that could re-appear if someone copy-pastes from
-# an old commit or AI-generates similar code.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 cd "$REPO_ROOT"
@@ -48,18 +45,12 @@ check_absent "starship literal '(style)' typo gone" \
 check_absent "bare-Esc kill-whole-line bindkey gone (Meta prefix shadow)" \
     "bindkey[[:space:]]+'\\\\e'[[:space:]]+kill-whole-line" \
     --exclude-dir=.git --exclude-dir=tests \
-    installer/shells/
+    installer/tools/
 
-# The PowerShell profiles must never use remote-eval (Invoke-Expression / iex) to
-# wire tools like zoxide or starship. Their documented one-liners pipe a freshly
-# generated init straight into Invoke-Expression; this repo instead caches the
-# init to a file and dot-sources it (race-safe, no remote eval). Windows
-# profiles dot-source the generated private initialization.
 check_absent "no Invoke-Expression/iex in PowerShell profiles (cached dot-source only)" \
     "Invoke-Expression|(^|[^[:alnum:]_])iex([^[:alnum:]_]|\$)" \
-    installer/shells/*.ps1
+    installer/tools/*/shell/*.ps1
 
-# Only the active configuration carries current terminal behavior.
 if ! grep -Fx "set -as terminal-features ',*:extkeys'" tmux/tmux.conf >/dev/null; then
     echo "FAIL: tmux/tmux.conf must keep extended-key terminal-features on macOS/Linux"
     fail=1
@@ -73,9 +64,6 @@ else
     echo "ok  : no local tmux theme snippets"
 fi
 
-# The Rose Pine bar is a single repo-owned generated config sourced by tmux. It must own only multiplexer context (session/windows/directory);
-# date/time, user, host stay with Starship. The old rose-pine/tmux plugin is
-# retired -- POSIX must not reference it.
 if grep -F '%a %d %b %H:%M' tmux/rose-pine.main.conf >/dev/null; then
     echo "FAIL: generated Rose Pine main config must leave date/time to Starship"
     fail=1
@@ -92,7 +80,6 @@ else
     echo "ok  : tmux own session/windows/directory only; Starship owns user/host/time"
 fi
 
-# Lazy-load discipline: only rose-pine should be lazy=false
 nonlazy=$(grep -lE "lazy[[:space:]]*=[[:space:]]*false" nvim/lua/plugins/*.lua 2>/dev/null | grep -v rose-pine.lua || true)
 if [[ -n "$nonlazy" ]]; then
     echo "FAIL: only rose-pine should be lazy=false. Offenders:"
@@ -102,8 +89,6 @@ else
     echo "ok  : lazy-load discipline (only rose-pine is lazy=false)"
 fi
 
-# Rose-pine must keep priority = 1000 so it loads before any plugin renders
-# (without it, you get a brief flash of default colorscheme on startup).
 if ! grep -E "priority[[:space:]]*=[[:space:]]*1000" nvim/lua/plugins/rose-pine.lua >/dev/null; then
     echo "FAIL: rose-pine.lua must keep priority = 1000"
     fail=1
@@ -111,7 +96,6 @@ else
     echo "ok  : rose-pine.lua has priority = 1000"
 fi
 
-# Lazy-lock must not contain references to removed plugins.
 for stale in mason-lspconfig.nvim none-ls.nvim CopilotChat.nvim copilot.vim nui.nvim; do
     if grep -q "\"$stale\"" nvim/lazy-lock.json 2>/dev/null; then
         echo "FAIL: lazy-lock.json still references removed plugin '$stale'"
@@ -133,7 +117,7 @@ else
 fi
 
 if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
-    installer/nvim_sync.go .github/workflows/ci.yml \
+    installer/hooks/nvim_sync.go .github/workflows/ci.yml \
     tests/nvim/spec/startup_spec.lua); then
     echo "FAIL: setup and validation paths must use Lazy! restore, not Lazy! sync"
     echo "$lazy_sync_hits"
@@ -231,10 +215,6 @@ else
     echo "ok  : markdown rendering excludes headlines.nvim and markview.nvim"
 fi
 
-# .ps1 files must be pure ASCII. Windows PowerShell 5.1 reads files
-# without a BOM as ANSI / CP-1252; UTF-8 multi-byte chars (em-dash,
-# arrows) get mis-tokenized and cause "Missing closing ')'" parse
-# errors. Save-as-UTF-8-BOM would also work, but ASCII is simpler.
 ps1_files=()
 while IFS= read -r f; do ps1_files+=("$f"); done < <(
     find . -type f -name '*.ps1' -not -path './.git/*' -not -path './tests/.cache/*'
@@ -275,12 +255,6 @@ else
 fi
 rm -rf "$ps1_ascii_regression_dir"
 
-# PS 5.1 has been observed mis-parsing comments that contain a lone
-# apostrophe (e.g. "5.1's") — it sometimes treats the apostrophe as
-# the start of a string literal that runs past the comment terminator,
-# producing "Missing closing ')' in expression" errors that point at
-# the wrong line. Easier to ban stray apostrophes in .ps1 comments than
-# to debug the next occurrence.
 ps1_comment_apos=$(grep -nE "^\s*#.*'" "${ps1_files[@]}" 2>/dev/null || true)
 if [[ -n "$ps1_comment_apos" ]]; then
     echo "FAIL: apostrophe in a .ps1 comment (PS 5.1 may mis-tokenize):"
@@ -291,14 +265,6 @@ else
     echo "ok  : no apostrophes in .ps1 comments"
 fi
 
-# $Home is a READ-ONLY automatic variable. Assigning to it -- including declaring
-# a param named $Home -- PARSES fine but CRASHES at runtime ("Cannot overwrite
-# variable Home because it is read-only or constant"). It bit validate.ps1
-# (a `[string]$Home` param) and only surfaced on a real Windows run. Use
-# $HomeOverride / $userHome / $env:USERPROFILE instead. This flags an assignment
-# (`$Home =`) or a typed param (`[string]$Home`); reading $Home is fine.
-# ($matches is a DIFFERENT trap -- it is writable but gets clobbered by -match,
-# a correctness issue, not a crash -- so it is not banned here.)
 # shellcheck disable=SC2016  # literal $home in the grep regex, not a shell expansion
 ps1_home_assign=$(grep -nEi '\$home[[:space:]]*=|\]\$home\b' "${ps1_files[@]}" 2>/dev/null || true)
 if [[ -n "$ps1_home_assign" ]]; then
@@ -310,12 +276,6 @@ else
     echo "ok  : no assignment to read-only \$Home in .ps1"
 fi
 
-# Lua indentation: spaces only. stylua.toml at repo root declares Spaces+2;
-# .editorconfig [*.lua] declares space+2. If a .lua file starts a line with
-# a TAB, either stylua was bypassed (someone wrote without format-on-save)
-# or one of the two configs got reverted -- fix the cause, do not retab
-# manually. Scope: every .lua under nvim/, tests/nvim/, linux/. Portable
-# `grep -E "^<TAB>"` via printf so this passes on BSD grep (macOS) too.
 tab_pat="$(printf '^\t')"
 tab_indented_lua=$(find nvim tests/nvim linux -name '*.lua' -type f \
     -exec grep -lE "$tab_pat" {} + 2>/dev/null || true)
@@ -328,7 +288,6 @@ else
     echo "ok  : no tab-indented .lua"
 fi
 
-# Dead-code guards
 for dead in nvim/lua/plugins.lua nvim/lua/plugins/ai.lua nvim/lua/plugins/avante.lua nvim/lua/plugins/none-ls.lua; do
     if [[ -e "$dead" ]]; then
         echo "FAIL: $dead should be deleted"

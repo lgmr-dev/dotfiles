@@ -1,12 +1,93 @@
 # Manual test checklist
 
-> Historical Nix/chezmoi release material. Commands below apply only at their
-> recorded revisions; retired launchers are not part of the new installer. Use
-> [the current guide](../README.md) for this major release.
-
 The automated suite covers the deterministic surface. Some things only
 make sense to verify by eye — keep this checklist alongside any
 significant change to the relevant area.
+
+## v3.0.0 migration from v2
+
+The owner does these checks on each machine, in this order: Ubuntu and WSL,
+then the Mac, then Windows. Follow
+[From v2 to v3.0.0](../docs/UPGRADING.md#from-v2-to-v300). The `migrate` jobs
+prove the import and `restore-v2` only for a small selection on disposable
+runners. They do not prove a real installation.
+
+On each machine:
+
+- [ ] **Before the import**: with the `v2.3.0` checkout, **Update tools** and
+      **Check installation** pass, and no interrupted operation remains. Copy
+      the state folder to a safe location.
+- [ ] **Review**: with the v3 checkout, setup shows the import review and
+      changes nothing before approval. `./setup.sh plan` prints the same
+      review. The review names each v2 record, the v2 folders that stay and
+      the restore set in `<state>/v2-restore`.
+- [ ] **Import**: the report shows that the import is complete. `state.json`
+      has `"schema": 2` and `"v2_restore": "open"`. **Check installation**
+      passes and tells you to keep the v2 folders.
+- [ ] **Tools**: in a new terminal, the command of each private tool
+      resolves to a path below `<state>/tools/<id>/current`. Neovim starts,
+      and `:checkhealth`
+      shows no new error. The prompt, the completion and the key bindings work
+      as before.
+- [ ] **Preserved content**: each profile, settings file and configuration
+      that you changed before the import has the same content after it.
+- [ ] **System packages**: the list of installed APT packages, Homebrew
+      formulae and casks, or Windows applications is the same as before the
+      import.
+- [ ] **v2 folders**: `packages`, `nvim-sync`, `configuration`, `profiles` and
+      `recovery` in the state folder are still there.
+- [ ] **Sentinel**: each agent file still has the Sentinel block, and
+      `<state>/sentinel/record.json` did not change.
+- [ ] **Fallback**, on the first machine of each system: run
+      `./setup.sh restore-v2`, read the preview, then run
+      `./setup.sh restore-v2 --yes`. Check out `v2.3.0` and make sure that its
+      **Check installation** passes. Then check out v3 and import again.
+- [ ] **Close the fallback**: the first **Update tools** run after the import
+      shows the line that it closes the v2 fallback. After that run,
+      `state.json` has no `v2_restore` field, and **Check installation** names
+      the v2 folders for your cleanup.
+- [ ] **Removal command**: untick one tool that has a recorded system package.
+      The review shows its removal command under **Run these commands
+      yourself:**, and setup does not remove the package.
+
+Ubuntu and WSL only:
+
+- [ ] **Keyboard rule**, with Mac keyboard shortcuts selected: the udev rule
+      file has the same bytes as before the import, and the remapper works
+      after the next login.
+- [ ] **WSL**: nothing changed under `/mnt/c`.
+
+Mac only:
+
+- [ ] **Three applications in the import run**: VS Code, Ghostty and
+      OpenWhispr still start from their v2 application links, and the `code`
+      and `ghostty` commands still work. The review listed them as
+      applications that stay on release v2.
+- [ ] **Cask moves**: quit each application. A later **Update tools** run
+      shows each cask install. After it, each signed app is in
+      `/Applications`, `code` and `ghostty` point into the new apps, and the
+      v2 application links are gone.
+- [ ] **VS Code updates**: after the move, setup no longer manages
+      `update.mode`, and the field has its earlier value.
+- [ ] **Signing requirements**: for each of the three apps,
+      `codesign --verify --deep --strict` passes on the bundle in
+      `/Applications`.
+
+Windows only:
+
+- [ ] **Windows Terminal**: the settings keep your profiles, schemes and
+      actions, and the managed fragment still applies.
+- [ ] **PowerShell profile**: a new PowerShell 7 window loads the prompt and
+      the key bindings, and a redirected `pwsh -NonInteractive -Command` prints
+      no prompt output.
+- [ ] **Vendor installers**: the VC++ runtime, Build Tools and T3 Code stay
+      installed, and setup shows no removal for them.
+
+## Historical checks
+
+> Historical Nix/chezmoi release material. Commands below apply only at their
+> recorded revisions; retired launchers are not part of the new installer. Use
+> [the current guide](../README.md) for this major release.
 
 ## v0.1.0 to v0.4.4 release upgrade
 
@@ -151,8 +232,8 @@ in the evidence.
       the README's one-time GNOME setup: `Option+1...9` switches to a workspace,
       `Option+Shift+<digit>` sends the window there, `Ctrl+Option+L/H` cycles
       windows, a quick `Option+Tab` returns to the previous app and `Cmd+1` still
-      selects Ghostty tab 1. The emitted keys are proven by
-      `TestNativeMacKeyboardLifecycle`; this checks GNOME's response.
+      selects Ghostty tab 1. No automated test proves the emitted keys; this
+      checks the emitted keys and GNOME's response.
 - [ ] **Herdr session smoke**, all OSes: `herdr --version` prints the installed
       version; start a session (`herdr`), confirm it opens panes and its
       agent-state awareness works, confirm the UI uses dark Rose Pine, then

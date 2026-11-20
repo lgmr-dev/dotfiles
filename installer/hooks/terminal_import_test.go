@@ -12,7 +12,7 @@ import (
 const terminalV2Fingerprint = "cfdd459b3d918e7b86e1724f30e6008662155b16c9173b797774a4ea3b02a553"
 
 func TestTerminalImportFingerprintEqualsTheFingerprintOfReleaseV2(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("testdata", "terminal-settings-v2.jsonc"))
+	data, err := os.ReadFile(filepath.Join("testdata", "terminal-settings-v2.golden"))
 	if err != nil {
 		t.Fatal(err)
 	}

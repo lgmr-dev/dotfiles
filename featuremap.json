@@ -63,15 +63,9 @@
     },
     "cmd/dotfiles": {
       "description": "The argument parser and the wiring of the packages"
-    },
-    "legacy-v2": {
-      "description": "The flat v2 package. The cutover deletes it."
     }
   },
   "owners": [
-    { "path": "installer/", "feature": "legacy-v2" },
-    { "path": "installer/*.go", "feature": "legacy-v2" },
-    { "path": "installer/testdata/**", "feature": "legacy-v2" },
     { "path": "installer/platform/**", "feature": "platform" },
     { "path": "installer/tools/**", "feature": "tools" },
     { "path": "installer/catalog/**", "feature": "catalog" },

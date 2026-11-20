@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "zsh",
+      "name": "zsh",
+      "description": "Shell profile and pinned completion plugins",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 3,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.zsh",
+        "zsh.plugins"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.zsh",
+      "name": "zsh",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "zsh",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "zsh"
+        }
+      }
+    },
+    {
+      "id": "zsh.plugins",
+      "name": "Pinned zsh plugins",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "plugin.fzf-tab",
+        "plugin.zsh-autosuggestions",
+        "tool.fzf",
+        "tool.zsh"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "config.zsh",
+      "name": "zsh configuration",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.zsh",
+        "integration.shells",
+        "zsh.plugins"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "plugin.fzf-tab",
+      "name": "fzf-tab pinned plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "plugin.fzf-tab"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "plugin.fzf-tab"
+        }
+      }
+    },
+    {
+      "id": "plugin.zsh-autosuggestions",
+      "name": "zsh-autosuggestions pinned plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "plugin.zsh-autosuggestions"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "plugin.zsh-autosuggestions"
+        }
+      }
+    }
+  ],
+  "shell": [
+    {
+      "resource": "config.zsh",
+      "shell": "zsh",
+      "source": "shell/zsh-core.zsh"
+    }
+  ]
+}

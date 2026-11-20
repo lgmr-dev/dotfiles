@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "ripgrep",
+      "name": "ripgrep",
+      "description": "Fast text search",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 10,
+      "requires": [
+        "tool.rg"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.rg",
+      "name": "ripgrep",
+      "action": "rg",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.rg"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.rg"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.rg"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    }
+  ]
+}

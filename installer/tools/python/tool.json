@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.python",
+      "name": "Python with pip/venv",
+      "action": "python",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "python"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "python"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "python"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    }
+  ]
+}

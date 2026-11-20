@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.az": {
+      "darwin/arm64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-macos-arm64.tar.gz",
+        "sha256": "6fb7d8d6d3db65098e259d5d1d6364359b4b54b5aef4ea6b18bddddd9468407a",
+        "format": "tar.gz",
+        "commands": {
+          "az": "commands/az"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
+        ],
+        "azure_cli": {
+          "python": {
+            "version": "3.14.10",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
+            "sha256": "f15ec3d15460dd66c2eb88639b152cd9040e7d1ece11e38bf89e8f53f0171e02",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "bin/python3.14"
+            ]
+          }
+        }
+      },
+      "linux/amd64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-linux-x86_64.tar.gz",
+        "sha256": "b90a489e0447b83e9d265b6d14f8b9306cd96b830c7f93e60bbcdf18cd2532af",
+        "format": "tar.gz",
+        "commands": {
+          "az": "commands/az"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
+        ],
+        "libc": "glibc",
+        "azure_cli": {
+          "python": {
+            "version": "3.14.10",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "bin/python3.14"
+            ]
+          }
+        }
+      },
+      "linux/arm64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-linux-arm64.tar.gz",
+        "sha256": "ef78aad855168a61eb372c1624406b97a94f1b23935b9391d131565337acc703",
+        "format": "tar.gz",
+        "commands": {
+          "az": "commands/az"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [
+          "libexec/lib/python3.14/site-packages/azure/cli/__main__.pyc"
+        ],
+        "libc": "glibc",
+        "azure_cli": {
+          "python": {
+            "version": "3.14.10",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "38fd50f07170adc29d481913d1c30b17ecb538fbe290315fe1f83d84fdd5b694",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "bin/python3.14"
+            ]
+          }
+        }
+      },
+      "windows/amd64": {
+        "version": "2.92.0",
+        "url": "https://github.com/Azure/azure-cli/releases/download/azure-cli-2.92.0/azure-cli-2.92.0-x64.zip",
+        "sha256": "2cbd2c10e4b2ec4de2ab98eaa69f51fa4c9dfc4922b5116ada88091663d92af2",
+        "format": "zip",
+        "commands": {
+          "az": "bin/az.cmd"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "python.exe"
+        ]
+      }
+    }
+  }
+}

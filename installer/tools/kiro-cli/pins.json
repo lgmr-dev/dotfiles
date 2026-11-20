@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.kiro": {
+      "darwin/arm64": {
+        "version": "2.37.1",
+        "url": "https://prod.download.cli.kiro.dev/stable/2.37.1/Kiro%20CLI.dmg",
+        "sha256": "3477707d09191f52c1d117dd92d79a6e57a793d577868cf5ce89315981314743",
+        "format": "dmg",
+        "commands": {
+          "kiro-cli": "Kiro CLI.app/Contents/MacOS/kiro-cli",
+          "kiro-cli-chat": "Kiro CLI.app/Contents/MacOS/kiro-cli-chat",
+          "kiro-cli-term": "Kiro CLI.app/Contents/MacOS/kiro-cli-term"
+        },
+        "bin_dirs": [
+          "Kiro CLI.app/Contents/MacOS"
+        ],
+        "required_files": [
+          "Kiro CLI.app/Contents/Info.plist"
+        ],
+        "app_bundle": "Kiro CLI.app"
+      },
+      "linux/amd64": {
+        "version": "2.37.1",
+        "url": "https://prod.download.cli.kiro.dev/stable/2.37.1/kirocli-x86_64-linux.zip",
+        "sha256": "b4049000d5a7b684947306eb9f9a480cab3a3ab2ff42584c293d05bde4d314a1",
+        "format": "zip",
+        "strip_components": 1,
+        "commands": {
+          "kiro-cli": "bin/kiro-cli",
+          "kiro-cli-chat": "bin/kiro-cli-chat",
+          "kiro-cli-term": "bin/kiro-cli-term"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "BUILD-INFO"
+        ],
+        "excluded_files": [
+          "bin/q",
+          "bin/qchat"
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "2.37.1",
+        "url": "https://prod.download.cli.kiro.dev/stable/2.37.1/kirocli-aarch64-linux.zip",
+        "sha256": "e589bd8d8b845bb193b9f36f2ee263fe8aef7dbb19aff03ce44c5076ce6ab0c1",
+        "format": "zip",
+        "strip_components": 1,
+        "commands": {
+          "kiro-cli": "bin/kiro-cli",
+          "kiro-cli-chat": "bin/kiro-cli-chat",
+          "kiro-cli-term": "bin/kiro-cli-term"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "BUILD-INFO"
+        ],
+        "excluded_files": [
+          "bin/q",
+          "bin/qchat"
+        ],
+        "libc": "glibc"
+      }
+    }
+  }
+}

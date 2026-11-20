@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "t3-code-app",
+      "name": "T3 Code",
+      "description": "Desktop app with its own server; configure/authenticate a provider separately; on Linux the official .deb runs privately without Chromium's sandbox and without automatic updates; on Windows the signed installer installs it for the current user",
+      "capability": true,
+      "category": "AI coding",
+      "order": 26,
+      "platforms": [
+        "darwin",
+        "linux",
+        "windows"
+      ],
+      "requires": [
+        "integration.t3-code"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "app.t3-code"
+        ],
+        "linux": [
+          "tool.t3-code-app",
+          "desktop.t3-code"
+        ],
+        "windows": [
+          "app.t3-code-windows"
+        ]
+      }
+    },
+    {
+      "id": "desktop.t3-code",
+      "name": "T3 Code launcher",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "tool.t3-code-app"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
+      "id": "tool.t3-code-app",
+      "name": "T3 Code desktop build",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "library.libgtk-3-0t64",
+        "library.libasound2t64",
+        "library.libnss3",
+        "library.libgbm1",
+        "library.libstdcxx6"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "linux": {
+          "provider": "archive",
+          "package": "tool.t3-code-app"
+        }
+      }
+    },
+    {
+      "id": "app.t3-code",
+      "name": "T3 Code application",
+      "description": "Official native app; normal app updates and personal T3 data remain under your control",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "package",
+      "scope": "machine",
+      "requires": [
+        "infra.homebrew"
+      ],
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-cask",
+          "package": "t3-code"
+        }
+      }
+    },
+    {
+      "id": "app.t3-code-windows",
+      "name": "T3 Code application",
+      "description": "Official signed per-user app; normal app updates and personal T3 data remain under your control",
+      "platforms": [
+        "windows"
+      ],
+      "action": "package",
+      "scope": "user",
+      "bindings": {
+        "windows": {
+          "provider": "windows-app",
+          "package": "t3-code"
+        }
+      }
+    }
+  ]
+}

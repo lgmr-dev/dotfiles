@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "sentinel",
+      "name": "Sentinel rules and skills",
+      "description": "The installer of the latest Sentinel release writes the rules and the core, UI, formal and ops skills for each installed coding agent",
+      "capability": true,
+      "category": "AI coding",
+      "order": 34,
+      "requires": [
+        "integration.sentinel-installer"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "integration.sentinel-installer",
+      "name": "Sentinel installer",
+      "requires": [
+        "tool.git"
+      ],
+      "action": "sentinel",
+      "scope": "user"
+    }
+  ]
+}

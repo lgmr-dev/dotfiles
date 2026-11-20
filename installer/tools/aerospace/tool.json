@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "aerospace",
+      "name": "AeroSpace",
+      "description": "Tiling window manager",
+      "capability": true,
+      "category": "Desktop apps",
+      "order": 40,
+      "platforms": [
+        "darwin"
+      ],
+      "requires": [
+        "config.aerospace",
+        "desktop.aerospace"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.aerospace",
+      "name": "AeroSpace",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "aerospace",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.aerospace"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "config.aerospace",
+      "name": "aerospace configuration",
+      "platforms": [
+        "darwin"
+      ],
+      "requires": [
+        "tool.aerospace"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "desktop.aerospace",
+      "name": "AeroSpace application launcher",
+      "requires": [
+        "tool.aerospace"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platforms": [
+        "darwin"
+      ]
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.aerospace",
+      "source": "aerospace/aerospace.toml",
+      "folder": "config",
+      "path": "aerospace/aerospace.toml",
+      "platforms": [
+        "darwin"
+      ]
+    }
+  ]
+}

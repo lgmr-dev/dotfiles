@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.openwhispr": {
+      "darwin/arm64": {
+        "version": "1.11.0",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.11.0/OpenWhispr-1.11.0-arm64-mac.zip",
+        "sha256": "77be646b39e0e012ebca9f8b87b8e46fb3a8706c70b0119ab372490e24854b57",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "OpenWhispr.app/Contents/Info.plist",
+          "OpenWhispr.app/Contents/MacOS/OpenWhispr"
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.11.0",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.11.0/OpenWhispr-1.11.0-linux-x64.tar.gz",
+        "sha256": "b238d9d3da3122c303f786590484b7aa627d4e625edd79d8c9f2f42af1ec4435",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "open-whispr": "open-whispr"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "open-whispr-app",
+          "resources/src/assets/icon.png"
+        ],
+        "libc": "glibc"
+      }
+    }
+  }
+}

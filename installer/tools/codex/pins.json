@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.codex": {
+      "darwin/arm64": {
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-darwin-arm64.tgz",
+        "sha256": "ab7ba154261db88eef760dfe69978fbb67018c2e1200ff536dc8c51ed9c758b5",
+        "format": "tar.gz",
+        "commands": {
+          "codex": "vendor/aarch64-apple-darwin/bin/codex",
+          "codex-code-mode-host": "vendor/aarch64-apple-darwin/bin/codex-code-mode-host"
+        },
+        "bin_dirs": [
+          "vendor/aarch64-apple-darwin/bin"
+        ],
+        "required_files": [
+          "package.json",
+          "README.md",
+          "vendor/aarch64-apple-darwin/codex-package.json",
+          "vendor/aarch64-apple-darwin/codex-path/rg"
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-linux-x64.tgz",
+        "sha256": "67c4bccce8e6c3a2b9ae0e586750e0efac7e0b8cd85e6b4734ad474317d2cc32",
+        "format": "tar.gz",
+        "commands": {
+          "codex": "vendor/x86_64-unknown-linux-musl/bin/codex",
+          "codex-code-mode-host": "vendor/x86_64-unknown-linux-musl/bin/codex-code-mode-host"
+        },
+        "bin_dirs": [
+          "vendor/x86_64-unknown-linux-musl/bin"
+        ],
+        "required_files": [
+          "package.json",
+          "README.md",
+          "vendor/x86_64-unknown-linux-musl/codex-package.json",
+          "vendor/x86_64-unknown-linux-musl/codex-path/rg",
+          "vendor/x86_64-unknown-linux-musl/codex-resources/bwrap"
+        ],
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-linux-arm64.tgz",
+        "sha256": "72a1b05ee522eb7b57a96ad60d26056da8adda20c630f54079c53dd8c292613a",
+        "format": "tar.gz",
+        "commands": {
+          "codex": "vendor/aarch64-unknown-linux-musl/bin/codex",
+          "codex-code-mode-host": "vendor/aarch64-unknown-linux-musl/bin/codex-code-mode-host"
+        },
+        "bin_dirs": [
+          "vendor/aarch64-unknown-linux-musl/bin"
+        ],
+        "required_files": [
+          "package.json",
+          "README.md",
+          "vendor/aarch64-unknown-linux-musl/codex-package.json",
+          "vendor/aarch64-unknown-linux-musl/codex-path/rg",
+          "vendor/aarch64-unknown-linux-musl/codex-resources/bwrap"
+        ],
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "0.170.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.170.0-win32-x64.tgz",
+        "sha256": "49eedd5e5e1c828b0cfcdde97f19d83528d8fda4eafef3b02cc770da218b6da3",
+        "format": "tar.gz",
+        "commands": {
+          "codex": "vendor/x86_64-pc-windows-msvc/bin/codex.exe",
+          "codex-code-mode-host": "vendor/x86_64-pc-windows-msvc/bin/codex-code-mode-host.exe"
+        },
+        "bin_dirs": [
+          "vendor/x86_64-pc-windows-msvc/bin"
+        ],
+        "required_files": [
+          "package.json",
+          "README.md",
+          "vendor/x86_64-pc-windows-msvc/codex-package.json",
+          "vendor/x86_64-pc-windows-msvc/codex-path/rg.exe",
+          "vendor/x86_64-pc-windows-msvc/codex-resources/codex-command-runner.exe",
+          "vendor/x86_64-pc-windows-msvc/codex-resources/codex-windows-sandbox-setup.exe"
+        ],
+        "strip_components": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.vcredist",
+      "name": "Microsoft Visual C++ runtime",
+      "platforms": [
+        "windows"
+      ],
+      "action": "vcredist",
+      "scope": "machine",
+      "shared": true
+    }
+  ]
+}

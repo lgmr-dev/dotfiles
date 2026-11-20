@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "ghostty",
+      "name": "Ghostty",
+      "description": "Terminal with the shared configuration and desktop launcher",
+      "capability": true,
+      "category": "Terminal apps",
+      "order": 21,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.ghostty",
+        "integration.ghostty"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.ghostty",
+      "name": "Ghostty",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "ghostty",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.ghostty"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.ghostty"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "linux": [
+          "library.libadwaita-1-0",
+          "library.libc6",
+          "library.libegl1",
+          "library.libfontconfig1",
+          "library.libfreetype6",
+          "library.libglib2.0-0t64",
+          "library.libgtk-4-1",
+          "library.libharfbuzz0b",
+          "library.libonig5",
+          "library.libx11-6",
+          "library.libwayland-client0"
+        ]
+      }
+    },
+    {
+      "id": "integration.ghostty",
+      "name": "Ghostty desktop integration",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.ghostty"
+      ],
+      "action": "ghostty-desktop",
+      "scope": "user"
+    },
+    {
+      "id": "config.ghostty",
+      "name": "ghostty configuration",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.ghostty",
+        "tool.font"
+      ],
+      "action": "config",
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.ghostty",
+      "source": "ghostty/config",
+      "folder": "home",
+      "path": "Library/Application Support/com.mitchellh.ghostty/config",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.ghostty",
+      "source": "ghostty/config",
+      "folder": "config",
+      "path": "ghostty/config",
+      "platforms": [
+        "linux"
+      ]
+    }
+  ]
+}

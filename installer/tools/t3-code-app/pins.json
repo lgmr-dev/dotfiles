@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.t3-code-app": {
+      "linux/amd64": {
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-amd64.deb",
+        "sha256": "418c7825f73107b7b5ba3babae5e3b485801dc22d9dc0d518af632f7906cbdd1",
+        "format": "deb",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "t3-code",
+          "opt/T3 Code (Beta)/t3code",
+          "opt/T3 Code (Beta)/resources/app.asar",
+          "usr/share/icons/hicolor/256x256/apps/t3code.png"
+        ],
+        "libc": "glibc",
+        "t3_code_launcher": true
+      },
+      "linux/arm64": {
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/T3-Code-0.1.9-arm64.deb",
+        "sha256": "7959976b4d7fc4443c9fb770128774d4e86f14db01044be36901e488908f3bb4",
+        "format": "deb",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "t3-code",
+          "opt/T3 Code (Beta)/t3code",
+          "opt/T3 Code (Beta)/resources/app.asar",
+          "usr/share/icons/hicolor/256x256/apps/t3code.png"
+        ],
+        "libc": "glibc",
+        "t3_code_launcher": true
+      }
+    }
+  }
+}

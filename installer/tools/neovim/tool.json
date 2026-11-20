@@ -1,0 +1,251 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "neovim",
+      "name": "Neovim",
+      "description": "Editor, locked plugins, parsers and bundled language tools",
+      "capability": true,
+      "category": "Editors",
+      "order": 1,
+      "requires": [
+        "config.nvim",
+        "nvim.sync",
+        "tool.clipboard"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.nvim",
+      "name": "Neovim",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "nvim",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.nvim"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.nvim"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.nvim"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ]
+      }
+    },
+    {
+      "id": "tool.tree-sitter",
+      "name": "Tree-sitter CLI",
+      "action": "tree-sitter",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.tree-sitter"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.tree-sitter"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.tree-sitter"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ]
+      }
+    },
+    {
+      "id": "tool.latex2text",
+      "name": "LaTeX text converter",
+      "requires": [
+        "tool.python",
+        "integration.shells"
+      ],
+      "action": "latex2text",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.latex2text"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.latex2text"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.latex2text"
+        }
+      }
+    },
+    {
+      "id": "nvim.sync",
+      "name": "Neovim plugins, parsers and language tools",
+      "requires": [
+        "config.nvim",
+        "tool.git",
+        "tool.make",
+        "tool.cmake",
+        "tool.compiler",
+        "tool.rg",
+        "tool.fd",
+        "tool.node",
+        "tool.python",
+        "tool.rust",
+        "tool.tree-sitter",
+        "tool.latex2text"
+      ],
+      "action": "nvim-sync",
+      "scope": "user",
+      "platform_requires": {
+        "linux": [
+          "tool.clangd",
+          "tool.curl",
+          "tool.unzip"
+        ],
+        "windows": [
+          "tool.powershell",
+          "tool.gersemi",
+          "tool.clang-format"
+        ]
+      }
+    },
+    {
+      "id": "config.nvim",
+      "name": "nvim configuration",
+      "requires": [
+        "tool.nvim"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "tool.clangd",
+      "name": "clangd language server",
+      "platforms": [
+        "linux"
+      ],
+      "action": "clangd",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "clangd"
+        }
+      }
+    },
+    {
+      "id": "tool.curl",
+      "name": "curl download client",
+      "platforms": [
+        "linux"
+      ],
+      "action": "curl",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "curl"
+        }
+      }
+    },
+    {
+      "id": "tool.unzip",
+      "name": "ZIP extraction utility",
+      "platforms": [
+        "linux"
+      ],
+      "action": "unzip",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "unzip"
+        }
+      }
+    },
+    {
+      "id": "tool.gersemi",
+      "name": "Gersemi CMake formatter",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "integration.shells"
+      ],
+      "action": "gersemi",
+      "scope": "user",
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "tool.gersemi"
+        }
+      }
+    },
+    {
+      "id": "tool.clang-format",
+      "name": "Clang C/C++ formatter",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "integration.shells",
+        "tool.vcredist"
+      ],
+      "action": "clang-format",
+      "scope": "user",
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "tool.clang-format"
+        }
+      }
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.nvim",
+      "source": "nvim",
+      "folder": "config",
+      "path": "nvim",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "directory": true
+    },
+    {
+      "resource": "config.nvim",
+      "source": "nvim",
+      "folder": "local_app_data",
+      "path": "nvim",
+      "platforms": [
+        "windows"
+      ],
+      "directory": true,
+      "mode": "junction"
+    }
+  ]
+}

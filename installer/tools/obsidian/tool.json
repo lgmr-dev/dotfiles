@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "obsidian",
+      "name": "Obsidian",
+      "description": "Markdown notes; personal vaults remain untouched; on Linux the official portable build runs without Chromium's sandbox",
+      "capability": true,
+      "category": "Desktop apps",
+      "order": 37,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "tool.obsidian",
+          "desktop.obsidian"
+        ],
+        "linux": [
+          "tool.obsidian-portable",
+          "desktop.obsidian"
+        ]
+      }
+    },
+    {
+      "id": "tool.obsidian",
+      "name": "Obsidian",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "obsidian",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.obsidian"
+        }
+      }
+    },
+    {
+      "id": "desktop.obsidian",
+      "name": "Obsidian launcher",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "tool.obsidian"
+        ],
+        "linux": [
+          "tool.obsidian-portable"
+        ]
+      }
+    },
+    {
+      "id": "tool.obsidian-portable",
+      "name": "Obsidian portable build",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "library.libgtk-3-0t64",
+        "library.libasound2t64",
+        "library.libnss3",
+        "library.libgbm1",
+        "library.libstdcxx6"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "linux": {
+          "provider": "archive",
+          "package": "tool.obsidian-portable"
+        }
+      }
+    }
+  ]
+}

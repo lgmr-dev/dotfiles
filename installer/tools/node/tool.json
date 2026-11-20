@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.node",
+      "name": "Node.js and npm",
+      "action": "node",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.node"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.node"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.node"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "linux": [
+          "library.libatomic1"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "mac-keyboard",
+      "name": "Mac keyboard shortcuts",
+      "description": "Linux only: a Mac-layout keyboard's Cmd and Option keys work as on macOS in every app; asks for sudo once for keyboard access",
+      "capability": true,
+      "category": "Desktop apps",
+      "order": 41,
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "config.xremap",
+        "desktop.xremap",
+        "system.keyboard-access"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.xremap",
+      "name": "xremap key remapper",
+      "platforms": [
+        "linux"
+      ],
+      "action": "xremap",
+      "scope": "user",
+      "bindings": {
+        "linux": {
+          "provider": "archive",
+          "package": "tool.xremap"
+        }
+      }
+    },
+    {
+      "id": "config.xremap",
+      "name": "xremap Mac keyboard configuration",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "tool.xremap"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "desktop.xremap",
+      "name": "Mac keyboard shortcuts at login",
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "tool.xremap",
+        "config.xremap"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    },
+    {
+      "id": "system.keyboard-access",
+      "name": "Keyboard access for the logged-in user",
+      "platforms": [
+        "linux"
+      ],
+      "action": "keyboard-access",
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.xremap",
+      "source": "xremap/config.yml",
+      "folder": "config",
+      "path": "xremap/config.yml",
+      "platforms": [
+        "linux"
+      ]
+    }
+  ]
+}

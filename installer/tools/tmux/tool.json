@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tmux",
+      "name": "tmux",
+      "description": "Terminal multiplexer and session plugins",
+      "capability": true,
+      "category": "Terminal sessions",
+      "order": 23,
+      "requires": [
+        "config.tmux",
+        "tmux.plugins"
+      ],
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "tool.tmux",
+      "name": "tmux",
+      "action": "tmux",
+      "scope": "user",
+      "shared": true,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-formula",
+          "package": "tmux"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "tmux"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.homebrew"
+        ]
+      }
+    },
+    {
+      "id": "tmux.plugins",
+      "name": "Multiplexer plugins",
+      "requires": [
+        "tool.tmux",
+        "tmux.sensible",
+        "tmux.yank",
+        "tmux.resurrect",
+        "tmux.continuum"
+      ],
+      "action": "tmux-plugins",
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "config.tmux",
+      "name": "tmux configuration",
+      "requires": [
+        "tool.tmux",
+        "integration.shells"
+      ],
+      "action": "config",
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "id": "tmux.sensible",
+      "name": "tmux sensible plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-sensible"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-sensible"
+        }
+      }
+    },
+    {
+      "id": "tmux.yank",
+      "name": "tmux yank plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-yank"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-yank"
+        }
+      }
+    },
+    {
+      "id": "tmux.resurrect",
+      "name": "tmux resurrect plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-resurrect"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-resurrect"
+        }
+      }
+    },
+    {
+      "id": "tmux.continuum",
+      "name": "tmux continuum plugin",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tmux-plugin-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tmux-continuum"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tmux-continuum"
+        }
+      }
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.tmux",
+      "source": "tmux/tmux.conf",
+      "folder": "home",
+      "path": ".tmux.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.tmux",
+      "source": "tmux/rose-pine.main.conf",
+      "folder": "home",
+      "path": ".tmux.rose-pine.main.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.tmux",
+      "source": "tmux/rose-pine.moon.conf",
+      "folder": "home",
+      "path": ".tmux.rose-pine.moon.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.tmux",
+      "source": "tmux/rose-pine.dawn.conf",
+      "folder": "home",
+      "path": ".tmux.rose-pine.dawn.conf",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    }
+  ]
+}

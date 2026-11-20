@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.cmake": {
+      "darwin/arm64": {
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-macos-universal.tar.gz",
+        "sha256": "a645d69fd21e521759cc0c64e7c60462d43faf0c7214ac05f75c80f7c5037dde",
+        "format": "tar.gz",
+        "commands": {
+          "cmake": "CMake.app/Contents/bin/cmake",
+          "ctest": "CMake.app/Contents/bin/ctest",
+          "cpack": "CMake.app/Contents/bin/cpack"
+        },
+        "bin_dirs": [
+          "CMake.app/Contents/bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "CMake.app/Contents/share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
+        ]
+      },
+      "linux/amd64": {
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-x86_64.tar.gz",
+        "sha256": "81f0d5b0960fb6adc8197030ffc827fba937640d51e73e39e0e9e40d88c66f6f",
+        "format": "tar.gz",
+        "commands": {
+          "cmake": "bin/cmake",
+          "ctest": "bin/ctest",
+          "cpack": "bin/cpack"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-aarch64.tar.gz",
+        "sha256": "0c8447e7bba9701467b5ac6155d157aa9e309e71af4981f78bd4b9176107f553",
+        "format": "tar.gz",
+        "commands": {
+          "cmake": "bin/cmake",
+          "ctest": "bin/ctest",
+          "cpack": "bin/cpack"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "4.5.0",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-windows-x86_64.zip",
+        "sha256": "301b1728317ccd84e984b02e366a8293735bc5ac618757d3d8f58b578f062411",
+        "format": "zip",
+        "commands": {
+          "cmake": "bin/cmake.exe",
+          "ctest": "bin/ctest.exe",
+          "cpack": "bin/cpack.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/cmake-4.5/Modules/CMakeDetermineSystem.cmake"
+        ]
+      }
+    },
+    "tool.make": {
+      "windows/amd64": {
+        "version": "4.4.1",
+        "url": "https://downloads.sourceforge.net/project/ezwinports/make-4.4.1-without-guile-w32-bin.zip",
+        "sha256": "fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7",
+        "format": "zip",
+        "commands": {
+          "make": "bin/make.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "bin/make.exe"
+        ]
+      }
+    }
+  }
+}

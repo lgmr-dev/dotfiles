@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "infra.homebrew",
+      "name": "Homebrew package infrastructure",
+      "platforms": [
+        "darwin"
+      ],
+      "action": "homebrew",
+      "scope": "machine",
+      "retain": true,
+      "replan_after": true
+    }
+  ]
+}

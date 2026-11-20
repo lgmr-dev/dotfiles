@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "sentinel-no-attribution",
+      "name": "Sentinel without attribution",
+      "description": "Sets the Git value sentinel.attribution to off, so agents name no model, harness, skill or review tool in commits, branches, PRs, PR comments or issues",
+      "capability": true,
+      "category": "AI coding",
+      "order": 35,
+      "requires": [
+        "integration.sentinel-installer",
+        "integration.git"
+      ],
+      "scope": "user"
+    }
+  ]
+}

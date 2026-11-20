@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.gh-dash": {
+      "darwin/arm64": {
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_darwin-arm64",
+        "sha256": "850c0f652f77837462ba4eba43513b10a63ac7e06646dbc80e00a9d7c1c959ab",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash"
+      },
+      "linux/amd64": {
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_linux-amd64",
+        "sha256": "9178abe35621ebe0d03978db0601c1f1aa9e7d42437bf71a07b6f6e43a7e7b40",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash"
+      },
+      "linux/arm64": {
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_linux-arm64",
+        "sha256": "940e93c216dc7fdea5b0c6471ce44eb7f6199d5a3b015bf3ea8adc50e67cccd0",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash"
+      },
+      "windows/amd64": {
+        "version": "4.26.3",
+        "url": "https://github.com/dlvhdr/gh-dash/releases/download/v4.26.3/gh-dash_v4.26.3_windows-amd64.exe",
+        "sha256": "972d49d0dddc2b47cb6d81f0e0a18638a4753776d38d130b13b1d0026f65ac3c",
+        "format": "file",
+        "commands": {
+          "gh-dash": "gh-dash.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "gh-dash.exe"
+      }
+    }
+  }
+}

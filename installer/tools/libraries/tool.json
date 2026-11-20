@@ -1,0 +1,314 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "library.libadwaita-1-0",
+      "name": "libadwaita-1-0 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libadwaita-1-0"
+        }
+      }
+    },
+    {
+      "id": "library.libc6",
+      "name": "libc6 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libc6"
+        }
+      }
+    },
+    {
+      "id": "library.libegl1",
+      "name": "libegl1 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libegl1"
+        }
+      }
+    },
+    {
+      "id": "library.libfontconfig1",
+      "name": "libfontconfig1 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libfontconfig1"
+        }
+      }
+    },
+    {
+      "id": "library.libfreetype6",
+      "name": "libfreetype6 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libfreetype6"
+        }
+      }
+    },
+    {
+      "id": "library.libglib2.0-0t64",
+      "name": "libglib2.0-0t64 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libglib2.0-0t64"
+        }
+      }
+    },
+    {
+      "id": "library.libgtk-4-1",
+      "name": "libgtk-4-1 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libgtk-4-1"
+        }
+      }
+    },
+    {
+      "id": "library.libharfbuzz0b",
+      "name": "libharfbuzz0b desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libharfbuzz0b"
+        }
+      }
+    },
+    {
+      "id": "library.libonig5",
+      "name": "libonig5 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libonig5"
+        }
+      }
+    },
+    {
+      "id": "library.libwayland-client0",
+      "name": "libwayland-client0 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libwayland-client0"
+        }
+      }
+    },
+    {
+      "id": "library.libx11-6",
+      "name": "libx11-6 desktop runtime",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libx11-6"
+        }
+      }
+    },
+    {
+      "id": "library.libgtk-3-0t64",
+      "name": "libgtk-3-0t64",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libgtk-3-0t64"
+        }
+      }
+    },
+    {
+      "id": "library.libdbus-glib-1-2",
+      "name": "libdbus-glib-1-2",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libdbus-glib-1-2"
+        }
+      }
+    },
+    {
+      "id": "library.libasound2t64",
+      "name": "libasound2t64",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libasound2t64"
+        }
+      }
+    },
+    {
+      "id": "library.libx11-xcb1",
+      "name": "libx11-xcb1",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libx11-xcb1"
+        }
+      }
+    },
+    {
+      "id": "library.libxt6t64",
+      "name": "libxt6t64",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libxt6t64"
+        }
+      }
+    },
+    {
+      "id": "library.libstdcxx6",
+      "name": "libstdc++6",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libstdc++6"
+        }
+      }
+    },
+    {
+      "id": "library.libatomic1",
+      "name": "libatomic1",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libatomic1"
+        }
+      }
+    },
+    {
+      "id": "library.libnss3",
+      "name": "libnss3",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libnss3"
+        }
+      }
+    },
+    {
+      "id": "library.libgbm1",
+      "name": "libgbm1",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libgbm1"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "gh-dash",
+      "name": "gh-dash",
+      "description": "GitHub dashboard; authentication is a separate step",
+      "capability": true,
+      "category": "Version control",
+      "order": 17,
+      "requires": [
+        "config.gh-dash",
+        "tool.gh-dash"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.gh-dash",
+      "name": "gh-dash",
+      "action": "gh-dash-binary",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "gh-dash"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "gh-dash"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "gh-dash"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "config.gh-dash",
+      "name": "gh-dash configuration",
+      "requires": [
+        "tool.gh"
+      ],
+      "action": "config",
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.gh-dash",
+      "source": "gh-dash/config.yml",
+      "folder": "config",
+      "path": "gh-dash/config.yml"
+    }
+  ]
+}

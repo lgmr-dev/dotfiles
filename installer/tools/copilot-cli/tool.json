@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "copilot-cli",
+      "name": "GitHub Copilot CLI",
+      "description": "Standalone terminal coding agent; sign in after installation; managed shells keep its self-update off so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "order": 30,
+      "requires": [
+        "tool.copilot"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.copilot",
+      "name": "GitHub Copilot CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.copilot"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.copilot"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.copilot"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.powershell"
+        ]
+      }
+    }
+  ]
+}

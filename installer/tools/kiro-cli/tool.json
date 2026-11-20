@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "kiro-cli",
+      "name": "Kiro CLI",
+      "description": "Standalone terminal coding agent (macOS/Linux); sign in after installation; its self-update stays off so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "order": 29,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.kiro",
+        "integration.kiro"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.kiro",
+      "name": "Kiro CLI",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.kiro"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.kiro"
+        }
+      }
+    },
+    {
+      "id": "integration.kiro",
+      "name": "Kiro CLI self-update switch (one field in its settings)",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.kiro"
+      ],
+      "action": "profile",
+      "scope": "user"
+    }
+  ]
+}

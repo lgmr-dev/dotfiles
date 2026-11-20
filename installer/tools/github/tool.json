@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "github",
+      "name": "GitHub CLI",
+      "description": "Repository and pull-request commands",
+      "capability": true,
+      "category": "Version control",
+      "order": 16,
+      "requires": [
+        "tool.gh"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.gh",
+      "name": "GitHub CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "gh",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.gh"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.gh"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.gh"
+        }
+      }
+    }
+  ]
+}

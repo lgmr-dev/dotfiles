@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "pins": {
+    "amd64": {
+      "version": "1.146.0-1794340865",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/code_1.146.0-1794340865_amd64.deb",
+      "sha256": "f83565f7f11a60b256807fe2216da8405f9728f193754959695242eecd148992",
+      "size": 291523322,
+      "architecture": "amd64"
+    },
+    "arm64": {
+      "version": "1.146.0-1794340783",
+      "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/code_1.146.0-1794340783_arm64.deb",
+      "sha256": "ae7c714ee9c80bd98323e53cdf211d3c9249a83f34d78b8fd6cfbc143ba2424f",
+      "size": 262905366,
+      "architecture": "arm64"
+    }
+  },
+  "modes": {
+    "1.141.2-1791980535": {
+      "sandbox": "755"
+    },
+    "1.141.2-1791980485": {
+      "sandbox": "755"
+    },
+    "1.146.0-1794340865": {
+      "sandbox": "4755",
+      "root_only": "/usr/share/code/resources/app/node-compile-cache"
+    },
+    "1.146.0-1794340783": {
+      "sandbox": "4755"
+    }
+  }
+}

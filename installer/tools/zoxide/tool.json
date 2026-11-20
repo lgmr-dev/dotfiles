@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "zoxide",
+      "name": "zoxide",
+      "description": "Jump to frequently used directories",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 8,
+      "requires": [
+        "tool.zoxide",
+        "integration.zoxide"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.zoxide",
+      "name": "zoxide",
+      "action": "zoxide",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.zoxide"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.zoxide"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.zoxide"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "integration.zoxide",
+      "name": "zoxide shell integration",
+      "requires": [
+        "tool.zoxide",
+        "integration.shells"
+      ],
+      "scope": "user"
+    }
+  ]
+}

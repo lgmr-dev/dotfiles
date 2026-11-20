@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.rust",
+      "name": "Rust toolchain",
+      "action": "rust",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.rust"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.rust"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.rust"
+        }
+      },
+      "requires": [
+        "integration.shells",
+        "tool.compiler"
+      ]
+    }
+  ]
+}

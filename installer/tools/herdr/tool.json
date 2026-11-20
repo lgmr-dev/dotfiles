@@ -1,0 +1,75 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "herdr",
+      "name": "Herdr",
+      "description": "Agent multiplexer",
+      "capability": true,
+      "category": "Terminal sessions",
+      "order": 24,
+      "requires": [
+        "config.herdr"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.herdr",
+      "name": "Herdr",
+      "platform_requires": {
+        "windows": [
+          "tool.powershell"
+        ]
+      },
+      "action": "herdr",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "herdr"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "herdr"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "herdr"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "config.herdr",
+      "name": "herdr configuration",
+      "requires": [
+        "tool.herdr"
+      ],
+      "action": "config",
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.herdr",
+      "source": "herdr/config.toml",
+      "folder": "config",
+      "path": "herdr/config.toml",
+      "platforms": [
+        "darwin",
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.herdr",
+      "source": "herdr/config.toml",
+      "folder": "app_data",
+      "path": "herdr/config.toml",
+      "platforms": [
+        "windows"
+      ]
+    }
+  ]
+}

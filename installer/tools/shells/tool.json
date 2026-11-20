@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "integration.shells",
+      "name": "Shared shell integration",
+      "action": "profile",
+      "scope": "user"
+    }
+  ],
+  "shell": [
+    {
+      "resource": "integration.shells",
+      "shell": "powershell",
+      "source": "shell/interactive.ps1"
+    },
+    {
+      "resource": "integration.shells",
+      "shell": "powershell",
+      "source": "shell/cache.ps1"
+    },
+    {
+      "resource": "integration.shells",
+      "shell": "posix",
+      "source": "shell/ls-colors.sh"
+    }
+  ]
+}

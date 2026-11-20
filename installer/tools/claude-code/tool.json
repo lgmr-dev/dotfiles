@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code CLI",
+      "description": "Standalone terminal coding agent; sign in after installation",
+      "capability": true,
+      "category": "AI coding",
+      "order": 27,
+      "requires": [
+        "tool.claude"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.claude",
+      "name": "Claude Code CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.claude"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.claude"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.claude"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.vscode": {
+      "darwin/arm64": {
+        "version": "1.146.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-darwin-arm64.zip",
+        "sha256": "6e8d27ee0c5a8f2aa3c43e373407eecd11c270c3fe7f46100ef682aac14bb648",
+        "format": "zip",
+        "commands": {
+          "code": "Visual Studio Code.app/Contents/Resources/app/bin/code"
+        },
+        "bin_dirs": [
+          "Visual Studio Code.app/Contents/Resources/app/bin"
+        ],
+        "required_files": [
+          "Visual Studio Code.app/Contents/MacOS/Code",
+          "Visual Studio Code.app/Contents/Info.plist",
+          "Visual Studio Code.app/Contents/Resources/app/product.json"
+        ]
+      },
+      "windows/amd64": {
+        "version": "1.146.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-win32-x64-1.146.0.zip",
+        "sha256": "0d47f5bbff72499c6a4a92f6d72dd8cc5ba4606185f624465032626614119d61",
+        "format": "zip",
+        "commands": {
+          "code": "bin/code.cmd"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "Code.exe",
+          "69047191fc/resources/app/product.json",
+          "69047191fc/resources/app/out/cli.js",
+          "69047191fc/ffmpeg.dll",
+          "69047191fc/libEGL.dll",
+          "69047191fc/icudtl.dat"
+        ]
+      }
+    },
+    "vscode.rose-pine": {
+      "darwin/arm64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      },
+      "linux/amd64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      },
+      "linux/arm64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      },
+      "windows/amd64": {
+        "version": "2.15.2",
+        "url": "https://marketplace.visualstudio.com/_apis/public/gallery/publishers/mvllow/vsextensions/rose-pine/2.15.2/vspackage",
+        "sha256": "e635e508593ff3a04bd72a234d1ba14734b75ea730702a65fe0980a5c4dd941c",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "extension/package.json",
+          "extension/LICENSE.txt",
+          "extension/themes/rose-pine-color-theme.json",
+          "extension/themes/rose-pine-no-italics-color-theme.json",
+          "extension/themes/rose-pine-moon-color-theme.json",
+          "extension/themes/rose-pine-moon-no-italics-color-theme.json",
+          "extension/themes/rose-pine-dawn-color-theme.json",
+          "extension/themes/rose-pine-dawn-no-italics-color-theme.json",
+          "extension/icons/rose-pine-icon-theme.json"
+        ]
+      }
+    }
+  }
+}

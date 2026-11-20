@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "openwhispr",
+      "name": "OpenWhispr",
+      "description": "Voice dictation; Linux vendor launcher disables Chromium sandbox when user namespaces are restricted",
+      "capability": true,
+      "category": "Desktop apps",
+      "order": 36,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.openwhispr"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "desktop.openwhispr"
+        ],
+        "linux": [
+          "desktop.openwhispr"
+        ]
+      },
+      "platform_architectures": {
+        "linux": [
+          "amd64"
+        ]
+      }
+    },
+    {
+      "id": "tool.openwhispr",
+      "name": "OpenWhispr",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "openwhispr",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.openwhispr"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.openwhispr"
+        }
+      },
+      "platform_architectures": {
+        "linux": [
+          "amd64"
+        ]
+      },
+      "platform_requires": {
+        "linux": [
+          "integration.shells",
+          "library.libgtk-3-0t64",
+          "library.libasound2t64",
+          "library.libnss3",
+          "library.libgbm1",
+          "library.libstdcxx6"
+        ]
+      }
+    },
+    {
+      "id": "desktop.openwhispr",
+      "name": "OpenWhispr launcher",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.openwhispr"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platform_architectures": {
+        "linux": [
+          "amd64"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "gitlab",
+      "name": "GitLab CLI",
+      "description": "Merge request, issue and pipeline commands; sign in with glab auth login",
+      "capability": true,
+      "category": "Version control",
+      "order": 18,
+      "requires": [
+        "tool.glab"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.glab",
+      "name": "GitLab CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.glab"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.glab"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.glab"
+        }
+      }
+    }
+  ]
+}

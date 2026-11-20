@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "codex",
+      "name": "Codex CLI",
+      "description": "Standalone terminal coding agent; sign in after installation",
+      "capability": true,
+      "category": "AI coding",
+      "order": 28,
+      "requires": [
+        "tool.codex"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.codex",
+      "name": "Codex CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.codex"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.codex"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.codex"
+        }
+      }
+    }
+  ]
+}

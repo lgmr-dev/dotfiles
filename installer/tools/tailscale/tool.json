@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tailscale",
+      "name": "Tailscale",
+      "description": "Private network client; sign in after installation",
+      "capability": true,
+      "category": "Desktop apps",
+      "order": 38,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "tool.tailscale"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.tailscale",
+      "name": "Tailscale",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "action": "tailscale",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-formula",
+          "package": "tailscale"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "tailscale"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.homebrew",
+          "integration.shells"
+        ]
+      }
+    }
+  ]
+}

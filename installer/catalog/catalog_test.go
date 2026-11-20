@@ -47,6 +47,10 @@ func TestLoadAcceptsOnlyTheReviewedNativeApplications(t *testing.T) {
 	}{
 		{"app.zen", "darwin", "homebrew-cask", "zen", []string{"infra.homebrew"}, true},
 		{"app.t3-code", "darwin", "homebrew-cask", "t3-code", []string{"infra.homebrew"}, true},
+		{"tool.ghostty", "darwin", "homebrew-cask", "ghostty", []string{"infra.homebrew"}, true},
+		{"tool.openwhispr", "darwin", "homebrew-cask", "openwhispr", []string{"infra.homebrew"}, true},
+		{"tool.ghostty", "darwin", "homebrew-cask", "ghostty@tip", []string{"infra.homebrew"}, false},
+		{"tool.ghostty", "darwin", "homebrew-cask", "ghostty", nil, false},
 		{"app.other", "darwin", "homebrew-cask", "zen", []string{"infra.homebrew"}, false},
 		{"app.zen", "darwin", "homebrew-cask", "t3-code", []string{"infra.homebrew"}, false},
 		{"app.zen", "darwin", "homebrew-cask", "zen", nil, false},

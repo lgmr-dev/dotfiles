@@ -30,8 +30,8 @@
       "shared": true,
       "bindings": {
         "darwin": {
-          "provider": "archive",
-          "package": "tool.ghostty"
+          "provider": "homebrew-cask",
+          "package": "ghostty"
         },
         "linux": {
           "provider": "archive",
@@ -54,6 +54,9 @@
           "library.libonig5",
           "library.libx11-6",
           "library.libwayland-client0"
+        ],
+        "darwin": [
+          "infra.homebrew"
         ]
       }
     },

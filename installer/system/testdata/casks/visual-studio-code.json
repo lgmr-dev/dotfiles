@@ -1,0 +1,59 @@
+{
+  "token": "visual-studio-code",
+  "full_token": "visual-studio-code",
+  "tap": "homebrew/cask",
+  "version": "1.147.0",
+  "url": "https://update.code.visualstudio.com/1.147.0/darwin-arm64/stable",
+  "sha256": "149d944feb599b076b48406b174e1c3cd1d510e9d673854777a20a6f4116a59a",
+  "auto_updates": true,
+  "depends_on": {
+    "macos": {}
+  },
+  "conflicts_with": null,
+  "artifacts": [
+    {
+      "uninstall": [
+        {
+          "launchctl": "com.microsoft.VSCode.ShipIt",
+          "quit": "com.microsoft.VSCode"
+        }
+      ]
+    },
+    {
+      "app": [
+        "Visual Studio Code.app"
+      ],
+      "target": "/Applications/Visual Studio Code.app"
+    },
+    {
+      "binary": [
+        "$APPDIR/Visual Studio Code.app/Contents/Resources/app/bin/code"
+      ],
+      "target": "$HOMEBREW_PREFIX/bin/code"
+    },
+    {
+      "binary": [
+        "$APPDIR/Visual Studio Code.app/Contents/Resources/app/bin/code-tunnel"
+      ],
+      "target": "$HOMEBREW_PREFIX/bin/code-tunnel"
+    },
+    {
+      "zap": [
+        {
+          "trash": [
+            "~/.vscode",
+            "~/Library/Application Support/Code",
+            "~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.microsoft.vscode.sfl*",
+            "~/Library/Caches/com.microsoft.VSCode",
+            "~/Library/Caches/com.microsoft.VSCode.ShipIt",
+            "~/Library/HTTPStorages/com.microsoft.VSCode",
+            "~/Library/Preferences/ByHost/com.microsoft.VSCode.ShipIt.*.plist",
+            "~/Library/Preferences/com.microsoft.VSCode.helper.plist",
+            "~/Library/Preferences/com.microsoft.VSCode.plist",
+            "~/Library/Saved Application State/com.microsoft.VSCode.savedState"
+          ]
+        }
+      ]
+    }
+  ]
+}

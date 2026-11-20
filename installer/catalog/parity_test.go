@@ -26,6 +26,13 @@ func previousResources(t *testing.T) []catalog.Resource {
 	decodePrevious(t, "resources.json", &document)
 	kept := []catalog.Resource{}
 	for _, r := range document.Resources {
+		if cask, moved := catalog.ReviewedCasks[r.ID]; moved && r.Bindings["darwin"].Provider == "archive" {
+			r.Bindings["darwin"] = catalog.Binding{Provider: "homebrew-cask", Package: cask}
+			if r.PlatformRequires == nil {
+				r.PlatformRequires = map[string][]string{}
+			}
+			r.PlatformRequires["darwin"] = append(r.PlatformRequires["darwin"], "infra.homebrew")
+		}
 		if r.Action != "sentinel-retired" {
 			kept = append(kept, r)
 		}
@@ -157,6 +164,9 @@ func TestArchivePinsEqualTheV2File(t *testing.T) {
 		t.Fatalf("the tool folders hold %d archive families, v2 holds %d", len(c.Pins.Archives), len(document.Resources))
 	}
 	for family, platforms := range document.Resources {
+		if _, moved := catalog.ReviewedCasks[family]; moved {
+			delete(platforms, "darwin/arm64")
+		}
 		if len(c.Pins.Archives[family]) != len(platforms) {
 			t.Errorf("%s has %d platform pins, v2 has %d", family, len(c.Pins.Archives[family]), len(platforms))
 		}

@@ -2,23 +2,6 @@
   "schema": 1,
   "resources": {
     "tool.vscode": {
-      "darwin/arm64": {
-        "version": "1.146.0",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-darwin-arm64.zip",
-        "sha256": "6e8d27ee0c5a8f2aa3c43e373407eecd11c270c3fe7f46100ef682aac14bb648",
-        "format": "zip",
-        "commands": {
-          "code": "Visual Studio Code.app/Contents/Resources/app/bin/code"
-        },
-        "bin_dirs": [
-          "Visual Studio Code.app/Contents/Resources/app/bin"
-        ],
-        "required_files": [
-          "Visual Studio Code.app/Contents/MacOS/Code",
-          "Visual Studio Code.app/Contents/Info.plist",
-          "Visual Studio Code.app/Contents/Resources/app/product.json"
-        ]
-      },
       "windows/amd64": {
         "version": "1.146.0",
         "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-win32-x64-1.146.0.zip",

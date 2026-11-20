@@ -30,8 +30,8 @@
       "shared": true,
       "bindings": {
         "darwin": {
-          "provider": "archive",
-          "package": "tool.vscode"
+          "provider": "homebrew-cask",
+          "package": "visual-studio-code"
         },
         "linux": {
           "provider": "apt",
@@ -44,7 +44,8 @@
       },
       "platform_requires": {
         "darwin": [
-          "integration.shells"
+          "integration.shells",
+          "infra.homebrew"
         ],
         "windows": [
           "integration.shells"

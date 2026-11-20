@@ -41,8 +41,8 @@
       "scope": "user",
       "bindings": {
         "darwin": {
-          "provider": "archive",
-          "package": "tool.openwhispr"
+          "provider": "homebrew-cask",
+          "package": "openwhispr"
         },
         "linux": {
           "provider": "archive",
@@ -62,6 +62,9 @@
           "library.libnss3",
           "library.libgbm1",
           "library.libstdcxx6"
+        ],
+        "darwin": [
+          "infra.homebrew"
         ]
       }
     },

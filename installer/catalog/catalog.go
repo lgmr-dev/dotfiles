@@ -30,6 +30,17 @@ var brewPackageName = regexp.MustCompile(`^[a-z0-9][a-z0-9+_.@-]{0,199}$`)
 
 var systems = []string{"darwin", "linux", "windows"}
 
+// ReviewedCasks maps each resource that can have a homebrew-cask binding to
+// the token of its reviewed cask. The system provider holds the reviewed
+// artifacts and the signing requirement of each cask.
+var ReviewedCasks = map[string]string{
+	"app.zen":         "zen",
+	"app.t3-code":     "t3-code",
+	"tool.vscode":     "visual-studio-code",
+	"tool.ghostty":    "ghostty",
+	"tool.openwhispr": "openwhispr",
+}
+
 var contexts = []platform.Context{{OS: "darwin", Arch: "arm64"}, {OS: "linux", Arch: "amd64"}, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}}
 
 // Available reports if the resource exists on the context. An empty
@@ -207,7 +218,7 @@ func (c *Catalog) validate() error {
 					return fmt.Errorf("invalid Homebrew formula binding for %s", r.ID)
 				}
 			}
-			if binding.Provider == "homebrew-cask" && map[string]string{"app.zen": "zen", "app.t3-code": "t3-code"}[r.ID] != binding.Package {
+			if binding.Provider == "homebrew-cask" && ReviewedCasks[r.ID] != binding.Package {
 				return fmt.Errorf("unsupported native application %s", r.ID)
 			}
 			if binding.Provider == "windows-app" && (os != "windows" || r.ID != "app.t3-code-windows" || binding.Package != "t3-code" || r.Scope != "user") {

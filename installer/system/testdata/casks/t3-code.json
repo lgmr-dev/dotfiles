@@ -1,0 +1,42 @@
+{
+  "token": "t3-code",
+  "full_token": "t3-code",
+  "tap": "homebrew/cask",
+  "version": "0.1.11",
+  "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/T3-Code-0.1.11-arm64.dmg",
+  "sha256": "c4f4203c14c6f47fc530a9ecfdc4c01ee0c485aa16a68599da972c6e98131d62",
+  "auto_updates": true,
+  "depends_on": {
+    "macos": {
+      ">=": [
+        "13"
+      ]
+    }
+  },
+  "conflicts_with": null,
+  "artifacts": [
+    {
+      "app": [
+        "T3 Code (Beta).app"
+      ],
+      "target": "/Applications/T3 Code (Beta).app"
+    },
+    {
+      "zap": [
+        {
+          "trash": [
+            "~/.t3/userdata",
+            "~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.t3tools.t3code.sfl*",
+            "~/Library/Application Support/T3 Code (Alpha)",
+            "~/Library/Application Support/t3code",
+            "~/Library/Application Support/t3code-v2",
+            "~/Library/Caches/com.t3tools.t3code",
+            "~/Library/HTTPStorages/com.t3tools.t3code",
+            "~/Library/Preferences/com.t3tools.t3code.plist",
+            "~/Library/Saved Application State/com.t3tools.t3code.savedState"
+          ]
+        }
+      ]
+    }
+  ]
+}

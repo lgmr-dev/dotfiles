@@ -1,0 +1,82 @@
+{
+  "token": "ghostty",
+  "full_token": "ghostty",
+  "tap": "homebrew/cask",
+  "version": "1.4.0",
+  "url": "https://release.files.ghostty.org/1.4.0/Ghostty.dmg",
+  "sha256": "3a02075dbd24318d778426af41dee5507d53ecc4578ede96912ec9ce6d18d3e8",
+  "auto_updates": true,
+  "depends_on": {
+    "macos": {
+      ">=": [
+        "13"
+      ]
+    }
+  },
+  "conflicts_with": {
+    "cask": [
+      "ghostty@tip"
+    ]
+  },
+  "artifacts": [
+    {
+      "uninstall": [
+        {
+          "quit": "com.mitchellh.ghostty"
+        }
+      ]
+    },
+    {
+      "app": [
+        "Ghostty.app"
+      ],
+      "target": "/Applications/Ghostty.app"
+    },
+    {
+      "manpage": [
+        "$APPDIR/Ghostty.app/Contents/Resources/man/man5/ghostty.5"
+      ],
+      "target": "$HOMEBREW_PREFIX/share/man/man5/ghostty.5"
+    },
+    {
+      "manpage": [
+        "$APPDIR/Ghostty.app/Contents/Resources/man/man1/ghostty.1"
+      ],
+      "target": "$HOMEBREW_PREFIX/share/man/man1/ghostty.1"
+    },
+    {
+      "zsh_completion": [
+        "$APPDIR/Ghostty.app/Contents/Resources/zsh/site-functions/_ghostty"
+      ],
+      "target": "$HOMEBREW_PREFIX/share/zsh/site-functions/_ghostty"
+    },
+    {
+      "bash_completion": [
+        "$APPDIR/Ghostty.app/Contents/Resources/bash-completion/completions/ghostty.bash"
+      ],
+      "target": "$HOMEBREW_PREFIX/etc/bash_completion.d/ghostty"
+    },
+    {
+      "fish_completion": [
+        "$APPDIR/Ghostty.app/Contents/Resources/fish/vendor_completions.d/ghostty.fish"
+      ],
+      "target": "$HOMEBREW_PREFIX/share/fish/vendor_completions.d/ghostty.fish"
+    },
+    {
+      "zap": [
+        {
+          "trash": [
+            "~/.cache/ghostty",
+            "~/.config/ghostty",
+            "~/Library/Application Support/com.mitchellh.ghostty",
+            "~/Library/Caches/com.mitchellh.ghostty",
+            "~/Library/HTTPStorages/com.mitchellh.ghostty",
+            "~/Library/Preferences/com.mitchellh.ghostty.plist",
+            "~/Library/Saved Application State/com.mitchellh.ghostty.savedState",
+            "~/Library/WebKit/com.mitchellh.ghostty"
+          ]
+        }
+      ]
+    }
+  ]
+}

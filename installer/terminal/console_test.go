@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -19,10 +20,6 @@ import (
 func TestTerminalChild(t *testing.T) {
 	mode := os.Getenv("DOTFILES_TEST_TERMINAL_CHILD")
 	if mode == "" {
-		return
-	}
-	if mode == "public-setup" {
-		testPublicSetupChild(t)
 		return
 	}
 	before, err := term.GetState(int(os.Stdin.Fd()))
@@ -64,9 +61,6 @@ func TestTerminalChild(t *testing.T) {
 	if closeErr != nil {
 		t.Fatal(closeErr)
 	}
-	// Exercise the next cooked-input consumer, too. Darwin sets the transient
-	// PENDIN bit when restoring ICANON; the next read processes that pending
-	// state. Comparing before this read mistakes kernel state for a lost mode.
 	fmt.Println("Ready for ordinary input")
 	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil || strings.TrimRight(line, "\r\n") != "ordinary input" {
@@ -189,6 +183,47 @@ func (s *nativeSession) waitForCount(t *testing.T, want string, count int) {
 	}
 }
 
+func (s *nativeSession) screens() []string {
+	return strings.Split(s.text(), "\x1b[2J")
+}
+
+func (s *nativeSession) nextScreen(t *testing.T, seen int, want func(string) bool, timeout time.Duration) (string, int) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for {
+		screens := s.screens()
+		latest := screens[len(screens)-1]
+		if len(screens)-1 > seen && strings.Contains(latest, "quit") && want(latest) {
+			return latest, len(screens) - 1
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("terminal did not show the expected screen; latest: %q", latest)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func (s *nativeSession) chooseMenu(t *testing.T, seen int, label string) int {
+	t.Helper()
+	labels := []string{"Choose tools", "Update tools", "Check installation", "Exit"}
+	deadline := time.Now().Add(time.Minute)
+	for {
+		menus := strings.Count(s.text(), "What would you like to do?")
+		screens := s.screens()
+		latest := screens[len(screens)-1]
+		current := slices.IndexFunc(labels, func(entry string) bool { return strings.Contains(latest, "> "+entry) })
+		if menus > seen && strings.Contains(latest, "What would you like to do?") && strings.Contains(latest, "Ctrl+C: quit") && current >= 0 {
+			target := slices.Index(labels, label)
+			s.send(t, strings.Repeat("j", (target-current+len(labels))%len(labels))+"\r")
+			return menus
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("terminal did not show the main menu; latest: %q", latest)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func (s *nativeSession) send(t *testing.T, input string) {
 	t.Helper()
 	if _, err := io.WriteString(s.input, input); err != nil {
@@ -213,7 +248,6 @@ func TestNativeTerminalAllThenNoneIsExplicitEmptySelection(t *testing.T) {
 	s.waitFor(t, "restored=true")
 }
 
-// Esc and q leave only the current screen; Ctrl-C and Ctrl-D quit setup.
 func TestNativeTerminalBackAndQuitRestoreInput(t *testing.T) {
 	for _, test := range []struct{ input, back, cancelled string }{
 		{"q", "true", "false"}, {"\x1b", "true", "false"}, {"\x03", "false", "true"}, {"\x04", "false", "true"},

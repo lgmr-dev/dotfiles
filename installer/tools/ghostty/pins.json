@@ -2,23 +2,6 @@
   "schema": 1,
   "resources": {
     "tool.ghostty": {
-      "darwin/arm64": {
-        "version": "1.4.0",
-        "url": "https://release.files.ghostty.org/1.4.0/Ghostty.dmg",
-        "sha256": "3a02075dbd24318d778426af41dee5507d53ecc4578ede96912ec9ce6d18d3e8",
-        "format": "dmg",
-        "commands": {
-          "ghostty": "Ghostty.app/Contents/MacOS/ghostty"
-        },
-        "bin_dirs": [
-          "Ghostty.app/Contents/MacOS"
-        ],
-        "required_files": [
-          "Ghostty.app/Contents/Info.plist",
-          "Ghostty.app/Contents/Resources/terminfo/78/xterm-ghostty"
-        ],
-        "app_bundle": "Ghostty.app"
-      },
       "linux/amd64": {
         "version": "1.4.0",
         "url": "https://github.com/mkasberg/ghostty-ubuntu/releases/download/1.4.0-0-ppa2/ghostty_1.4.0-0.ppa2_amd64_trixie.deb",

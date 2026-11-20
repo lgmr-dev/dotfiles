@@ -43,7 +43,8 @@ set -euo pipefail
 [[ ${GOENV:-} == personal-setting ]]
 if [[ ${CHECK_MODULE_CACHE:-0} == 1 ]]; then printf '%s\n' "$GOMODCACHE" > "$FIXTURE/application-module-cache"; fi
 printf '%s\n' "$#" "$DOTFILES_CHECKOUT" > "$FIXTURE/application-result"
-if [[ $# == 1 ]]; then printf '%s\n' "$1" >> "$FIXTURE/application-result"; cat; fi
+if [[ $# != 0 ]]; then printf '%s\n' "$@" >> "$FIXTURE/application-result"; fi
+if [[ $# == 1 ]]; then cat; fi
 exit "${APPLICATION_EXIT:-0}"
 '''
 CURL = r'''#!/usr/bin/env bash
@@ -119,12 +120,14 @@ class LauncherTest(unittest.TestCase):
     def events(self):
         return (self.root / "log").read_text().splitlines()
 
-    def test_menu_machine_arguments_source_cache_and_environment(self):
+    def test_menu_command_arguments_source_cache_and_environment(self):
         self.launch()
         self.assertEqual((self.root / "application-result").read_text(encoding="utf-8").splitlines(),
                          ["0", shell_path(self.checkout)])
-        result = self.launch("machine")
+        result = self.launch("check")
         self.assertEqual(result.stdout, '{"operation":"check"}\n')
+        self.assertEqual((self.root / "application-result").read_text(encoding="utf-8").splitlines(),
+                         ["1", shell_path(self.checkout), "check"])
         self.assertEqual(self.events().count("download"), 1)
         self.assertEqual(self.events().count("build"), 1)
         self.write("installer/irrelevant_test.go", "package main // test edits\n")
@@ -142,7 +145,7 @@ class LauncherTest(unittest.TestCase):
         personal = self.root / "personal Go cache"
         personal.mkdir()
         (personal / "preserve").write_text("personal module bytes")
-        self.launch("machine", entrypoint="setup", CHECK_MODULE_CACHE="1", GOMODCACHE=shell_path(personal))
+        self.launch("check", entrypoint="setup", CHECK_MODULE_CACHE="1", GOMODCACHE=shell_path(personal))
         self.assertEqual((self.root / "application-module-cache").read_text(encoding="utf-8").strip(), shell_path(personal))
         self.assertEqual(sorted(p.name for p in personal.iterdir()), ["preserve"])
         self.assertEqual((personal / "preserve").read_text(), "personal module bytes")
@@ -174,7 +177,7 @@ class LauncherTest(unittest.TestCase):
                 (self.root / "engine-file").unlink(missing_ok=True)
                 if (self.root / "engine-directory").exists():
                     (self.root / "engine-directory").rmdir()
-                self.launch(*([] if mask == "0022" else ["machine"]), entrypoint="setup", CALLER_UMASK=mask)
+                self.launch(*([] if mask == "0022" else ["check"]), entrypoint="setup", CALLER_UMASK=mask)
                 self.assertEqual((self.root / "engine-umask").read_text().strip(), mask)
                 if os.name != "nt":
                     self.assertEqual((self.root / "engine-file").stat().st_mode & 0o777, 0o666 & ~int(mask, 8))
@@ -195,9 +198,31 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(self.events().count("download"), 1)
         self.assertTrue((self.root / "application-result").is_file())
 
-    def test_legacy_flags_rejected_before_cache_mutation(self):
-        self.launch("--all", success=False)
-        self.assertFalse((self.root / "cache").exists())
+    def test_commands_and_flags_pass_through_unchanged(self):
+        for arguments in [
+            ["plan"], ["plan", "--select=neovim,zsh", "--remove-shared=tool.git", "--replace=config.nvim"],
+            ["apply"], ["apply", "--yes", "--select="], ["apply", "--select=name with space,zsh", "--yes"],
+            ["update", "--yes", "--replace=config.zsh"], ["check"], ["restore-v2"], ["restore-v2", "--yes"],
+        ]:
+            with self.subTest(arguments=arguments):
+                for entrypoint in [None, "setup"]:
+                    self.launch(*arguments, entrypoint=entrypoint)
+                    self.assertEqual((self.root / "application-result").read_text(encoding="utf-8").splitlines(),
+                                     [str(len(arguments)), shell_path(self.checkout), *arguments])
+        self.assertEqual(self.events().count("build"), 1)
+
+    def test_other_arguments_rejected_before_cache_mutation(self):
+        for arguments in [
+            ["--all"], ["machine"], ["internal-native-worker", "state"], ["install"], ["--yes"], ["--select=zsh"], [""],
+            ["plan", "apply"], ["apply", "--all"], ["apply", "--yes", "zsh"], ["apply", "--select"], ["apply", "--select", "zsh"],
+            ["check", "-y"], ["update", "--Yes"], ["apply", "--yes", ""],
+        ]:
+            with self.subTest(arguments=arguments):
+                for entrypoint in [None, "setup"]:
+                    result = self.launch(*arguments, success=False, entrypoint=entrypoint)
+                    self.assertIn("run without arguments for the menu", result.stderr)
+                    self.assertFalse((self.root / "cache").exists())
+                    self.assertFalse((self.root / "application-result").exists())
 
     def test_intel_macos_and_unknown_platform_rejected_before_download(self):
         for operating_system, arch in [("Darwin", "x86_64"), ("FreeBSD", "amd64")]:
@@ -260,7 +285,7 @@ class LauncherTest(unittest.TestCase):
         self.launch()
         (self.root / "log").unlink()
         (self.root / "cache/dotfiles/bootstrap/go1.27.4.linux-amd64.tar.gz").unlink()
-        result = self.launch("machine")
+        result = self.launch("check")
         self.assertEqual(result.stdout, '{"operation":"check"}\n')
         self.assertFalse((self.root / "log").exists(), "unchanged checkout extracted or ran the toolchain")
         self.assertEqual((self.root / "application-result").read_text(encoding="utf-8").splitlines()[:2], ["1", shell_path(self.checkout)])

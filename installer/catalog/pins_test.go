@@ -159,7 +159,7 @@ func TestLoadRejectsInvalidArchivePinFiles(t *testing.T) {
 		"family without a platform":   func(d map[string]any) { d["resources"].(map[string]any)["tool.ghostty"] = map[string]any{} },
 		"release without common pin":  func(d map[string]any) { delete(ghostty(d), "linux/amd64") },
 		"unknown distribution":        func(d map[string]any) { ghostty(d)["linux/amd64/fedora-42"] = ghostty(d)["linux/amd64"] },
-		"unsupported platform":        func(d map[string]any) { ghostty(d)["darwin/amd64"] = ghostty(d)["darwin/arm64"] },
+		"unsupported platform":        func(d map[string]any) { ghostty(d)["darwin/amd64"] = ghostty(d)["linux/amd64"] },
 		"platform without a binding":  func(d map[string]any) { ghostty(d)["windows/amd64"] = ghostty(d)["linux/amd64"] },
 		"malformed platform":          func(d map[string]any) { ghostty(d)["linux"] = ghostty(d)["linux/amd64"] },
 		"plain HTTP":                  func(d map[string]any) { at(ghostty(d), "linux/amd64")["url"] = "http://example.com/ghostty.deb" },
@@ -168,7 +168,7 @@ func TestLoadRejectsInvalidArchivePinFiles(t *testing.T) {
 		"unknown field":               func(d map[string]any) { at(ghostty(d), "linux/amd64")["command"] = "sh" },
 		"changed fixed recipe layout": func(d map[string]any) { at(ghostty(d), "linux/amd64")["bin_dirs"] = []any{"bin"} },
 		"application bundle in a DEB": func(d map[string]any) { at(ghostty(d), "linux/amd64")["app_bundle"] = "Ghostty.app" },
-		"disk image without a bundle": func(d map[string]any) { delete(at(ghostty(d), "darwin/arm64"), "app_bundle") },
+		"macOS pin of a cask":         func(d map[string]any) { ghostty(d)["darwin/arm64"] = ghostty(d)["linux/amd64"] },
 	} {
 		files := releasedFiles(t)
 		edit(t, files, "ghostty/pins.json", change)
@@ -177,6 +177,13 @@ func TestLoadRejectsInvalidArchivePinFiles(t *testing.T) {
 		}
 	}
 	files := releasedFiles(t)
+	edit(t, files, "obsidian/pins.json", func(d map[string]any) {
+		delete(at(d, "resources", "tool.obsidian", "darwin/arm64"), "app_bundle")
+	})
+	if _, err := catalog.Load(files); err == nil {
+		t.Error("invalid archive pins accepted: disk image without a bundle")
+	}
+	files = releasedFiles(t)
 	files["zsh/pins.json"] = files["ghostty/pins.json"]
 	if _, err := catalog.Load(files); err == nil {
 		t.Error("a pin file in the folder of another tool was accepted")

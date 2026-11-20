@@ -13,12 +13,6 @@ import (
 
 const progressIndent = "    "
 
-// progressView prints approved work on the ordinary screen, where it stays in
-// the scrollback. Installer steps stand out; native output follows indented.
-// Native output is untrusted text, so complete escape sequences and controls
-// are removed. A carriage return rewrites the current line, as package
-// managers expect. Writes never fail: a display failure must not interrupt a
-// provider command, so the first one is kept and returned with the report.
 type progressView struct {
 	mutex   sync.Mutex
 	output  *os.File
@@ -26,9 +20,10 @@ type progressView struct {
 	pending []byte
 	open    bool
 	err     error
-	// clixml is set inside a PowerShell CLIXML document; skip marks hidden
-	// text ended by a carriage return, whose line feed then adds no blank line.
-	clixml, skip bool
+	plain   bool
+	held    string
+	clixml  bool
+	skip    bool
 }
 
 func (v *progressView) Step(text string) {
@@ -36,6 +31,10 @@ func (v *progressView) Step(text string) {
 	defer v.mutex.Unlock()
 	v.finish()
 	v.clixml, v.skip = false, false
+	if v.plain {
+		v.write("==> " + plain(text) + "\n")
+		return
+	}
 	v.write("\x1b[1m==> " + plain(text) + "\x1b[0m\n")
 }
 
@@ -51,7 +50,6 @@ func (v *progressView) Write(data []byte) (int, error) {
 		default:
 			v.pending = append(v.pending, b)
 			if len(v.pending) >= 4096 {
-				// Wrap an endless line at a character boundary.
 				cut := len(v.pending) - 1
 				for cut > 0 && !utf8.RuneStart(v.pending[cut]) {
 					cut--
@@ -66,8 +64,6 @@ func (v *progressView) Write(data []byte) (int, error) {
 	return len(data), nil
 }
 
-// Close ends a partial line before the result report, restores the output
-// mode and returns the first display failure.
 func (v *progressView) Close() error {
 	v.mutex.Lock()
 	defer v.mutex.Unlock()
@@ -80,19 +76,17 @@ func (v *progressView) Close() error {
 }
 
 func (v *progressView) finish() {
-	if len(v.pending) > 0 || v.open {
+	if len(v.pending) > 0 || v.open || v.held != "" {
 		v.emit(true)
 	}
 }
 
-// emit displays the pending segment: final segments end their line, others
-// stay rewritable until the next carriage return or newline.
 func (v *progressView) emit(final bool) {
 	text := cleanOutput(string(v.pending))
 	v.pending = v.pending[:0]
 	if v.hidden(text) {
 		if final && v.open {
-			v.write("\n") // Keep the line a carriage return displayed.
+			v.write("\n")
 			v.open = false
 		}
 		v.skip = !final
@@ -101,6 +95,18 @@ func (v *progressView) emit(final bool) {
 	skip := v.skip
 	v.skip = false
 	if skip && final && text == "" {
+		return
+	}
+	if v.plain {
+		if text == "" {
+			text = v.held
+		}
+		v.held = ""
+		if final {
+			v.write(strings.TrimRight(progressIndent+text, " ") + "\n")
+		} else {
+			v.held = text
+		}
 		return
 	}
 	rewind := ""
@@ -120,16 +126,11 @@ func (v *progressView) emit(final bool) {
 	if text != "" {
 		v.write(rewind + progressIndent + text + "\n")
 	} else {
-		v.write("\n") // After CRLF, keep the line the carriage return displayed.
+		v.write("\n")
 	}
 	v.open = false
 }
 
-// Windows PowerShell children serialize their progress and information
-// records as CLIXML on stderr: a "#< CLIXML" marker, then an <Objs> document
-// that the 4096-byte wrap can split. The plain text appears as ordinary lines
-// too, so the display hides the markup; captured evidence and the apply log
-// keep every byte, and protocol parsers still refuse CLIXML.
 func (v *progressView) hidden(text string) bool {
 	trimmed := strings.TrimSpace(text)
 	switch {
@@ -150,8 +151,6 @@ func (v *progressView) write(text string) {
 	}
 }
 
-// cleanOutput removes whole escape sequences, not only their ESC byte, so
-// colored output does not leave parameter debris, and drops other controls.
 func cleanOutput(text string) string {
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -167,7 +166,6 @@ func cleanOutput(text string) string {
 	return b.String()
 }
 
-// skipEscape returns the index after the sequence introduced at text[i-1].
 func skipEscape(text string, i int) int {
 	if i >= len(text) {
 		return i

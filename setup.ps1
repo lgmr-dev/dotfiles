@@ -1,4 +1,3 @@
-# Human menu by default; automation supplies the explicit machine request.
 $ErrorActionPreference = 'Stop'
 $PreviousEntrypoint = $env:DOTFILES_ENTRYPOINT
 try {

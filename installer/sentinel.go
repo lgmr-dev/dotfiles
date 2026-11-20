@@ -165,6 +165,11 @@ type SentinelDriver struct {
 	Floor                sentinelRelease
 	// Latest returns the latest release. Nil asks Releases.
 	Latest func(context.Context) (sentinelRelease, error)
+	// Client sends the Releases requests. Nil uses a new http.Client.
+	Client *http.Client
+	// Token is the GITHUB_TOKEN value, or "". Setup sends it only to
+	// https://api.github.com, and never writes it.
+	Token string
 	// Git is the git executable. Shell is /bin/bash, or Windows PowerShell.
 	Git, Shell string
 	// Run changes the system under the controller mutation guard. Query only
@@ -303,7 +308,11 @@ func (d *SentinelDriver) resolve(ctx context.Context) (sentinelRelease, error) {
 func (d *SentinelDriver) githubRelease(ctx context.Context) (sentinelRelease, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	client := &http.Client{}
+	var client http.Client
+	if d.Client != nil {
+		client = *d.Client
+	}
+	client.Transport = githubAuthorization{d.Token, transportOrDefault(client.Transport)}
 	get := func(url, accept string) ([]byte, error) {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
@@ -341,6 +350,19 @@ func (d *SentinelDriver) githubRelease(ctx context.Context) (sentinelRelease, er
 	return sentinelRelease{release.Tag, strings.TrimSpace(string(data))}, err
 }
 
+type githubAuthorization struct {
+	token string
+	next  http.RoundTripper
+}
+
+func (a githubAuthorization) RoundTrip(request *http.Request) (*http.Response, error) {
+	if a.token != "" && request.URL.Scheme == "https" && request.URL.Host == "api.github.com" {
+		request = request.Clone(request.Context())
+		request.Header.Set("Authorization", "Bearer "+a.token)
+	}
+	return a.next.RoundTrip(request)
+}
+
 // installed returns the release in a record. A record from before setup kept
 // the tag names only the commit, and the floor commit is the floor release.
 func (d *SentinelDriver) installed(record *sentinelRecord) sentinelRelease {
@@ -373,7 +395,7 @@ func (d *SentinelDriver) target(ctx context.Context, record *sentinelRecord) (se
 	latest, err := d.resolve(ctx)
 	if record == nil {
 		if err != nil {
-			return sentinelRelease{}, "", "Setup cannot find the latest Sentinel release: " + err.Error() + ". Check the network and the proxy settings (HTTPS_PROXY), then apply again."
+			return sentinelRelease{}, "", "Setup cannot find the latest Sentinel release: " + err.Error() + ". Check the network, the proxy settings (HTTPS_PROXY) and GITHUB_TOKEN, then apply again."
 		}
 		return latest, "", ""
 	}

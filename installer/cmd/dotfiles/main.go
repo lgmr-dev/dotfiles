@@ -79,6 +79,7 @@ func run(ctx context.Context) (resultErr error) {
 		return err
 	}
 	platform.Sentinel = engine.SentinelLocations{CodexHome: os.Getenv("CODEX_HOME"), ConfigHome: os.Getenv("XDG_CONFIG_HOME"), ClaudeConfigDir: os.Getenv("CLAUDE_CONFIG_DIR"), KiroHome: os.Getenv("KIRO_HOME"), CopilotHome: os.Getenv("COPILOT_HOME")}
+	platform.GitHubToken = os.Getenv("GITHUB_TOKEN")
 	if platform.OS == "darwin" {
 		discoverHomebrew(ctx, &platform)
 	}

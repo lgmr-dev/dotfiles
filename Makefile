@@ -1,20 +1,19 @@
-# Dotfiles test/lint entry point. Runs everything that can run on the
-# current OS; sub-targets skip themselves with a clear message when the
-# tool they depend on isn't installed.
+FEATUREMAP := node scripts/featuremap/featuremap.mjs
+FEATUREMAP_SYSTEMS := linux darwin windows
 
-.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-xcompose test-static validate-renovate lint release-check setup help
+.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-xcompose test-static validate-renovate lint deps-baseline deps-check setup help
 
 help:
 	@echo "setup: launch the installer menu"
-	@echo "ci / test-required: configuration, bootstrap, Go format/vet/race and Renovate gates"
-	@echo "test: configuration/editor/shell checks; test-bootstrap: public launchers and release scripts"
-	@echo "test-installer: Go installer behavior and recovery tests"
-	@echo "release-check: validate the release manifest and its notes"
+	@echo "ci / test-required: configuration, bootstrap, Go format/vet/race, Renovate and package boundary gates"
+	@echo "test: configuration/editor/shell checks; test-bootstrap: launchers and pin scripts"
+	@echo "test-installer: gofmt, go vet and the Go race suite of all installer packages"
+	@echo "deps-check: package boundaries of featuremap.json; deps-baseline: write featuremap.baseline.json"
 
 setup:
 	@bash setup.sh
 
-ci: test validate-renovate test-bootstrap test-installer
+ci: test validate-renovate test-bootstrap test-installer deps-check
 	@echo "=== ci summary: local pre-PR gate passed ==="
 
 test-required: ci
@@ -62,5 +61,12 @@ validate-renovate:
 lint:
 	@bash tests/shell/lint.sh
 
-release-check:
-	@python3 scripts/release.py check
+deps-baseline:
+	@GOOS=linux $(FEATUREMAP) baseline
+
+deps-check:
+	@command -v node >/dev/null || { echo "FAIL: install Node 22 or later to run the package boundary check" >&2; exit 1; }
+	@for system in $(FEATUREMAP_SYSTEMS); do \
+		echo "--- package boundaries (GOOS=$$system) ---"; \
+		GOOS=$$system $(FEATUREMAP) check $(if $(BASE),--base $(BASE)) || exit $$?; \
+	done

@@ -11,7 +11,7 @@ if [[ -z "${DOTFILES_SHELL_FIXTURES:-}" ]]; then
     DOTFILES_SHELL_FIXTURES="$(cd "$DOTFILES_SHELL_FIXTURES" && pwd -P)"
     ACTIVE_SHELL_OWNED="$DOTFILES_SHELL_FIXTURES"
     trap active_shell_cleanup EXIT
-    DOTFILES_WRITE_SHELL_FIXTURES="$DOTFILES_SHELL_FIXTURES" go -C "$REPO_ROOT/installer" test -count=1 -run '^TestWriteActiveShellFixtures$' .
+    DOTFILES_WRITE_SHELL_FIXTURES="$DOTFILES_SHELL_FIXTURES" go -C "$REPO_ROOT/installer" test -count=1 -run '^TestWriteActiveShellFixtures$' ./hooks
 fi
 export DOTFILES_SHELL_FIXTURES
 export ACTIVE_ZSH="$DOTFILES_SHELL_FIXTURES/posix/state/shells/init.sh"

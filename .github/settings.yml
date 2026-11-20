@@ -1,6 +1,6 @@
 # Synced by the Probot Settings app: https://probot.github.io/apps/settings/
 # Repository-level settings only. Branch protection is deliberately absent:
-# scripts/apply-repo-safeguards.sh owns its transactional cutover and recovery.
+# the owner sets it in the GitHub repository settings.
 
 repository:
   allow_merge_commit: false

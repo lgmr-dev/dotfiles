@@ -1,0 +1,614 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_BINSTALL_COMMIT: 7ed9f6a3b608d9a7d5b0b09355754fbc817d9c14
+  CARGO_BINSTALL_INSTALLER_SHA256: 4ed264e49bc3f5ec66de52ff2823e2bd04710b327df9dac809e2e36bdc4613b3
+  NVIM_LINUX_VERSION: v0.12.6
+  NVIM_LINUX_X86_64_SHA256: 474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  STARSHIP_VERSION: v1.27.0
+  STARSHIP_LINUX_X86_64_SHA256: 3b94758850901717eb36aa1b53f8492c1322506ec6d41273bc6151e79ed8e4a1
+  TREE_SITTER_CLI_LINUX_VERSION: v0.27.2
+  TREE_SITTER_CLI_LINUX_X86_64_SHA256: b4233ecc4f0e648d6d8ccc4bac96c00c712ca1a5eb1e0ca7197d29b750bffa6d
+  GOTOOLCHAIN: local
+  V2_REF: fb15ce5
+
+jobs:
+  lint:
+    name: lint (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            target: linux/amd64
+            repository_checks: true
+          - runner: ubuntu-26.04-arm
+            target: linux/arm64
+          - runner: macos-26
+            target: darwin/arm64
+          - runner: windows-2025
+            target: windows/amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.27.4
+          cache: ${{ github.event_name == 'pull_request' }}
+          cache-dependency-path: installer/go.sum
+      - name: Verify the native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates clangd curl ruby shellcheck tmux zsh python3-pip unzip
+          sudo apt-get install -y --no-install-recommends dbus-daemon gir1.2-ibus-1.0 ibus libx11-data libxkbcommon0 python3-gi
+          python3 -m pip install --user --break-system-packages --disable-pip-version-check yamllint editorconfig-checker
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          if [[ "$(uname -m)" != x86_64 ]]; then
+            echo 'The pinned x86_64 test tools have no arm64 pin. Their configuration tests skip on this runner.'
+            exit 0
+          fi
+          curl -fsSL "https://github.com/starship/starship/releases/download/${STARSHIP_VERSION}/starship-x86_64-unknown-linux-gnu.tar.gz" -o /tmp/starship.tar.gz
+          printf '%s  %s\n' "$STARSHIP_LINUX_X86_64_SHA256" /tmp/starship.tar.gz | sha256sum -c -
+          sudo tar -xzf /tmp/starship.tar.gz -C /usr/local/bin starship
+          starship --version
+          curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/${TREE_SITTER_CLI_LINUX_VERSION}/tree-sitter-cli-linux-x64.zip" -o /tmp/tree-sitter-cli-linux-x64.zip
+          printf '%s  %s\n' "$TREE_SITTER_CLI_LINUX_X86_64_SHA256" /tmp/tree-sitter-cli-linux-x64.zip | sha256sum -c -
+          rm -rf /tmp/tree-sitter-cli
+          mkdir -p /tmp/tree-sitter-cli
+          unzip -oq /tmp/tree-sitter-cli-linux-x64.zip -d /tmp/tree-sitter-cli
+          sudo install -m 0755 /tmp/tree-sitter-cli/tree-sitter /usr/local/bin/tree-sitter
+          tree-sitter --version
+          curl -fsSL "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/${CARGO_BINSTALL_COMMIT}/install-from-binstall-release.sh" -o /tmp/cargo-binstall.sh
+          printf '%s  %s\n' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -
+          bash /tmp/cargo-binstall.sh
+          # taplo-cli 0.10.0 has no cargo-binstall prebuilt (quickinstall 404) and
+          # fails to source-build on the current runner Rust (time-crate E0119), so
+          # pin 0.9.3, which has a quickinstall prebuilt and installs without compiling.
+          "$HOME/.cargo/bin/cargo-binstall" -y taplo-cli@0.9.3 hyperfine
+          command -v pwsh
+          pwsh -NoLogo -NoProfile -Command 'if ($PSVersionTable.PSVersion.Major -lt 7) { throw "PowerShell 7 is required" }; $PSVersionTable.PSVersion'
+          curl -fsSL "https://github.com/neovim/neovim/releases/download/${NVIM_LINUX_VERSION}/nvim-linux-x86_64.tar.gz" -o /tmp/nvim-linux-x86_64.tar.gz
+          printf '%s  %s\n' "$NVIM_LINUX_X86_64_SHA256" /tmp/nvim-linux-x86_64.tar.gz | sha256sum -c -
+          sudo rm -rf /opt/nvim-linux-x86_64
+          sudo tar -xzf /tmp/nvim-linux-x86_64.tar.gz -C /opt
+          sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+          nvim --version | head -n 1
+      - name: Test the disposable host preparation
+        if: matrix.repository_checks
+        run: bash tests/native/linux_host_preparation_test.sh
+      - name: Establish trusted disposable completion directories
+        if: runner.os == 'Linux'
+        run: bash scripts/prepare-disposable-linux-host.sh shell
+      - name: Require the US International Compose test runtime
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          command -v ibus-daemon >/dev/null
+          command -v dbus-run-session >/dev/null
+          python3 -c 'import ctypes, gi; gi.require_version("IBus", "1.0"); ctypes.CDLL("libxkbcommon.so.0")'
+      - name: Install macOS deps
+        if: runner.os == 'macOS'
+        run: |
+          set -euxo pipefail
+          brew install ruby shellcheck neovim tmux starship tree-sitter-cli taplo hyperfine yamllint editorconfig-checker
+          echo "$(brew --prefix ruby)/bin" >> "$GITHUB_PATH"
+      - name: Install Windows deps
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $WarningPreference = 'Stop'
+          if (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue) {
+            Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          }
+          function Install-ModuleWithRetry {
+            param(
+              [Parameter(Mandatory)][string]$Name,
+              [string]$MinimumVersion = ''
+            )
+            $installArgs = @{
+              Name = $Name
+              Force = $true
+              Scope = 'CurrentUser'
+              SkipPublisherCheck = $true
+              ErrorAction = 'Stop'
+            }
+            if (-not [string]::IsNullOrWhiteSpace($MinimumVersion)) {
+              $installArgs.MinimumVersion = $MinimumVersion
+            }
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              try {
+                Install-Module @installArgs
+                return
+              } catch {
+                if ($attempt -eq 3) { throw }
+                Write-Host ("WARN: Install-Module {0} failed on attempt {1}/3: {2}" -f $Name, $attempt, $_.Exception.Message)
+                Start-Sleep -Seconds (5 * $attempt)
+              }
+            }
+          }
+          $pester = Get-Module -ListAvailable Pester |
+            Where-Object { $_.Version -ge [version]'5.0.0' } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+          if (-not $pester) {
+            Install-ModuleWithRetry -Name Pester -MinimumVersion 5.5.0
+          }
+          Install-ModuleWithRetry -Name PSScriptAnalyzer
+          $nvimPin = (Get-Content -LiteralPath 'installer/tools/neovim/pins.json' -Raw | ConvertFrom-Json).resources.'tool.nvim'.'windows/amd64'
+          $nvimUrl = "https://github.com/neovim/neovim/releases/download/v$($nvimPin.version)/nvim-win64.zip"
+          if ($nvimPin.format -cne 'zip' -or $nvimPin.strip_components -ne 1 -or
+              $nvimPin.sha256 -cnotmatch '^[0-9a-f]{64}$' -or $nvimPin.url -cne $nvimUrl) {
+            throw 'Unexpected reviewed Windows Neovim archive pin.'
+          }
+          $nvimRoot = Join-Path $env:RUNNER_TEMP ("quality-neovim-" + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $nvimRoot | Out-Null
+          $nvimArchive = Join-Path $nvimRoot 'nvim-win64.zip'
+          $nvimPayload = Join-Path $nvimRoot 'payload'
+          Invoke-WebRequest -UseBasicParsing -Uri $nvimPin.url -OutFile $nvimArchive
+          $nvimHash = (Get-FileHash -LiteralPath $nvimArchive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($nvimHash -cne $nvimPin.sha256) {
+            throw 'Neovim archive checksum mismatch; nothing was extracted or executed.'
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          [System.IO.Compression.ZipFile]::ExtractToDirectory($nvimArchive, $nvimPayload)
+          $nvimEntries = @(Get-ChildItem -LiteralPath $nvimPayload -Force)
+          if ($nvimEntries.Count -ne 1 -or -not $nvimEntries[0].PSIsContainer -or $nvimEntries[0].Name -cne 'nvim-win64') {
+            throw 'Unexpected verified Neovim archive layout.'
+          }
+          $nvimBin = Join-Path $nvimPayload 'nvim-win64/bin'
+          $nvimExe = Join-Path $nvimBin 'nvim.exe'
+          $nvimRuntime = Join-Path $nvimPayload 'nvim-win64/share/nvim/runtime/filetype.lua'
+          if (-not (Test-Path -LiteralPath $nvimExe -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $nvimRuntime -PathType Leaf)) {
+            throw 'Verified Neovim archive is missing its executable or runtime.'
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $nvimBin
+          $env:PATH = "$nvimBin;$env:PATH"
+          if ([System.IO.Path]::GetFullPath((Get-Command nvim -CommandType Application).Source) -ne [System.IO.Path]::GetFullPath($nvimExe)) {
+            throw 'Windows quality resolved a different Neovim executable.'
+          }
+          $nvimVersion = @(& $nvimExe --version)
+          if ($nvimVersion.Count -eq 0 -or $nvimVersion[0] -cne "NVIM v$($nvimPin.version)") {
+            throw 'Verified Neovim version differs from its reviewed pin.'
+          }
+          Write-Host "Verified $($nvimPin.url) SHA256=$nvimHash"
+          Write-Host "Neovim executable: $nvimExe"
+          Write-Host $nvimVersion[0]
+
+          Import-Module Pester -MinimumVersion 5.0.0 -Force
+          Import-Module PSScriptAnalyzer -Force
+          Get-Module Pester, PSScriptAnalyzer | Format-Table Name,Version,Path -AutoSize
+      - name: Configuration tests
+        if: runner.os != 'Windows'
+        run: make test
+      - name: Go format, vet and race suite
+        if: runner.os != 'Windows'
+        run: make test-installer
+      - name: Launcher and pin script tests
+        if: runner.os != 'Windows'
+        run: make test-bootstrap
+      - name: Windows test suite
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          .\test.ps1
+      - name: Go module files are tidy
+        if: matrix.repository_checks
+        working-directory: installer
+        run: |
+          set -euo pipefail
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Renovate schema and inventory
+        if: matrix.repository_checks
+        run: make validate-renovate
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: matrix.repository_checks
+        with:
+          node-version: 22
+      - name: Package boundaries
+        if: matrix.repository_checks
+        run: make deps-check BASE=${{ github.event.pull_request.base.sha || github.event.before }}
+
+  e2e:
+    name: e2e (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            runner: macos-26
+            target: darwin/arm64
+          - name: Windows amd64
+            runner: windows-2025
+            target: windows/amd64
+          - name: Ubuntu 24.04 amd64
+            runner: ubuntu-24.04
+            target: linux/amd64
+          - name: Ubuntu 24.04 arm64
+            runner: ubuntu-24.04-arm
+            target: linux/arm64
+          - name: Ubuntu 26.04 arm64
+            runner: ubuntu-26.04-arm
+            target: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 150
+    env:
+      DOTFILES_TEST_NATIVE: '1'
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.27.4
+          cache: false
+      - name: Verify the native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Prepare the disposable Ubuntu host
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          bash scripts/prepare-disposable-linux-host.sh desktop
+          test -c /dev/uinput || sudo modprobe uinput
+      - name: Install, smoke, update and remove each tool of the system
+        if: runner.os != 'Windows'
+        run: bash tests/e2e/run.sh
+      - name: Install, smoke, update and remove each tool of the system
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\e2e\run.ps1
+
+  e2e-debian:
+    name: e2e (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 13 amd64
+            runner: ubuntu-26.04
+            target: linux/amd64
+          - name: Debian 13 arm64
+            runner: ubuntu-26.04-arm
+            target: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    container: debian:13-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
+    timeout-minutes: 150
+    env:
+      DOTFILES_TEST_NATIVE: '1'
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Prepare the Debian container
+        run: |
+          set -euo pipefail
+          test "$(id -u)" = 0
+          if command -v sudo >/dev/null; then exit 1; fi
+          apt-get -o APT::Update::Error-Mode=any update
+          apt-get install --yes --no-install-recommends ca-certificates curl
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.27.4
+          cache: false
+      - name: Verify the native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Install, smoke, update and remove each tool of the system
+        run: bash tests/e2e/run.sh --exclude=mac-keyboard,tailscale
+
+  clean:
+    name: clean (${{ matrix.case }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - case: fresh-homebrew
+            runner: macos-26
+            target: darwin/arm64
+            select: tmux
+            timeout: 45
+          - case: missing-apple-clt
+            runner: macos-26
+            target: darwin/arm64
+            select: neovim
+            timeout: 120
+          - case: vc-runtime
+            runner: windows-2025
+            target: windows/amd64
+            select: lsd
+            timeout: 60
+          - case: build-tools
+            runner: windows-2025
+            target: windows/amd64
+            select: neovim
+            timeout: 150
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    env:
+      WINDOWS_TEST_IMAGE: mcr.microsoft.com/dotnet/framework/runtime:4.8-windowsservercore-ltsc2022@sha256:3983348680840ca6e53ad641e314c3c9184ca2fd19f88bc467600f7d9f6e9d73
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.27.4
+          cache: false
+      - name: Verify the disposable native runner
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Move the Homebrew prefix aside
+        if: matrix.case == 'fresh-homebrew'
+        run: |
+          set -euo pipefail
+          if [[ -e /opt/homebrew ]]; then
+            test ! -e "$RUNNER_TEMP/preinstalled-homebrew"
+            sudo mv /opt/homebrew "$RUNNER_TEMP/preinstalled-homebrew"
+          fi
+          test ! -e /opt/homebrew
+      - name: Move the Apple developer tools aside and keep Homebrew
+        if: matrix.case == 'missing-apple-clt'
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = true
+          test "$RUNNER_ENVIRONMENT" = github-hosted
+          test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = darwin/arm64
+          test -x /opt/homebrew/bin/brew
+          baseline="$RUNNER_TEMP/preinstalled-apple-tools"
+          mkdir "$baseline"
+          receipts="$(pkgutil --pkgs)"
+          outside="$baseline/outside-receipt-paths.txt"
+          (umask 077; set -C; : > "$outside")
+          while IFS= read -r receipt; do
+            case "$receipt" in
+              com.apple.pkg.CLTools*)
+                info="$(pkgutil --pkg-info "$receipt")"
+                printf '%s\n' "$info"
+                printf '%s\n' "$info" | /usr/bin/awk -F': ' -v package="$receipt" '
+                  $1 == "package-id" {if ($2 != package) exit 1; ids++}
+                  $1 == "volume" {if ($2 != "/") exit 1; volumes++}
+                  $1 == "location" {if ($2 != "/") exit 1; locations++}
+                  END {if (ids != 1 || volumes != 1 || locations != 1) exit 1}'
+                members="$(pkgutil --only-files --files "$receipt")"
+                printf '%s' "$members" | /usr/bin/awk -v outside="$outside" '
+                  {
+                    n=split($0, parts, "/")
+                    valid=length($0)>0 && length($0)<=4096 && substr($0,1,1)!="/"
+                    for (i=1;i<=n;i++) if (parts[i]=="." || parts[i]==".." || parts[i]=="") valid=0
+                    if (valid) {
+                      if ($0 !~ /^Library\/Developer\/CommandLineTools\//) print "/" $0 >> outside
+                      next
+                    }
+                    invalid++
+                    if (invalid <= 20) printf "CLT receipt has a noncanonical payload file: %.256s\n", $0 > "/dev/stderr"
+                  }
+                  END {
+                    if (invalid > 20) printf "CLT receipt has %d additional invalid payload files\n", invalid-20 > "/dev/stderr"
+                    if (invalid) exit 1
+                  }
+                '
+                ;;
+            esac
+          done <<< "$receipts"
+          shopt -s nullglob
+          for application in /Applications/Xcode*.app; do
+            sudo mv "$application" "$baseline/"
+          done
+          if [[ -e /Library/Developer/CommandLineTools ]]; then
+            sudo mv /Library/Developer/CommandLineTools "$baseline/"
+          fi
+          sudo xcode-select --reset
+          unset DEVELOPER_DIR SDKROOT TOOLCHAINS
+          if selected="$(LC_ALL=C xcode-select --print-path 2>&1)"; then exit 1; else status=$?; fi
+          test "$status" = 2
+          test "$selected" = $'xcode-select: error: Unable to get active developer directory. Use `sudo xcode-select --switch path/to/Xcode.app` to set one (or see `man xcode-select`)'
+          existing="$baseline/outside-receipt-paths-present.txt"
+          while IFS= read -r path; do
+            if [[ -e "$path" ]]; then printf '%s\n' "$path"; fi
+          done < "$outside" > "$existing"
+      - name: Install, smoke, update and remove a selection that needs the provider
+        if: runner.os == 'macOS'
+        env:
+          DOTFILES_TEST_NATIVE: '1'
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bash tests/e2e/run.sh --select=${{ matrix.select }} --case=${{ matrix.case }}
+      - name: Files outside the Apple tools folder remain
+        if: matrix.case == 'missing-apple-clt'
+        run: |
+          set -euo pipefail
+          while IFS= read -r path; do
+            test -e "$path" || { printf 'setup removed %s\n' "$path" >&2; exit 1; }
+          done < "$RUNNER_TEMP/preinstalled-apple-tools/outside-receipt-paths-present.txt"
+      - name: Prepare the disposable Windows container engine
+        if: runner.os == 'Windows'
+        timeout-minutes: 2
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Disposable runner required' }
+          if ((go env GOHOSTOS) -ne 'windows' -or (go env GOHOSTARCH) -ne 'amd64') { throw 'Native Windows amd64 required' }
+          Get-CimInstance Win32_Service -Filter "Name='docker'" |
+            Select-Object State, StartMode, ProcessId, ExitCode, ServiceSpecificExitCode | Format-List
+          $service = Get-Service -Name docker -ErrorAction Stop
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          $probeDirectory = Join-Path $env:RUNNER_TEMP ('docker-readiness-' + [Guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $probeDirectory | Out-Null
+          $stdout = Join-Path $probeDirectory 'stdout'
+          $stderr = Join-Path $probeDirectory 'stderr'
+          $lastOutput = 'No Docker API response'
+          try {
+            if ($service.Status -eq 'Stopped') { Start-Service -Name docker -ErrorAction Stop }
+            while ($true) {
+              $service.Refresh()
+              if ($service.Status -notin @('Running', 'StartPending')) { throw "Docker service stopped or cannot start: $($service.Status)" }
+              $remaining = 60000 - $timer.ElapsedMilliseconds
+              if ($remaining -le 0) { throw "Windows Docker API readiness expired: $lastOutput" }
+              $probe = Start-Process docker -ArgumentList @('--host', 'npipe:////./pipe/docker_engine', 'version', '--format', '{{.Server.Os}}') `
+                -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+              try {
+                if (-not $probe.WaitForExit([int]$remaining)) {
+                  $probe.Kill()
+                  $probe.WaitForExit()
+                  throw 'Windows Docker API readiness query timed out'
+                }
+                $exitCode = $probe.ExitCode
+                $output = [IO.File]::ReadAllText($stdout).Trim()
+                $lastOutput = [IO.File]::ReadAllText($stderr).Trim()
+              } finally { $probe.Dispose() }
+              if ($exitCode -eq 0) {
+                if ($output -cne 'windows') { throw "Native Windows container engine required; received '$output'" }
+                if ($timer.ElapsedMilliseconds -ge 60000) { throw 'Windows Docker API readiness expired' }
+                break
+              }
+              Start-Sleep -Milliseconds 500
+            }
+            Write-Output "Windows Docker API ready after $($timer.ElapsedMilliseconds) ms"
+          } catch {
+            Get-CimInstance Win32_Service -Filter "Name='docker'" |
+              Select-Object State, StartMode, ProcessId, ExitCode, ServiceSpecificExitCode | Format-List
+            Write-Output "Last Docker API diagnostic: $lastOutput"
+            throw
+          }
+      - name: Build the installer and the test helper, then pull the Windows image
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ((docker info --format '{{.OSType}}') -ne 'windows') { throw 'Native Windows container engine required' }
+          $fixture = Join-Path $env:RUNNER_TEMP 'e2e-native'
+          New-Item -ItemType Directory -Path $fixture | Out-Null
+          $env:CGO_ENABLED = '0'
+          go -C installer build -trimpath -o (Join-Path $fixture 'dotfiles.exe') ./cmd/dotfiles
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
+          go build -o (Join-Path $fixture 'e2e-helper.exe') tests/e2e/helper/main.go
+          if ($LASTEXITCODE -ne 0) { throw 'Test helper compilation failed' }
+          docker pull $env:WINDOWS_TEST_IMAGE
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Windows test image unavailable' }
+      - name: Time the first containers after the image pull (diagnostic only, cannot fail the job)
+        if: runner.os == 'Windows'
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          $nt = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+          Write-Output "host: image=$env:ImageVersion build=$($nt.CurrentBuild).$($nt.UBR)"
+          $probe = @'
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          $nt = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
+          $registry = $timer.ElapsedMilliseconds
+          $null = Get-CimInstance -ClassName Win32_OperatingSystem
+          $first = $timer.ElapsedMilliseconds - $registry
+          $mark = $timer.ElapsedMilliseconds
+          $null = Get-CimInstance -ClassName Win32_OperatingSystem
+          $second = $timer.ElapsedMilliseconds - $mark
+          $mark = $timer.ElapsedMilliseconds
+          $null = Get-AuthenticodeSignature -LiteralPath (Join-Path ([Environment]::SystemDirectory) 'kernel32.dll')
+          $signature = $timer.ElapsedMilliseconds - $mark
+          "container: build=$($nt.CurrentBuild).$($nt.UBR) to_registry_ms=$registry cim_first_ms=$first cim_second_ms=$second authenticode_ms=$signature winmgmt=$((Get-Service winmgmt).Status)"
+          '@
+          $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($probe))
+          $powershell = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          docker run --rm --isolation=process --memory 4g $env:WINDOWS_TEST_IMAGE `
+            $powershell -NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded
+          Write-Output "first PowerShell container total: $($timer.ElapsedMilliseconds) ms (exit $LASTEXITCODE)"
+          $timer.Restart()
+          docker run --rm --isolation=process $env:WINDOWS_TEST_IMAGE cmd.exe /d /c exit 0
+          Write-Output "bare container start and exit: $($timer.ElapsedMilliseconds) ms (exit $LASTEXITCODE)"
+          $timer.Restart()
+          docker run --rm --isolation=process --memory 4g $env:WINDOWS_TEST_IMAGE `
+            $powershell -NoLogo -NoProfile -NonInteractive -EncodedCommand $encoded
+          Write-Output "second PowerShell container total: $($timer.ElapsedMilliseconds) ms (exit $LASTEXITCODE)"
+      - name: Install, smoke, update and remove a selection that needs the provider
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $fixture = Join-Path $env:RUNNER_TEMP 'e2e-native'
+          docker run --rm --isolation=process --memory 4g --storage-opt size=60G `
+            --mount "type=bind,source=$fixture,target=C:\fixtures,readonly" `
+            --mount "type=bind,source=$env:GITHUB_WORKSPACE,target=C:\checkout,readonly" `
+            --env DOTFILES_TEST_NATIVE=1 `
+            --env DOTFILES_E2E_INSTALLER=C:\fixtures\dotfiles.exe `
+            --env DOTFILES_E2E_HELPER=C:\fixtures\e2e-helper.exe `
+            --workdir C:\checkout `
+            $env:WINDOWS_TEST_IMAGE powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File C:\checkout\tests\e2e\run.ps1 -Select '${{ matrix.select }}' -Case '${{ matrix.case }}'
+          if ($LASTEXITCODE -ne 0) { throw 'The clean Windows end-to-end test failed' }
+
+  migrate:
+    name: migrate (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-26.04
+            target: linux/amd64
+            select: mac-keyboard,ripgrep
+          - runner: macos-26
+            target: darwin/arm64
+            select: vscode,ghostty,openwhispr
+          - runner: windows-2025
+            target: windows/amd64
+            select: windows-terminal,ripgrep
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    env:
+      DOTFILES_TEST_NATIVE: '1'
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.27.4
+          cache: false
+      - name: Verify the native runner target
+        run: test "$(go env GOHOSTOS)/$(go env GOHOSTARCH)" = '${{ matrix.target }}'
+      - name: Prepare the disposable Ubuntu host
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          bash scripts/prepare-disposable-linux-host.sh desktop
+          test -c /dev/uinput || sudo modprobe uinput
+      - name: Install with v2, import, check, restore v2 and check with v2
+        if: runner.os != 'Windows'
+        run: bash tests/e2e/migrate.sh --select=${{ matrix.select }}
+      - name: Install with v2, import, check, restore v2 and check with v2
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tests\e2e\migrate.ps1 -Select '${{ matrix.select }}'

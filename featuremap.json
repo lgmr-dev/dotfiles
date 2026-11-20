@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "sources": ["installer/**/*.go"],
+  "features": {
+    "platform": {
+      "description": "Host discovery, known folders, the lock, strict JSON, atomic save and file system primitives",
+      "mayUse": [],
+      "mustNotReach": ["v2import"]
+    },
+    "tools": {
+      "description": "The embedded tool folders: catalog entries, pins and shell fragments",
+      "mayUse": [],
+      "mustNotReach": ["v2import"]
+    },
+    "catalog": {
+      "description": "Catalog and pin types, load, validation, closure, menu entries and target resolution",
+      "mayUse": ["platform", "tools"],
+      "mustNotReach": ["v2import"]
+    },
+    "state": {
+      "description": "State schema 2, the store, record operations, pending marks and system records",
+      "mayUse": ["platform"],
+      "mustNotReach": ["catalog", "v2import"]
+    },
+    "fetch": {
+      "description": "Download with resume, SHA-256 verification and archive extraction",
+      "mayUse": ["platform", "catalog"],
+      "mustNotReach": ["v2import"]
+    },
+    "engine": {
+      "description": "Planner, retention, run loop, check, the provider and UI contracts, progress and the apply log",
+      "mayUse": ["platform", "catalog", "state"],
+      "mustNotReach": ["targets", "builds", "system", "hooks", "fetch", "terminal", "v2import"]
+    },
+    "targets": {
+      "description": "Target kinds file, tree, link, block, field and font, and the write order",
+      "mayUse": ["platform", "catalog", "state", "engine"],
+      "mustNotReach": ["v2import"]
+    },
+    "builds": {
+      "description": "Private builds, their manifests, the current link, the sweep and the runtime recipes",
+      "mayUse": ["platform", "catalog", "state", "engine", "fetch", "targets"],
+      "mustNotReach": ["v2import"]
+    },
+    "system": {
+      "description": "APT, pinned DEBs, Homebrew, Apple CLT, the Windows vendor installers and the keyboard rule",
+      "mayUse": ["platform", "catalog", "state", "engine", "fetch", "targets"],
+      "mustNotReach": ["v2import"]
+    },
+    "hooks": {
+      "description": "Compiled integrations: shell init, settings, desktop entries, fonts, Neovim sync and Sentinel",
+      "mayUse": ["platform", "tools", "catalog", "state", "fetch", "engine", "targets", "builds", "system"],
+      "mustNotReach": ["v2import"]
+    },
+    "terminal": {
+      "description": "The menu, the review screen and the progress display",
+      "mayUse": ["engine", "catalog"],
+      "mustNotReach": ["targets", "builds", "system", "hooks", "fetch", "v2import"]
+    },
+    "v2import": {
+      "description": "Schema-1 readers, the mapping, the switch and restore-v2. Release v3.1.0 deletes it.",
+      "mayUse": ["platform", "tools", "catalog", "state", "fetch", "engine", "targets", "builds", "system", "hooks"]
+    },
+    "cmd/dotfiles": {
+      "description": "The argument parser and the wiring of the packages"
+    },
+    "legacy-v2": {
+      "description": "The flat v2 package. The cutover deletes it."
+    }
+  },
+  "owners": [
+    { "path": "installer/", "feature": "legacy-v2" },
+    { "path": "installer/*.go", "feature": "legacy-v2" },
+    { "path": "installer/testdata/**", "feature": "legacy-v2" },
+    { "path": "installer/platform/**", "feature": "platform" },
+    { "path": "installer/tools/**", "feature": "tools" },
+    { "path": "installer/catalog/**", "feature": "catalog" },
+    { "path": "installer/state/**", "feature": "state" },
+    { "path": "installer/fetch/**", "feature": "fetch" },
+    { "path": "installer/engine/**", "feature": "engine" },
+    { "path": "installer/targets/**", "feature": "targets" },
+    { "path": "installer/builds/**", "feature": "builds" },
+    { "path": "installer/system/**", "feature": "system" },
+    { "path": "installer/hooks/**", "feature": "hooks" },
+    { "path": "installer/terminal/**", "feature": "terminal" },
+    { "path": "installer/v2import/**", "feature": "v2import" },
+    { "path": "installer/cmd/dotfiles/**", "feature": "cmd/dotfiles" }
+  ],
+  "extract": [
+    { "tool": "go", "dir": "installer" }
+  ]
+}

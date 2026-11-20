@@ -213,7 +213,6 @@
       "repository": "OpenWhispr/openwhispr",
       "tag": "v{version}",
       "assets": {
-        "darwin/arm64": "OpenWhispr-{version}-arm64-mac.zip",
         "linux/amd64": "OpenWhispr-{version}-linux-x64.tar.gz"
       }
     },

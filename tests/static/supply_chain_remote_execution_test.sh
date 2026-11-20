@@ -15,12 +15,12 @@ root = pathlib.Path(".")
 scan_files = [
     pathlib.Path("setup.sh"), pathlib.Path("setup.ps1"),
     pathlib.Path("scripts/installer-bootstrap.sh"), pathlib.Path("scripts/installer-bootstrap.ps1"),
-    pathlib.Path("scripts/validate-renovate.sh"), pathlib.Path(".github/workflows/test.yml"),
+    pathlib.Path("scripts/validate-renovate.sh"), pathlib.Path(".github/workflows/ci.yml"),
 ]
 
 allowlist = {
     (
-        ".github/workflows/test.yml",
+        ".github/workflows/ci.yml",
         "bash /tmp/cargo-binstall.sh",
     ): "CI verifies the pinned cargo-binstall installer SHA-256 immediately before execution.",
 }
@@ -205,7 +205,7 @@ for label, probe, should_fail in privileged_package_probes:
     if not should_fail and probe_failures:
         failures.append(f"supply-chain scanner rejected verified privileged package probe: {label}")
 
-workflow = pathlib.Path(".github/workflows/test.yml").read_text(encoding="utf-8")
+workflow = pathlib.Path(".github/workflows/ci.yml").read_text(encoding="utf-8")
 required_workflow_snippets = [
     "STARSHIP_VERSION: v",
     "STARSHIP_LINUX_X86_64_SHA256:",
@@ -218,7 +218,7 @@ required_workflow_snippets = [
 ]
 for snippet in required_workflow_snippets:
     if snippet not in workflow:
-        failures.append(f".github/workflows/test.yml missing supply-chain guard snippet: {snippet}")
+        failures.append(f".github/workflows/ci.yml missing supply-chain guard snippet: {snippet}")
 
 for banned in (
     "starship.rs/install.sh",
@@ -227,18 +227,18 @@ for banned in (
     "scriptblock]::Create($installScript)",
 ):
     if banned in workflow:
-        failures.append(f".github/workflows/test.yml contains banned mutable installer pattern: {banned}")
+        failures.append(f".github/workflows/ci.yml contains banned mutable installer pattern: {banned}")
 
 cargo_verify = 'printf \'%s  %s\\n\' "$CARGO_BINSTALL_INSTALLER_SHA256" /tmp/cargo-binstall.sh | sha256sum -c -'
 cargo_exec = "bash /tmp/cargo-binstall.sh"
 cargo_verify_idx = workflow.find(cargo_verify)
 cargo_exec_idx = workflow.find(cargo_exec)
 if cargo_verify_idx == -1 or cargo_exec_idx == -1 or cargo_verify_idx > cargo_exec_idx:
-    failures.append(".github/workflows/test.yml must verify cargo-binstall SHA-256 immediately before executing it")
+    failures.append(".github/workflows/ci.yml must verify cargo-binstall SHA-256 immediately before executing it")
 else:
     between = workflow[cargo_verify_idx + len(cargo_verify):cargo_exec_idx].strip()
     if between:
-        failures.append(".github/workflows/test.yml has commands between cargo-binstall SHA-256 verification and execution")
+        failures.append(".github/workflows/ci.yml has commands between cargo-binstall SHA-256 verification and execution")
 
 renovate_validator = pathlib.Path("scripts/validate-renovate.sh").read_text(encoding="utf-8")
 for snippet in (

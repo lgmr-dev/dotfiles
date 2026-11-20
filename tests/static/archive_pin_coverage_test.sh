@@ -3,7 +3,8 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 python3 scripts/update-agent-cli-pins.py --check-coverage
 ruby -ryaml -rjson -ropen3 -rtmpdir -rfileutils - <<'RUBY'
-steps = YAML.load_file('.github/workflows/agent-cli-pins.yml')['jobs']['propose']['steps']
+job = YAML.load_file('.github/workflows/agent-cli-pins.yml')['jobs']['propose']
+steps = job['steps']
 cases = [
   ['Report a proposal without the App', '0', 1],
   ['Fail when a release needs manual review', '1', 1],
@@ -86,8 +87,8 @@ Dir.mktmpdir do |directory|
   ].each do |state, lease, expected|
     work = Dir.mktmpdir(nil, directory)
     git.call('init', '-q', '-b', 'main', work, chdir: directory)
-    FileUtils.mkdir_p(File.join(work, 'installer'))
-    File.write(File.join(work, 'installer/archive-pins.json'), "{}\n")
+    FileUtils.mkdir_p(File.join(work, 'installer/tools/fzf'))
+    File.write(File.join(work, 'installer/tools/fzf/pins.json'), "{}\n")
     git.call('add', '.', chdir: work)
     git.call('commit', '-q', '-m', 'base', chdir: work)
     git.call('push', '-q', '--force', remote, 'main', chdir: work)
@@ -103,11 +104,11 @@ Dir.mktmpdir do |directory|
     end
     expected_sha = { '' => '', 'stale' => '2' * 40, 'current' => reviewer }.fetch(lease)
     git.call('remote', 'add', 'origin', remote, chdir: work)
-    File.write(File.join(work, 'installer/archive-pins.json'), "{\"new\": true}\n")
+    File.write(File.join(work, 'installer/tools/fzf/pins.json'), "{\"new\": true}\n")
     File.write(File.join(directory, 'summary.md'), "Archive pins:\n")
     environment = { 'PATH' => "#{directory}:#{ENV['PATH']}", 'RUNNER_TEMP' => directory, 'GH_TOKEN' => 'token',
                     'APP_SLUG' => 'dotfiles-pins', 'BASE' => 'main', 'BRANCH' => 'automation/agent-cli-pins',
-                    'EXPECTED' => expected_sha, 'GIT_CONFIG_GLOBAL' => File::NULL }
+                    'EXPECTED' => expected_sha, 'PINS' => job.fetch('env').fetch('PINS'), 'GIT_CONFIG_GLOBAL' => File::NULL }
     output, status = Open3.capture2e(environment, 'bash', '-c', publish.fetch('run'), chdir: work)
     abort "FAIL: publication with a #{state} proposal branch: #{output}" unless status.exitstatus == expected
     after = git.call('ls-remote', remote, 'refs/heads/automation/agent-cli-pins', chdir: work).split.first

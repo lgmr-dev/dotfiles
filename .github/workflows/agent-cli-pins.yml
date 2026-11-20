@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 45
     env:
       BRANCH: automation/agent-cli-pins
+      PINS: ':(glob)installer/tools/*/pins.json'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -38,10 +39,10 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           test -f "$RUNNER_TEMP/summary.md"
           cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
-          if git diff --quiet -- installer/archive-pins.json; then
+          if git diff --quiet -- "$PINS"; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            git diff -- installer/archive-pins.json > "$RUNNER_TEMP/agent-cli-pins.patch"
+            git diff -- "$PINS" > "$RUNNER_TEMP/agent-cli-pins.patch"
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Authenticate the pin proposal App
@@ -99,7 +100,7 @@ jobs:
             printf '\nMerge only after the required native checks pass on this head. Then run `git pull` and **Update tools** on each machine; Update without new pins changes nothing.\n'
           } > "$RUNNER_TEMP/body.md"
           git switch -c "$BRANCH"
-          git commit -q -F "$RUNNER_TEMP/message.txt" -- installer/archive-pins.json
+          git commit -q -F "$RUNNER_TEMP/message.txt" -- "$PINS"
           git push --force-with-lease="refs/heads/$BRANCH:$EXPECTED" origin "HEAD:refs/heads/$BRANCH"
           number="$(gh pr list --head "$BRANCH" --base "$BASE" --state open --json number --jq '.[0].number // empty')"
           if [ -n "$number" ]; then

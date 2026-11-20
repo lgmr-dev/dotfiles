@@ -3,8 +3,8 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 python3 - <<'PY'
 import json, pathlib, re
-pins=json.loads(pathlib.Path("installer/archive-pins.json").read_text())["resources"]
-workflow=pathlib.Path(".github/workflows/test.yml").read_text()
+pins={tool: targets for path in sorted(pathlib.Path("installer/tools").glob("*/pins.json")) for tool, targets in json.loads(path.read_text())["resources"].items()}
+workflow=pathlib.Path(".github/workflows/ci.yml").read_text()
 def value(key):
     matches=re.findall(r"^  "+key+r": (\S+)$",workflow,re.M)
     assert len(matches)==1, key
@@ -17,15 +17,12 @@ for resource, version, digest in (
     assert pin["version"].lstrip("v")==value(version).lstrip("v"), resource+" version drift"
     if resource == "tool.nvim":
         assert pin["sha256"]==value(digest), resource+" checksum drift"
-# Windows consumes the production pin directly, so Renovate has no duplicate pin.
-windows=workflow.split("  windows:\n", 1)[1]
+windows=workflow.split("      - name: Install Windows deps\n", 1)[1].split("      - name: ", 1)[0]
 assert "choco install neovim" not in windows, "Windows quality must use the installer Neovim pin"
 assert "ProgramFiles\\Neovim" not in windows and "C:\\tools\\neovim" not in windows, "Windows quality must not guess another installation"
-assert "installer/archive-pins.json" in windows and "resources.'tool.nvim'.'windows/amd64'" in windows
+assert "installer/tools/neovim/pins.json" in windows and "resources.'tool.nvim'.'windows/amd64'" in windows
 assert windows.index("Get-FileHash") < windows.index("::ExtractToDirectory"), "verify before extraction"
 assert 'NVIM v$($nvimPin.version)' in windows and "$nvimVersion[0] -cne" in windows, "verify the installed version"
-# CI tree-sitter is ZIP; installer gzip. CI Starship is glibc; installer musl. Versions must agree,
-# checksums intentionally differ because they identify different upstream bytes.
 assert pins["tool.starship"]["linux/amd64"]["version"]==value("STARSHIP_VERSION").lstrip("v")
 go_version=re.search(r"(?m)^go (\S+)$",pathlib.Path("installer/go.mod").read_text()).group(1)
 for path in pathlib.Path(".github/workflows").glob("*.yml"):

@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 python3 - <<'PY'
 import json,pathlib
-pins=json.loads(pathlib.Path("installer/archive-pins.json").read_text())["resources"]
+pins={tool: targets for path in sorted(pathlib.Path("installer/tools").glob("*/pins.json")) for tool, targets in json.loads(path.read_text())["resources"].items()}
 assert all(key != "darwin/amd64" for targets in pins.values() for key in targets)
 bootstrap=pathlib.Path("scripts/installer-bootstrap.sh").read_text()
 assert "darwin-arm64" in bootstrap

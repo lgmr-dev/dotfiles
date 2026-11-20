@@ -133,7 +133,7 @@ else
 fi
 
 if lazy_sync_hits=$(grep -rnF '+Lazy! sync' \
-    installer/nvim_sync.go .github/workflows/installer-engine.yml \
+    installer/nvim_sync.go .github/workflows/ci.yml \
     tests/nvim/spec/startup_spec.lua); then
     echo "FAIL: setup and validation paths must use Lazy! restore, not Lazy! sync"
     echo "$lazy_sync_hits"
@@ -190,7 +190,7 @@ else
     echo "ok  : repo text line endings stay LF-only across EditorConfig and Git attributes"
 fi
 
-if ! grep -Fq '.\test.ps1' .github/workflows/test.yml; then
+if ! grep -Fq '.\test.ps1' .github/workflows/ci.yml; then
     echo "FAIL: Windows CI must use the repo-local test.ps1 entry point"
     fail=1
 else
@@ -207,7 +207,7 @@ else
     echo "ok  : AGENTS.md points to the canonical CLAUDE.md guide"
 fi
 
-if grep -q 'sequential[[:space:]]*=[[:space:]]*true' tests/nvim/run.ps1 .github/workflows/test.yml 2>/dev/null; then
+if grep -q 'sequential[[:space:]]*=[[:space:]]*true' tests/nvim/run.ps1 .github/workflows/ci.yml 2>/dev/null; then
     echo "FAIL: Windows nvim test path must not use Plenary sequential mode"
     fail=1
 else

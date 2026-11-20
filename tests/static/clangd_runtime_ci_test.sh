@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
-WORKFLOW="$REPO_ROOT/.github/workflows/test.yml"
+WORKFLOW="$REPO_ROOT/.github/workflows/ci.yml"
 SPEC="$REPO_ROOT/tests/nvim/spec/clangd_projects_spec.lua"
 
 fail() {

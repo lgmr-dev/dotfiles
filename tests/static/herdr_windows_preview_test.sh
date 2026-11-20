@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Herdr Windows ships the reviewed official archive and adjacent ConPTY runtime.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
@@ -32,7 +31,7 @@ else
     echo "ok  : no herdr.dev remote-eval installer in repo code"
 fi
 
-python3 - "$REPO_ROOT/installer/archive-pins.json" <<'PY'
+python3 - "$REPO_ROOT/installer/tools/herdr/pins.json" <<'PY'
 import json,pathlib,re,sys
 pin=json.loads(pathlib.Path(sys.argv[1]).read_text())["resources"]["tool.herdr"]["windows/amd64"]
 assert re.fullmatch(r"\d+\.\d+\.\d+",pin["version"])

@@ -166,7 +166,23 @@ Invoke-Step 'Installer format, vet and race tests' {
     }
 }
 
-Invoke-Step 'Public launchers and release scripts' {
+Invoke-Step 'Package boundaries' {
+    if (-not (Require-OrSkip 'node' ([bool](Get-Command node -ErrorAction SilentlyContinue)) 'install Node 22 or later')) {
+        return
+    }
+    $previousSystem = $env:GOOS
+    try {
+        foreach ($system in @('linux', 'darwin', 'windows')) {
+            $env:GOOS = $system
+            & node scripts/featuremap/featuremap.mjs check
+            if ($LASTEXITCODE -ne 0) { throw "Package boundary check failed for GOOS=$system" }
+        }
+    } finally {
+        $env:GOOS = $previousSystem
+    }
+}
+
+Invoke-Step 'Launchers and pin scripts' {
     & python -m unittest discover -s tests/bootstrap -p '*_test.py'
     if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed' }
 }

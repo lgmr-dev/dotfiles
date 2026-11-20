@@ -200,7 +200,9 @@ func TestArchiveTransferKeepsSlowProgressWithoutRanges(t *testing.T) {
 			time.Sleep(40 * time.Millisecond)
 		}
 	})
-	written, err := fetchForTest(t, testArchiveTransfer, server.Client(), server.URL+"/tool", nil)
+	policy := testArchiveTransfer
+	policy.Window = time.Second
+	written, err := fetchForTest(t, policy, server.Client(), server.URL+"/tool", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

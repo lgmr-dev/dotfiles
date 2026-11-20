@@ -556,7 +556,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $fixture = Join-Path $env:RUNNER_TEMP 'e2e-native'
-          docker run --rm --isolation=process --memory 4g --storage-opt size=60G `
+          docker run --rm --isolation=process --memory 8g --storage-opt size=60G `
             --mount "type=bind,source=$fixture,target=C:\fixtures,readonly" `
             --mount "type=bind,source=$env:GITHUB_WORKSPACE,target=C:\checkout,readonly" `
             --env DOTFILES_TEST_NATIVE=1 `

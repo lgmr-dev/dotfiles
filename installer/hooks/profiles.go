@@ -331,7 +331,7 @@ func (p *Profiles) Inspect(ctx context.Context, r catalog.Resource, want engine.
 	case work != 0 && owned == 0:
 		finding.Status = engine.Missing
 	case work != 0:
-		finding.Status, finding.Reason = engine.Unhealthy, "a profile block, field or generated file differs from its record"
+		finding.Status, finding.Reason = engine.Unhealthy, "a profile block, field or generated file needs the current content"
 	}
 	return finding, nil
 }

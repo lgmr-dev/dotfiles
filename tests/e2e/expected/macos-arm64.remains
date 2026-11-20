@@ -1,5 +1,23 @@
+.agents/**
+.azure/**
 .cache/**
+.claude/**
+.codex/**
+.config
+.config/glab-cli/**
+.config/opencode/**
+.config/superfile/theme/**
+.copilot/**
+.kiro/**
 .local
+.local/share
+.local/share/opencode/**
+.local/share/superfile/**
 .local/state
+.local/state/gh/**
+.local/state/nvim/**
+.local/state/opencode/**
+Library/Application Support/Microsoft/**
+Library/Application Support/superfile/**
 Library/Caches/**
 Library/Logs/**

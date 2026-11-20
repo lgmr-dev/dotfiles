@@ -43,7 +43,7 @@ func fixtureNamed(name string) fixture {
 func (e *env) unowned(d targets.Desired) state.Record {
 	e.t.Helper()
 	record, has := e.State().Targets[targets.Key(d.Path, d.Slot)]
-	if !has || record.Applied != "" || record.Next != "" || record.Release || record.Before == "" || record.Before == targets.Absent || len(record.Made) != 0 {
+	if !has || record.Applied != "" || record.Next != "" || record.Release || record.Before == "" || record.Before == targets.Absent {
 		e.t.Fatalf("content that setup did not write must have a record with a baseline only: %+v", record)
 	}
 	return record

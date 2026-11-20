@@ -3,7 +3,7 @@ library.libdbus-glib-1-2
 tool.clangd
 tool.clipboard
 tool.clipboard-wayland
+tool.compiler
 tool.tailscale
-tool.tmux
 tool.vscode
 tool.zsh

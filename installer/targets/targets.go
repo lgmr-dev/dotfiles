@@ -11,8 +11,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/engine"
@@ -350,7 +352,10 @@ func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Re
 		}
 	}
 	unowned := state.Record{Resource: d.Resource, Kind: d.Kind, Before: before}
-	if before != "" && record.Kind == d.Kind && record.Applied == "" && record.Next == "" && !record.Release && len(record.Made) == 0 {
+	if has {
+		unowned.Made = record.Made
+	}
+	if before != "" && record.Kind == d.Kind && record.Applied == "" && record.Next == "" && !record.Release {
 		return nil
 	}
 	fresh := before == ""
@@ -510,7 +515,9 @@ func created(d Desired) ([]string, error) {
 
 // Release removes one unit through the write order: it restores the first
 // baseline, or absence, removes the empty folders that setup created and
-// drops the record. The restored baseline stays unowned. A record without an
+// drops the record. A created folder that is not empty stays: when it holds
+// another recorded unit, that record takes the folder in its created folders
+// in the same state change, so the last release removes it. The restored baseline stays unowned. A record without an
 // applied value gives no ownership: the destination stays as it is, and the
 // record and a baseline that equals the destination go away. Changed content
 // stops with ErrChanged, or with Replace it is saved in the baselines folder
@@ -547,9 +554,8 @@ func (w *Writer) Release(ctx context.Context, key string, rec engine.Records, c 
 	if err != nil {
 		return fmt.Errorf("baseline of %s: %w", key, err)
 	}
-	drop := func() error { return rec.Update(func(s *state.State) error { s.Drop(key); return nil }) }
 	if record.Applied == "" {
-		if err := drop(); err != nil {
+		if err := w.drop(ctx, rec, d, record); err != nil {
 			return err
 		}
 		if live.Fingerprint == baseline {
@@ -594,23 +600,56 @@ func (w *Writer) Release(ctx context.Context, key string, rec engine.Records, c 
 			return errors.Join(fmt.Errorf("%s differs from its baseline after the restore; run setup again", key), err)
 		}
 	}
-	if baseline == Absent {
-		made := record.Made
-		if len(made) != 0 && made[0] == d.Path {
-			made = made[1:]
-		}
-		if kept := platform.RemoveCreatedDirectories(made); kept != "" {
-			platform.Detail(ctx, "Kept the folder %s, which setup created and could not remove", kept)
-		}
-	}
-	if err := hit("made"); err != nil {
-		return err
-	}
-	if err := drop(); err != nil {
+	if err := w.drop(ctx, rec, d, record); err != nil {
 		return err
 	}
 	if err := hit("drop"); err != nil {
 		return err
 	}
 	return kind.Discard(before, w.baselines())
+}
+
+func (w *Writer) drop(ctx context.Context, rec engine.Records, d Desired, record state.Record) error {
+	made := record.Made
+	if len(made) != 0 && made[0] == d.Path {
+		made = made[1:]
+	}
+	if kept := platform.RemoveCreatedDirectories(made); kept != "" {
+		platform.Detail(ctx, "Kept the folder %s, which setup created and could not remove", kept)
+	}
+	if err := hit("made"); err != nil {
+		return err
+	}
+	remaining := []string{}
+	for _, dir := range made {
+		if _, err := os.Lstat(dir); err == nil {
+			remaining = append(remaining, dir)
+		}
+	}
+	return rec.Update(func(s *state.State) error {
+		s.Drop(d.Key)
+		for _, dir := range remaining {
+			w.handOver(s, dir)
+		}
+		return nil
+	})
+}
+
+func (w *Writer) handOver(s *state.State, dir string) {
+	for _, key := range slices.Sorted(maps.Keys(s.Targets)) {
+		heir := s.Targets[key]
+		inside, _, err := w.recorded(key, heir)
+		if err != nil || len(heir.Made) >= platform.MaxCreatedDirectories {
+			continue
+		}
+		if relative, err := filepath.Rel(dir, inside.Path); err != nil || relative == "." || !filepath.IsLocal(relative) {
+			continue
+		}
+		if !slices.Contains(heir.Made, dir) {
+			heir.Made = append(slices.Clone(heir.Made), dir)
+			slices.SortStableFunc(heir.Made, func(a, b string) int { return len(b) - len(a) })
+			s.Targets[key] = heir
+		}
+		return
+	}
 }

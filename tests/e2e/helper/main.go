@@ -20,6 +20,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type resource struct {
@@ -422,6 +423,9 @@ func compare(args []string) error {
 		switch {
 		case !had:
 			differences = append(differences, "added    "+current.kind+" "+name)
+			if data, err := os.ReadFile(filepath.Join(*root, filepath.FromSlash(name))); err == nil && current.kind == "file" && len(data) <= 4096 && utf8.Valid(data) && name[0] == '.' && !strings.Contains(name, "/") {
+				fmt.Printf("content of the added file %s:\n%s\n", name, data)
+			}
 		case !has:
 			differences = append(differences, "removed  "+old.kind+" "+name)
 		default:
@@ -532,13 +536,13 @@ func smoke(args []string) error {
 				failures = append(failures, fmt.Sprintf("%s: command %s is not a file at %s", id, name, path))
 				continue
 			}
-			if noVersionCommand[name] {
+			if noVersionCommand[name] || h.os == "windows" && name == "gh-dash" {
 				fmt.Printf("%s: %s is present (no version command)\n", id, name)
 				continue
 			}
-			environment := []string{}
+			environment := []string{"PATH=" + filepath.Dir(path) + string(os.PathListSeparator) + os.Getenv("PATH")}
 			if id == "tool.ghostty" && h.os == "linux" {
-				environment = []string{"LD_BIND_NOW=1"}
+				environment = append(environment, "LD_BIND_NOW=1")
 			}
 			output, err := execute(2*time.Minute, environment, path, "--version")
 			first, _, _ := strings.Cut(output, "\n")

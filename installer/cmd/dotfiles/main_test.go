@@ -334,7 +334,7 @@ func TestEntrypointChecksComeBeforeDiscovery(t *testing.T) {
 }
 
 func TestUnconnectedWiringFailsWithItsName(t *testing.T) {
-	if _, err := newRouter(setup{})(catalog.Resource{ID: "tool.rg"}); err == nil || !strings.Contains(err.Error(), "provider wiring is not connected") {
+	if _, err := newRouter(setup{})(catalog.Resource{ID: "tool.rg"}); err == nil || !strings.Contains(err.Error(), "tool.rg") {
 		t.Fatal(err)
 	}
 	if err := importV2(context.Background(), setup{}); err == nil || !strings.Contains(err.Error(), "import") {

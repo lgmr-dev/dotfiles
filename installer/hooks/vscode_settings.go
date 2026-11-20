@@ -2,8 +2,11 @@ package hooks
 
 import (
 	"path/filepath"
+	"slices"
+	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
 )
 
@@ -23,7 +26,20 @@ func vscodeSettingsFile(path string) bool {
 	return filepath.Base(path) == "settings.json" && filepath.Base(filepath.Dir(path)) == "User" && filepath.Base(filepath.Dir(filepath.Dir(path))) == "Code"
 }
 
-func (p *Profiles) vscodeUnits() []targets.Desired {
+func (p *Profiles) vscodeUpdateModeManaged(st state.State) bool {
+	if p.Context.OS != "darwin" {
+		return true
+	}
+	if p.VSCodeCask == nil {
+		return false
+	}
+	recorded := slices.ContainsFunc(p.recorded(st, profileVSCode), func(key string) bool {
+		return strings.HasSuffix(key, "#"+vscodeUpdateMode)
+	})
+	return recorded && !p.VSCodeCask(st)
+}
+
+func (p *Profiles) vscodeUnits(st state.State) []targets.Desired {
 	fields := []profileField{
 		{"workbench.colorTheme", `"Rosé Pine"`},
 		{"workbench.preferredDarkColorTheme", `"Rosé Pine"`},
@@ -32,7 +48,7 @@ func (p *Profiles) vscodeUnits() []targets.Desired {
 		{"editor.fontFamily", `"'Hack Nerd Font', Consolas, monospace"`},
 		{"terminal.integrated.fontFamily", `"'Hack Nerd Font', Consolas, monospace"`},
 	}
-	if p.Context.OS != "darwin" {
+	if p.vscodeUpdateModeManaged(st) {
 		fields = append(fields, profileField{vscodeUpdateMode, `"none"`})
 	}
 	return profileFields(vscodeSettingsPath(p.Context, p.Folders), fields)

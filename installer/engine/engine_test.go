@@ -3,6 +3,7 @@ package engine_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -693,5 +694,64 @@ func TestChangedContentStaysUntilAnApprovedReplacement(t *testing.T) {
 	mustApply(t, e, update)
 	if !slices.Equal(w.replaced, []string{"config.editor"}) {
 		t.Fatal("update did not accept the approved replacement")
+	}
+}
+
+func TestSelectionReachesTheWiringBeforeInspectionsAndSteps(t *testing.T) {
+	e, w := fixture(t)
+	seen := [][]string{}
+	e.Selection = func(wanted []string) {
+		seen = append(seen, append([]string{fmt.Sprint(len(w.log))}, wanted...))
+	}
+	request := selection("editor")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	closure, err := e.Catalog.Closure([]string{"editor"}, e.Context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 1 || seen[0][0] != "0" || !slices.Equal(seen[0][1:], closure) || !slices.Contains(closure, "editor") {
+		t.Fatalf("a preview must give the closure with its capability before the first inspection: %v, want %v", seen, closure)
+	}
+	inspected := len(w.log)
+	if _, err := e.Apply(context.Background(), request, plan); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 2 || seen[1][0] != fmt.Sprint(inspected) || !slices.Equal(seen[1][1:], closure) {
+		t.Fatalf("an apply must give the closure of the approved plan before its first step: %v", seen)
+	}
+	if _, err := e.Preview(context.Background(), selection()); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 3 || len(seen[2]) != 1 {
+		t.Fatalf("an empty selection must clear the closure also while a release is inspected: %v", seen)
+	}
+}
+
+func TestCheckListsTheLeftoversAsNotes(t *testing.T) {
+	e, _ := fixture(t)
+	mustApply(t, e, selection("editor"))
+	e.Leftovers = func(context.Context) ([]string, error) {
+		return []string{"/state/tools/tool.b/1-x-1", "/state/sentinel/checkout.kept", "/state/tools/tool.b/1-x-1"}, errors.New("unreadable folder")
+	}
+	check, err := e.Check(context.Background())
+	if err != nil || check.Status != "ready" {
+		t.Fatalf("a leftover is a note, not a difference: %+v %v", check, err)
+	}
+	want := "All selected resources passed verification." +
+		"\nNote: setup could not list the content that it keeps and no longer uses: unreadable folder" +
+		"\nNote: setup keeps /state/sentinel/checkout.kept and no longer uses it; inspect it, then delete it yourself" +
+		"\nNote: setup keeps /state/tools/tool.b/1-x-1 and no longer uses it; inspect it, then delete it yourself"
+	if check.Message != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", check.Message, want)
+	}
+	plan, err := e.Preview(context.Background(), selection("editor"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := e.Apply(context.Background(), selection("editor"), plan); err != nil || strings.Contains(result.Message, "no longer uses") {
+		t.Fatalf("only a check lists the leftovers: %+v %v", result, err)
 	}
 }

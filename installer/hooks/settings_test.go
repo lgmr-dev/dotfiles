@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
 )
 
@@ -118,6 +119,49 @@ func TestVSCodeJSONCRemovalPreservesAddedComment(t *testing.T) {
 				t.Fatal("removal left the folders that setup created", err)
 			}
 		}
+	}
+}
+
+func TestVSCodeOnMacOSKeepsTheUpdateModeUntilTheCaskApplicationVerifies(t *testing.T) {
+	e := newProfileEnv(t, "linux")
+	e.p.Folders.Config = filepath.Join(e.home, "Library", "Application Support")
+	path := e.units(vscodeID)[0].Path
+	profileWrite(t, path, "{\"update.mode\":\"manual\"}\n")
+	e.mustApply(vscodeID, true)
+	e.p.Context.OS, e.p.Context.Arch = "darwin", "arm64"
+	e.p.Folders.Config = filepath.Join(e.home, ".config")
+	key := targets.Key(path, "update.mode")
+
+	verified := false
+	e.p.VSCodeCask = func(st state.State) bool {
+		if _, recorded := st.Targets[key]; !recorded {
+			t.Error("the cask question came without the record of the field")
+		}
+		return verified
+	}
+	if finding := e.inspect(vscodeID, true); finding.Status != engine.Satisfied {
+		t.Fatalf("the field of the legacy VS Code payload must stay managed: %+v", finding)
+	}
+	e.mustApply(vscodeID, false)
+	if _, recorded := e.State().Targets[key]; !recorded || !strings.Contains(profileReadFile(t, path), `"update.mode":"none"`) {
+		t.Fatal("setup released update.mode while the legacy payload is the active VS Code")
+	}
+
+	verified = true
+	if finding := e.inspect(vscodeID, true); finding.Status != engine.Unhealthy {
+		t.Fatalf("a verified cask application must release the field: %+v", finding)
+	}
+	e.mustApply(vscodeID, false)
+	if _, recorded := e.State().Targets[key]; recorded || !strings.Contains(profileReadFile(t, path), `"update.mode":"manual"`) {
+		t.Fatal("the release did not restore the personal baseline", profileReadFile(t, path))
+	}
+
+	verified = false
+	if finding := e.inspect(vscodeID, true); finding.Status != engine.Satisfied {
+		t.Fatalf("a field without a record must stay released: %+v", finding)
+	}
+	if strings.Contains(profileReadFile(t, path), `"update.mode":"none"`) {
+		t.Fatal("setup took the field again on macOS")
 	}
 }
 

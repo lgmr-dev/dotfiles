@@ -138,7 +138,7 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 		return Plan{}, err
 	}
 	plan := Plan{Mode: request.Mode, Source: source, Target: st.Target, Context: ctx, Selected: request.Selected, Keep: request.Keep,
-		RemoveShared: request.RemoveShared, Replace: request.Replace, Pending: slices.Clone(st.Pending)}
+		RemoveShared: request.RemoveShared, Replace: request.Replace, Pending: slices.Clone(st.Pending), V2Restore: st.V2Restore}
 	for _, id := range request.Replace {
 		if f, ok := found.Wanted[id]; !ok || !slices.Contains(wanted, id) || f.Status != Changed {
 			return plan, fmt.Errorf("%s has no changed content to replace in this selection", id)

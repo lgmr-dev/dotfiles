@@ -44,7 +44,15 @@ const (
 // text without Homebrew. Wanted returns the closure of the selected and kept
 // resources of the run: the generated shell content and the Git block depend
 // on it. The wiring sets Wanted before a run; without it the selection is
-// empty.
+// empty. VSCodeCask reports, on macOS, that the VS Code application of the
+// Homebrew cask verifies: that application updates itself, so setup releases
+// the update.mode field. While the field has a record and the cask application
+// does not verify, a VS Code payload of release v2 is the active application,
+// and the field stays managed. Without VSCodeCask the field is released.
+// LegacyCommandDirectories are the command folders of the payloads of release
+// v2 that stay active after the import, such as the macOS applications that
+// move to a cask later: the shell profile keeps them on PATH, after the
+// managed folders of this release.
 type Profiles struct {
 	Catalog  *catalog.Catalog
 	Context  platform.Context
@@ -56,6 +64,10 @@ type Profiles struct {
 	KiroHome string
 	Homebrew func() string
 	Wanted   func() []string
+
+	VSCodeCask func(st state.State) bool
+
+	LegacyCommandDirectories []string
 }
 
 // ProfileResource reports that Profiles is the provider of the resource.
@@ -157,7 +169,7 @@ func (p *Profiles) plan(id string, st state.State) ([]targets.Desired, string, e
 	case profileGit:
 		units, blocked, err = p.gitUnits(p.wanted())
 	case profileVSCode:
-		units = p.vscodeUnits()
+		units = p.vscodeUnits(st)
 	case profileKiro:
 		units = p.kiroUnits()
 	case profileT3:

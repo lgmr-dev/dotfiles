@@ -13,12 +13,15 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/luisgui1757/dotfiles/installer/builds"
 	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/luisgui1757/dotfiles/installer/system"
 	"github.com/luisgui1757/dotfiles/installer/terminal"
 	"github.com/luisgui1757/dotfiles/installer/tools"
 )
@@ -53,6 +56,18 @@ type setup struct {
 	catalog      *catalog.Catalog
 	authenticate func(context.Context) error
 	output       *os.File
+
+	sudo              string
+	apt               *system.APTLocation
+	aptIssue          string
+	clipboard         system.LinuxClipboard
+	dpkgDeb           string
+	powershell        string
+	buildTools        string
+	windowsIssue      string
+	homebrew          *system.HomebrewLocation
+	homebrewDirectory func() string
+	sentinel          hooks.SentinelLocations
 }
 
 func main() {
@@ -183,6 +198,9 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	if checkout, err = platform.ResolvePath(checkout); err != nil {
+		return fmt.Errorf("DOTFILES_CHECKOUT does not name a readable checkout: %w", err)
+	}
 	executable, source, err := executableHash()
 	if err != nil {
 		return err
@@ -199,26 +217,27 @@ func run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
+	bound, err := platform.BindDestination(filepath.Join(stateDir, state.File))
+	if err != nil {
+		return err
+	}
+	stateDir = filepath.Dir(bound)
 	resources, err := catalog.Load(tools.FS)
 	if err != nil {
 		return err
 	}
 	s := setup{command: c, checkout: checkout, executable: executable, source: source, stateDir: stateDir, target: host.OS + "/" + host.Arch + ":" + folders.Home,
 		host: host, folders: folders, catalog: resources, output: os.Stdout}
-	sudo := sudoProgram(host.OS)
-	if sudo != "" {
-		s.authenticate = foregroundSudo(sudo, "administrator authentication failed")
+	if err := discover(ctx, &s); err != nil {
+		return err
 	}
 	if c.name == "restore-v2" {
 		return restoreV2(ctx, s)
 	}
-	if _, err := state.Peek(stateDir, s.target); errors.Is(err, state.ErrSchema1) {
+	if st, err := state.Peek(stateDir, s.target); errors.Is(err, state.ErrSchema1) || err == nil && st.V2Restore == "switching" {
 		return importV2(ctx, s)
 	}
-	e := &engine.Engine{Catalog: resources, Router: newRouter(s), Context: host.Context, StateDir: stateDir, Target: s.target, Source: source, Sweep: newSweep(s)}
-	if sudo != "" {
-		e.Elevate = sudoSession(sudo, s.authenticate)
-	}
+	e := newEngine(s)
 	if c.name != "" {
 		return execute(ctx, e, c, s.output)
 	}
@@ -249,6 +268,9 @@ func execute(ctx context.Context, e *engine.Engine, c command, output *os.File) 
 		return err
 	}
 	preview := strings.Join(terminal.PlanText(e.Catalog, plan), "\n") + "\n"
+	if notice := engine.FallbackNotice(plan); notice != "" {
+		preview += notice + "\n"
+	}
 	if !c.yes && c.name != "plan" {
 		preview += "Nothing was changed. To apply this plan, run the same command with --yes.\n"
 	}
@@ -292,18 +314,73 @@ func finish(result engine.Result, err error) error {
 
 const sudoPrompt = "Dotfiles needs administrator access for the approved changes. [sudo] password for %u: "
 
-func sudoProgram(goos string) string {
-	if goos == "windows" || os.Geteuid() == 0 {
-		return ""
+func discover(ctx context.Context, s *setup) error {
+	s.sentinel = hooks.SentinelLocations{CodexHome: os.Getenv("CODEX_HOME"), ConfigHome: os.Getenv("XDG_CONFIG_HOME"), ClaudeConfigDir: os.Getenv("CLAUDE_CONFIG_DIR"),
+		KiroHome: os.Getenv("KIRO_HOME"), CopilotHome: os.Getenv("COPILOT_HOME"), Installed: hooks.DiscoverSentinelAgents(s.host.Context, s.folders.Home)}
+	s.homebrewDirectory = func() string { return "" }
+	failure := "administrator authentication failed"
+	switch s.host.OS {
+	case "darwin":
+		directory := &homebrewDirectory{}
+		s.homebrew, s.homebrewDirectory = directory.discover(ctx), directory.get
+		if os.Geteuid() != 0 {
+			s.sudo = "/usr/bin/sudo"
+		}
+	case "linux":
+		var err error
+		s.clipboard = system.DiscoverLinuxClipboard()
+		if s.apt, err = system.DiscoverLinuxAPT(ctx); err != nil {
+			s.apt, s.aptIssue = nil, err.Error()
+		} else {
+			s.sudo, failure = s.apt.Sudo, "APT administrator authentication failed"
+		}
+		if s.dpkgDeb, err = exec.LookPath("dpkg-deb"); err != nil {
+			return fmt.Errorf("Ubuntu/Debian requires its native archive decoder dpkg-deb: %w", err)
+		}
+	case "windows":
+		var err error
+		if s.powershell, err = system.DiscoverWindowsPowerShell(); err != nil {
+			s.powershell, s.windowsIssue = "", err.Error()
+		}
+		if s.buildTools, err = system.DiscoverWindowsBuildToolsDirectory(); err != nil {
+			s.buildTools, s.windowsIssue = "", err.Error()
+		}
 	}
-	if goos == "darwin" {
-		return "/usr/bin/sudo"
+	if s.sudo != "" {
+		s.authenticate = foregroundSudo(s.sudo, failure)
 	}
-	program, err := exec.LookPath("sudo")
-	if err != nil {
-		return ""
+	return ctx.Err()
+}
+
+type homebrewDirectory struct {
+	mu        sync.Mutex
+	directory string
+}
+
+func (h *homebrewDirectory) discover(ctx context.Context) *system.HomebrewLocation {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	location, err := system.DiscoverHomebrew(ctx)
+	if err != nil || location == nil || location.Validate() != nil {
+		return nil
 	}
-	return program
+	if system.NixHomebrewIssue(*location) == "" {
+		h.directory = location.CommandDirectory()
+	}
+	return location
+}
+
+func (h *homebrewDirectory) get() string {
+	h.mu.Lock()
+	directory := h.directory
+	h.mu.Unlock()
+	if directory == "" {
+		h.discover(context.Background())
+		h.mu.Lock()
+		directory = h.directory
+		h.mu.Unlock()
+	}
+	return directory
 }
 
 func foregroundSudo(program, failure string) func(context.Context) error {

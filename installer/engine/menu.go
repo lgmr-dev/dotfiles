@@ -272,7 +272,7 @@ func (s *menuSession) propose(ctx context.Context, base Request, keepChoices boo
 			}
 		}
 	}
-	return Proposal{Plan: plan, Choices: choices}, request, nil
+	return Proposal{Plan: plan, Choices: choices, Notice: FallbackNotice(plan)}, request, nil
 }
 
 func (s *menuSession) sharedRemovalChoices(ctx context.Context, request Request, plan Plan) ([]ReviewChoice, error) {
@@ -443,7 +443,7 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 		if err != nil {
 			return result, err
 		}
-		result = e.checkResult(plan)
+		result = e.checkResult(ctx, plan)
 		session.checkFailed = result.Status != "ready"
 		return result, ui.Report(result)
 	}
@@ -480,7 +480,9 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 		if err != nil {
 			return result, err
 		}
-		proposal.Notice = notice
+		if notice != "" {
+			proposal.Notice = strings.TrimSpace(notice + " " + proposal.Notice)
+		}
 		revise := func(ctx context.Context, choices []ReviewChoice) (Proposal, error) {
 			if err := recordChoices(proposal.Choices, choices, checked); err != nil {
 				return Proposal{}, err

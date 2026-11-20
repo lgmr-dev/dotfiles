@@ -18,7 +18,15 @@ import (
 // executable. UI is nil outside the menu. Sweep, when set, removes unused
 // private builds after a pass without a failure. Elevate, when set, starts
 // the administrator session before the first privileged step and returns its
-// release.
+// release. Selection, when set, receives the closure of the selected and kept
+// resources of a request before its inspections and before the steps of its
+// approved plan, so a provider whose content depends on the selection can use
+// it. Leftovers, when set, returns the paths that setup keeps for the owner
+// and no longer uses: a check lists them as notes. Switch is true only for
+// the run of the import that completes the switch from release v2: that run
+// is permitted while v2_restore is "switching", and it does not close the v2
+// fallback. Each other confirmed apply or update closes an open fallback
+// before its first change.
 type Engine struct {
 	Catalog  Catalog
 	Router   Router
@@ -29,6 +37,10 @@ type Engine struct {
 	UI       Interaction
 	Sweep    func(ctx context.Context, rec Records) error
 	Elevate  func(ctx context.Context) (func() error, error)
+
+	Selection func(wanted []string)
+	Leftovers func(ctx context.Context) ([]string, error)
+	Switch    bool
 }
 
 type viewRecords struct{ st state.State }
@@ -73,6 +85,9 @@ func (e *Engine) inspect(ctx context.Context, st state.State, request Request, r
 	if err != nil {
 		return found, err
 	}
+	if e.Selection != nil {
+		e.Selection(slices.Clone(wanted))
+	}
 	for _, id := range wanted {
 		if r, _ := e.Catalog.Resource(id); r.Action == "" {
 			continue
@@ -99,6 +114,16 @@ func (e *Engine) Preview(ctx context.Context, request Request) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
+	return e.PreviewState(ctx, st, request)
+}
+
+// PreviewState inspects the system and returns the plan of a request for a
+// state that is not the saved one. The import from release v2 uses it for
+// the state that it maps in memory. It only reads.
+func (e *Engine) PreviewState(ctx context.Context, st state.State, request Request) (Plan, error) {
+	if err := e.validate(); err != nil {
+		return Plan{}, err
+	}
 	found, err := e.inspect(ctx, st, request, viewRecords{st})
 	if err != nil {
 		return Plan{}, err
@@ -113,7 +138,7 @@ func (e *Engine) Check(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{Status: "failed"}, err
 	}
-	return e.checkResult(plan), nil
+	return e.checkResult(ctx, plan), nil
 }
 
 func pendingLine(mark string) string {
@@ -136,8 +161,11 @@ func (e *Engine) disclosures(plan Plan) string {
 	return message
 }
 
-func (e *Engine) checkResult(plan Plan) Result {
+func (e *Engine) checkResult(ctx context.Context, plan Plan) Result {
 	reasons := []string{}
+	if plan.V2Restore == "switching" {
+		reasons = append(reasons, switchingLine)
+	}
 	for _, mark := range plan.Pending {
 		reasons = append(reasons, pendingLine(mark))
 	}
@@ -151,7 +179,17 @@ func (e *Engine) checkResult(plan Plan) Result {
 	if len(reasons) > 0 {
 		status, message = "needs-action", strings.Join(reasons, "\n")
 	}
-	return Result{Status: status, Plan: plan, Message: message + e.disclosures(plan)}
+	message += e.disclosures(plan)
+	if e.Leftovers != nil {
+		left, err := e.Leftovers(ctx)
+		if err != nil {
+			message += "\nNote: setup could not list the content that it keeps and no longer uses: " + err.Error()
+		}
+		for _, path := range sortedUnique(left) {
+			message += "\nNote: setup keeps " + path + " and no longer uses it; inspect it, then delete it yourself"
+		}
+	}
+	return Result{Status: status, Plan: plan, Message: message + e.v2FolderReport(plan.V2Restore)}
 }
 
 func sameSelection(plan Plan, request Request) bool {
@@ -195,12 +233,28 @@ func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (res
 		result.Status, result.Message = "needs-action", strings.Join(lines, "\n")
 		return result, fmt.Errorf("%w: %s", ErrPending, strings.Join(st.Pending, ", "))
 	}
+	if st.V2Restore == "switching" && !e.Switch {
+		result.Status, result.Message = "needs-action", switchingLine
+		return result, ErrSwitching
+	}
 	effective, err := resolve(e.Catalog, st, request)
 	if err != nil {
 		return result, err
 	}
-	if !sameSelection(approved, effective) {
+	if !sameSelection(approved, effective) || approved.V2Restore != st.V2Restore {
 		return result, ErrPlanChanged
+	}
+	if st.V2Restore == "open" && !e.Switch {
+		if err := store.Update(func(s *state.State) error { s.V2Restore = ""; return nil }); err != nil {
+			return result, err
+		}
+	}
+	if e.Selection != nil {
+		wanted, err := e.Catalog.Closure(slices.Concat(effective.Selected, effective.Keep), e.Context)
+		if err != nil {
+			return result, err
+		}
+		e.Selection(wanted)
 	}
 	logNotes := []string{}
 	log, err := openApplyLog(e.StateDir, time.Now())

@@ -41,7 +41,9 @@ type Operation struct {
 }
 
 // Plan is the preview of a run. Pending lists the pending marks of the state:
-// a mutating run stops while one stays.
+// a mutating run stops while one stays. V2Restore is the v2_restore value of
+// the state: "switching" while the import from release v2 is not complete,
+// "open" while restore-v2 is available.
 type Plan struct {
 	Mode         string
 	Source       string
@@ -52,6 +54,7 @@ type Plan struct {
 	RemoveShared []string
 	Replace      []string
 	Pending      []string
+	V2Restore    string
 	Operations   []Operation
 }
 
@@ -80,6 +83,10 @@ var ErrPlanChanged = errors.New("machine or selection changed; review a fresh pl
 // after it. The command line exits with 3 and the menu shows the remaining
 // plan.
 var ErrReplan = errors.New("a provider became available; run the same command again to review the remaining work")
+
+// ErrSwitching means that the import from release v2 published the new state
+// and did not complete the switch. Only the import and restore-v2 can run.
+var ErrSwitching = errors.New("the import from release v2 is not complete; run setup to complete it, or run restore-v2")
 
 // ErrPending means that the state has a pending mark. A run without the menu
 // stops before any change.

@@ -1,0 +1,251 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"maps"
+	"os"
+	"strings"
+
+	"github.com/luisgui1757/dotfiles/installer/builds"
+	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/hooks"
+	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/luisgui1757/dotfiles/installer/terminal"
+	"github.com/luisgui1757/dotfiles/installer/v2import"
+)
+
+func init() { importV2, restoreV2 = runImportV2, runRestoreV2 }
+
+func legacyCommandDirectories(s setup) []string {
+	if s.host.OS != "darwin" {
+		return nil
+	}
+	st, err := state.Peek(s.stateDir, s.target)
+	if err != nil {
+		return nil
+	}
+	return v2import.LegacyCommandDirectories(s.stateDir, st, s.host.Context)
+}
+
+func verifyNvim(s setup) func(context.Context) error {
+	return func(ctx context.Context) error {
+		pins, err := builds.HostPins(s.catalog.Pins, s.host)
+		if err != nil {
+			return err
+		}
+		nvim := builds.CommandPath(s.stateDir, "tool.nvim", "nvim", pins["tool.nvim"])
+		if nvim == "" {
+			return errors.New("the Neovim build has no command path on this system")
+		}
+		_, err = platform.Exec{}.Run(ctx, platform.Command{Path: nvim, Args: []string{"--headless", "+if v:errmsg != '' | cquit 1 | endif", "+qa"}})
+		return err
+	}
+}
+
+func importOptions(s setup) (v2import.Options, func([]string), error) {
+	if s.catalog == nil {
+		return v2import.Options{}, nil, errors.New("the import from release v2 and restore-v2 require the catalog")
+	}
+	w := newWiring(s)
+	if w.err != nil {
+		return v2import.Options{}, nil, fmt.Errorf("the import from release v2 and restore-v2 require the provider wiring: %w", w.err)
+	}
+	e := &engine.Engine{Catalog: s.catalog, Router: w.route, Context: s.host.Context, StateDir: s.stateDir, Target: s.target, Source: s.source,
+		Sweep: w.sweep, Selection: w.selected.set, Leftovers: w.leftovers}
+	if s.sudo != "" {
+		e.Elevate = sudoSession(s.sudo, s.authenticate)
+	}
+	kinds := map[string]targets.Kind{}
+	maps.Copy(kinds, hooks.ProfileKinds())
+	maps.Copy(kinds, hooks.SentinelKinds())
+	maps.Copy(kinds, w.fonts.Kinds())
+	options := v2import.Options{Engine: e, Folders: s.folders, Kinds: kinds, VerifyNvim: verifyNvim(s)}
+	return options, func(directories []string) { w.profiles.LegacyCommandDirectories = directories }, nil
+}
+
+func importPreview(options v2import.Options, proposal *v2import.Proposal) string {
+	return strings.Join(terminal.PlanText(options.Engine.Catalog, proposal.Plan), "\n") + "\n\n" + proposal.Details + "\n"
+}
+
+func reportImport(ui *terminal.Workflow, result engine.Result, err error) error {
+	if err != nil && !errors.Is(err, engine.ErrReplan) && !errors.Is(err, engine.ErrPending) {
+		result.Status, result.Message = "failed", strings.TrimSpace(err.Error()+"\n"+result.Message)
+	}
+	if reportErr := ui.Report(result); reportErr != nil {
+		return errors.Join(err, reportErr)
+	}
+	if err != nil {
+		err = &engine.ReportedError{Err: err}
+	}
+	return finish(result, err)
+}
+
+func runImportV2(ctx context.Context, s setup) error {
+	options, setLegacy, err := importOptions(s)
+	if err != nil {
+		return err
+	}
+	c := s.command
+	if c.name == "" {
+		return importMenu(ctx, s, options, setLegacy)
+	}
+	if c.selectSet || len(c.removeShared) != 0 || len(c.replace) != 0 {
+		return errors.New("the import from release v2 keeps the selection of release v2; run apply --yes without other arguments first, then change the selection. Nothing was changed")
+	}
+	proposal, err := v2import.Preview(ctx, options, setLegacy)
+	if err != nil {
+		return err
+	}
+	preview := importPreview(options, proposal)
+	if c.name == "check" {
+		if _, err := fmt.Fprint(s.output, preview); err != nil {
+			return err
+		}
+		if proposal.Switching {
+			return errors.New("the import from release v2 is not complete; run apply --yes to complete it, or restore-v2 --yes to go back to release v2")
+		}
+		return errors.New("this installation runs release v2; run setup, or apply --yes, to import it. Nothing was changed")
+	}
+	if !c.yes || c.name == "plan" {
+		if c.name != "plan" {
+			preview += "Nothing was changed. To import this installation, run the same command with --yes.\n"
+		}
+		_, err := fmt.Fprint(s.output, preview)
+		return err
+	}
+	if _, err := fmt.Fprint(s.output, preview); err != nil {
+		return err
+	}
+	ui := &terminal.Workflow{Output: s.output}
+	applying, err := ui.BeginApply(ctx)
+	if err != nil {
+		return err
+	}
+	result, err := proposal.Run(applying)
+	return reportImport(ui, result, err)
+}
+
+func importMenu(ctx context.Context, s setup, options v2import.Options, setLegacy func([]string)) (resultErr error) {
+	ui := &terminal.Workflow{Input: os.Stdin, Output: s.output}
+	defer func() { resultErr = errors.Join(resultErr, ui.Close()) }()
+	notice := "This installation runs release v2. Review the import to release v3: setup builds the private tools first, and release v2 stays active when a build fails."
+	for {
+		proposal, err := v2import.Preview(ctx, options, setLegacy)
+		if err != nil {
+			return err
+		}
+		if proposal.Switching {
+			choices := []engine.Choice{
+				{ID: "complete", Label: "Complete the import", Detail: "Review and apply the remaining switch to release v3."},
+				{ID: "restore", Label: "Restore release v2", Detail: "Give back the saved targets and the state of release v2."},
+				{ID: "exit", Label: "Exit"},
+			}
+			choice, err := ui.Choose(ctx, "The import from release v2 is not complete. What would you like to do?", choices, []string{"complete"}, false)
+			if errors.Is(err, engine.ErrCancelled) || err == nil && (len(choice) != 1 || choice[0] == "exit") {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if choice[0] == "restore" {
+				return restoreMenu(ctx, ui, s, options)
+			}
+			notice = "The import from release v2 is not complete. Review the remaining switch."
+		}
+		accepted, err := ui.Review(ctx, options.Engine.Catalog, engine.Proposal{Plan: proposal.Plan, Details: proposal.Details, Notice: notice}, nil)
+		if errors.Is(err, engine.ErrCancelled) || err == nil && !accepted {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		applying, err := ui.BeginApply(ctx)
+		if err != nil {
+			return err
+		}
+		result, err := proposal.Run(applying)
+		if errors.Is(err, engine.ErrPlanChanged) || errors.Is(err, engine.ErrReplan) {
+			notice = "Your system changed after the review. This is the updated plan."
+			if errors.Is(err, engine.ErrReplan) {
+				notice = result.Message
+			}
+			continue
+		}
+		if err := reportImport(ui, result, err); err != nil || result.Plan.V2Restore != "open" {
+			return err
+		}
+		if err := ui.Close(); err != nil {
+			return err
+		}
+		return menu(ctx, newEngine(s), os.Stdin, s.output)
+	}
+}
+
+func restoreMenu(ctx context.Context, ui *terminal.Workflow, s setup, options v2import.Options) error {
+	restoration, err := v2import.PreviewRestore(ctx, options)
+	if err != nil {
+		return err
+	}
+	confirm := []engine.Choice{
+		{ID: "restore", Label: "Restore release v2", Detail: strings.TrimSpace(restoration.Text())},
+		{ID: "back", Label: "Go back", Detail: "Nothing changes now."},
+	}
+	choice, err := ui.Choose(ctx, "Restore release v2?", confirm, []string{"back"}, false)
+	if errors.Is(err, engine.ErrCancelled) || err == nil && (len(choice) != 1 || choice[0] != "restore") {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	replace := []string{}
+	if changed := restoration.Changed(); len(changed) != 0 {
+		choices := []engine.Choice{}
+		for _, item := range changed {
+			choices = append(choices, engine.Choice{ID: item.Key, Label: item.Key, Detail: "Checked: setup saves your changed content, then writes the value of release v2. Unchecked: your content stays."})
+		}
+		replace, err = ui.Choose(ctx, "These targets changed after the switch. Select the ones that restore-v2 replaces.", choices, nil, true)
+		if errors.Is(err, engine.ErrCancelled) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if err := ui.Close(); err != nil {
+		return err
+	}
+	message, err := restoration.Run(ctx, replace)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(s.output, message)
+	return err
+}
+
+func runRestoreV2(ctx context.Context, s setup) error {
+	options, _, err := importOptions(s)
+	if err != nil {
+		return err
+	}
+	restoration, err := v2import.PreviewRestore(ctx, options)
+	if err != nil {
+		return err
+	}
+	preview := restoration.Text()
+	if !s.command.yes && !restoration.Done {
+		preview += "Nothing was changed. To restore release v2, run restore-v2 --yes. It keeps each target that you changed after the switch.\n"
+	}
+	if _, err := fmt.Fprint(s.output, preview); err != nil || !s.command.yes || restoration.Done {
+		return err
+	}
+	message, err := restoration.Run(ctx, nil)
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintln(s.output, message)
+	return err
+}

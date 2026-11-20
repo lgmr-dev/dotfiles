@@ -102,6 +102,11 @@ func (p *Profiles) shellCommandDirectories(selected []string) []string {
 	for _, id := range ids {
 		directories = append(directories, builds.BinaryDirectories(p.StateDir, id, p.Pins[id])...)
 	}
+	for _, directory := range p.LegacyCommandDirectories {
+		if !slices.Contains(directories, directory) {
+			directories = append(directories, directory)
+		}
+	}
 	return directories
 }
 

@@ -24,7 +24,10 @@ func wiredSetup(t *testing.T, goos, arch string) setup {
 	if err != nil {
 		t.Fatal(err)
 	}
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	home := filepath.Join(root, "home")
 	host := platform.Host{Context: platform.Context{OS: goos, Arch: arch}}
 	if goos == "linux" {
@@ -108,6 +111,9 @@ func TestEachResourceOfEachSystemRoutesToItsProvider(t *testing.T) {
 				if err != nil {
 					t.Errorf("%s has no route: %v", r.ID, err)
 					continue
+				}
+				if deferred, wrapped := provider.(deferredProvider); wrapped {
+					provider = deferred.Provider
 				}
 				if r.Action == "" {
 					if provider != nil {

@@ -57,11 +57,16 @@ func (r *macTestRunner) Run(_ context.Context, c platform.Command) ([]byte, erro
 	return r.run(c, input)
 }
 
-func macTestRoot(t *testing.T) string {
+func macTestSkipWithoutPOSIXPaths(t *testing.T) {
 	t.Helper()
 	if os.PathSeparator != '/' {
 		t.Skip("the macOS providers use POSIX paths")
 	}
+}
+
+func macTestRoot(t *testing.T) string {
+	t.Helper()
+	macTestSkipWithoutPOSIXPaths(t)
 	root, err := platform.ResolvePath(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

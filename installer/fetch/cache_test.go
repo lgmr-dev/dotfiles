@@ -46,7 +46,9 @@ func TestDownloadCacheResumesInTheNextRun(t *testing.T) {
 	base := t.TempDir()
 	cache := filepath.Join(base, "downloads")
 	destination := filepath.Join(base, "payload")
-	if err := fetch.Download(t.Context(), pin, destination, fetch.Options{Client: server.Client(), Cache: cache, Transfer: testArchiveTransfer}); err == nil {
+	withoutSlowWindow := testArchiveTransfer
+	withoutSlowWindow.Window = withoutSlowWindow.Limit
+	if err := fetch.Download(t.Context(), pin, destination, fetch.Options{Client: server.Client(), Cache: cache, Transfer: withoutSlowWindow}); err == nil {
 		t.Fatal("the cut transfer succeeded")
 	}
 	if _, err := os.Lstat(destination); !errors.Is(err, os.ErrNotExist) {
@@ -56,7 +58,7 @@ func TestDownloadCacheResumesInTheNextRun(t *testing.T) {
 	if err != nil || info.Size() != int64(half) {
 		t.Fatalf("kept download = %v, %v; want %d bytes", info, err, half)
 	}
-	if err := fetch.Download(t.Context(), pin, destination, fetch.Options{Client: server.Client(), Cache: cache, Transfer: testArchiveTransfer}); err != nil {
+	if err := fetch.Download(t.Context(), pin, destination, fetch.Options{Client: server.Client(), Cache: cache, Transfer: withoutSlowWindow}); err != nil {
 		t.Fatal(err)
 	}
 	requests := log.all()

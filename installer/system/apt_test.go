@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -53,11 +54,18 @@ type aptFixture struct {
 
 func newAPTFixture(t *testing.T) *aptFixture {
 	t.Helper()
-	root := t.TempDir()
+	if os.PathSeparator != '/' {
+		t.Skip("the APT provider uses POSIX paths")
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	f := &aptFixture{t: t, rec: newAPTFixtureRecords(), installed: map[string]aptPackage{}, candidates: map[string]string{}, verify: map[string]string{}}
 	location := APTLocation{APTGet: "/fake/apt-get", APTCache: "/fake/apt-cache", Dpkg: "/fake/dpkg", DpkgQuery: "/fake/dpkg-query", APTMark: "/fake/apt-mark", Sudo: "/fake/sudo"}
 	f.apt = NewAPT(location, catalog.Pins{}, "amd64", filepath.Join(root, "apt"))
 	f.apt.Temporary = filepath.Join(root)
+	f.apt.DpkgConfiguration = filepath.Join(root, "dpkg")
 	f.apt.Query, f.apt.Runner = f.query, f
 	f.apt.Authenticate = func(context.Context) error { f.authentication++; return nil }
 	return f
@@ -556,5 +564,71 @@ func TestAPTRefusesAResourceWithoutItsBindingOrHealthCheck(t *testing.T) {
 	found, err := f.apt.Inspect(ctx, aptFixtureResource("unknown"), engine.Want{Present: true}, f.rec)
 	if err != nil || found.Status != engine.Blocked || !strings.Contains(found.Reason, "lacks its APT command health check") {
 		t.Fatal(found, err)
+	}
+}
+
+func TestAPTHealthIgnoresOnlyMissingFilesThatDpkgExcludes(t *testing.T) {
+	ctx := context.Background()
+	r := catalog.Resource{ID: "library.first", Name: "Fixture library", Action: "apt-library", Bindings: map[string]catalog.Binding{"linux": {Provider: "apt", Package: "first"}}}
+	for name, c := range map[string]struct {
+		verify  string
+		healthy bool
+	}{
+		"excluded doc and locale files":   {"missing     /usr/share/doc/first/NEWS.gz\nmissing     /usr/share/locale/ab/LC_MESSAGES/first.mo\nmissing     /usr/share/man/man1/first.1.gz\n", true},
+		"excluded file in the short form": {"missing /usr/share/doc/first/NEWS.gz\n", true},
+		"re-included file is missing":     {"missing     /usr/share/doc/first/copyright\n", false},
+		"last matching option wins":       {"missing     /usr/share/locale/en/LC_MESSAGES/first.mo\n", false},
+		"excluded file changed":           {"??5??????   /usr/share/doc/first/NEWS.gz\n", false},
+		"missing file outside the globs":  {"missing     /usr/lib/x86_64-linux-gnu/libfirst.so.1\n", false},
+		"missing file that is unreadable": {"missing     /usr/share/doc/first/NEWS.gz (Permission denied)\n", false},
+		"excluded and other missing file": {"missing     /usr/share/doc/first/NEWS.gz\nmissing     /usr/lib/libfirst.so\n", false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newAPTFixture(t)
+			if err := os.MkdirAll(filepath.Join(f.apt.DpkgConfiguration, "dpkg.cfg.d"), 0755); err != nil {
+				t.Fatal(err)
+			}
+			for file, text := range map[string]string{
+				"dpkg.cfg.d/docker":      "# minimized image\npath-exclude /usr/share/doc/*\npath-include=/usr/share/doc/*/copyright\npath-exclude=/usr/share/man/*\n",
+				"dpkg.cfg.d/excludes":    "path-exclude=/usr/share/locale/*\npath-include=/usr/share/locale/en*\n",
+				"dpkg.cfg.d/ignored.bak": "path-exclude=/usr/lib/*\n",
+				"dpkg.cfg":               "no-debsig\nlog /var/log/dpkg.log\n",
+			} {
+				if err := os.WriteFile(filepath.Join(f.apt.DpkgConfiguration, file), []byte(text), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			aptFixtureInstalled(f, "first", "1")
+			f.rec.st.AddSystem("apt", "first")
+			f.verify["first:amd64"] = c.verify
+			found, err := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec)
+			if err != nil || (found.Status == engine.Satisfied) != c.healthy || !c.healthy && (found.Status != engine.Unhealthy || !strings.Contains(found.Reason, "changed package files")) {
+				t.Fatal(found, err)
+			}
+		})
+	}
+	f := newAPTFixture(t)
+	aptFixtureInstalled(f, "first", "1")
+	f.verify["first:amd64"] = "missing     /usr/share/doc/first/NEWS.gz\n"
+	if found, err := f.apt.Inspect(ctx, r, engine.Want{Present: true}, f.rec); err != nil || found.Status == engine.Satisfied {
+		t.Fatal("a missing file without a dpkg exclusion must fail", found, err)
+	}
+}
+
+func TestAPTPathFilterGlobsFollowDpkg(t *testing.T) {
+	filters := parseAPTPathFilters([]byte("path-exclude=/usr/share/*\n--path-include \"/usr/share/doc/?[a-c]*\"\npath-exclude=/opt/[!x]\\*\npath-exclude=/broken/[\n"))
+	for path, excluded := range map[string]bool{
+		"/usr/share/a/b/c":    true,
+		"/usr/share/doc/xb/y": false,
+		"/usr/share/doc/xd/y": true,
+		"/usr/lib/a":          false,
+		"/opt/a*":             true,
+		"/opt/x*":             false,
+		"/opt/ab":             false,
+		"/broken/[":           false,
+	} {
+		if got := aptPathExcluded(filters, path); got != excluded {
+			t.Fatal(path, got)
+		}
 	}
 }

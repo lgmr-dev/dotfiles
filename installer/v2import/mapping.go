@@ -575,6 +575,17 @@ func LegacyCommandDirectories(stateDir string, st state.State, ctx platform.Cont
 	return legacyDirectories(stateDir, legacyTools(stateDir, st, ctx))
 }
 
+// LegacyApplications returns the macOS applications that still run from
+// their payloads of release v2: tool.vscode, tool.ghostty or tool.openwhispr.
+// An application counts while a recorded link of its desktop integration
+// points into the packages folder of release v2 and that payload exists.
+func LegacyApplications(stateDir string, st state.State, ctx platform.Context) []string {
+	return slices.DeleteFunc(legacyTools(stateDir, st, ctx), func(tool string) bool {
+		_, err := os.Stat(filepath.Join(stateDir, "packages", tool, "current"))
+		return err != nil
+	})
+}
+
 func legacyDirectories(stateDir string, tools []string) []string {
 	directories := []string{}
 	for _, application := range deferredApplications {

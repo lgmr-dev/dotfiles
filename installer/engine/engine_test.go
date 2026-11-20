@@ -72,8 +72,12 @@ func TestSharedResourceStaysUntilRemovalByName(t *testing.T) {
 	}
 	request := selection()
 	request.RemoveShared = []string{"tool.other"}
+	if plan, err := e.Preview(context.Background(), request); err != nil || !slices.Equal(actions(plan), []string{"retain:tool.git"}) {
+		t.Fatal("the removal of an unrecorded resource is not a no-op", actions(plan), err)
+	}
+	request.RemoveShared = []string{"tool.unknown"}
 	if _, err := e.Preview(context.Background(), request); err == nil {
-		t.Fatal("accepted the removal of an unrecorded resource")
+		t.Fatal("accepted the removal of an unknown resource")
 	}
 }
 

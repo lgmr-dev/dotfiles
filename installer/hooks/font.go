@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -359,6 +360,21 @@ func (p *Fonts) keys(paths []string) []string {
 	return keys
 }
 
+func (p *Fonts) withoutQueryTool(st state.State, id string, paths []string) bool {
+	if p.Context.OS != "linux" || !filepath.IsAbs(p.FontMatch) || len(desktopRecorded(st, id)) != 0 {
+		return false
+	}
+	if _, err := os.Stat(p.FontMatch); !errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	for _, path := range paths {
+		if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+			return false
+		}
+	}
+	return true
+}
+
 // Inspect implements engine.Provider. It only reads: it queries the native
 // font engine for the twelve faces and compares the font files and the
 // registration records. It reports Satisfied without a record when the faces
@@ -366,7 +382,11 @@ func (p *Fonts) keys(paths []string) []string {
 // that setup did not record, Missing without a record, Changed for an edited
 // font file, and Unhealthy while the activation is unfinished or the engine
 // does not select each face. A failed query is an error, which never proves
-// absence.
+// absence. The one exception is Linux without fc-match, which the same run
+// can install: without a font record and without a managed font file the
+// missing files prove absence, and the result is Missing. The token covers
+// the font files, the records and the registration values, not the selection
+// of the font engine, so it stays the same when fc-match appears.
 func (p *Fonts) Inspect(ctx context.Context, r catalog.Resource, want engine.Want, rec engine.Records) (engine.Finding, error) {
 	if err := ctx.Err(); err != nil {
 		return engine.Finding{}, err
@@ -400,6 +420,15 @@ func (p *Fonts) Inspect(ctx context.Context, r catalog.Resource, want engine.Wan
 		}
 		return finding, nil
 	}
+	if p.withoutQueryTool(st, r.ID, paths) {
+		i, err := desktopInspect(p.writer(nil), rec, r.ID, want, nil, paths)
+		if err != nil {
+			return engine.Finding{}, err
+		}
+		registrations, _ := json.Marshal(make([]string, len(paths)))
+		i.rows = append(i.rows, []string{string(registrations)})
+		return engine.Finding{Status: engine.Missing, Token: desktopToken(i.rows)}, nil
+	}
 	o, err := p.observe(ctx, r, rec)
 	if err != nil {
 		return engine.Finding{}, err
@@ -408,7 +437,7 @@ func (p *Fonts) Inspect(ctx context.Context, r catalog.Resource, want engine.Wan
 	if err != nil {
 		return engine.Finding{}, err
 	}
-	registrations, _ := json.Marshal(o.probe)
+	registrations, _ := json.Marshal(fontRegistrations(o.probe))
 	i.rows = append(i.rows, []string{string(registrations)})
 	if o.reused {
 		return engine.Finding{Status: engine.Satisfied, Token: desktopToken(i.rows), Notes: []string{"Hack Nerd Font is already installed for this user. Setup uses it and adds no font file."}}, nil

@@ -51,6 +51,13 @@ func desktopBuild(t *testing.T, stateDir, id string) string {
 	return build
 }
 
+func desktopSkipWithoutPOSIXPaths(t *testing.T, provider string) {
+	t.Helper()
+	if os.PathSeparator != '/' {
+		t.Skip(provider + " uses POSIX paths")
+	}
+}
+
 func desktopProvider(e *sentinelEnv, os string) *hooks.Desktop {
 	arch := "amd64"
 	if os == "darwin" {
@@ -99,6 +106,7 @@ func TestDesktopLinuxEntriesNameTheStableCommandAndTheWindowClass(t *testing.T) 
 		{"desktop.obsidian", "tool.obsidian-portable", "obsidian", "dotfiles-obsidian.desktop", []string{"\" --no-sandbox %U\n", "StartupWMClass=md.obsidian.Obsidian\n", "Categories=Office;\nMimeType=x-scheme-handler/obsidian;\n"}},
 		{"desktop.t3-code", "tool.t3-code-app", "t3-code", "dotfiles-t3-code-app.desktop", []string{"\" %U\n", "StartupWMClass=com.t3tools.T3Code\n", "Categories=Development;\nMimeType=x-scheme-handler/t3code;\n"}},
 	}
+	desktopSkipWithoutPOSIXPaths(t, "a Linux desktop entry")
 	for _, c := range cases {
 		t.Run(c.id, func(t *testing.T) {
 			e := newSentinelEnv(t)
@@ -138,6 +146,7 @@ func TestDesktopLinuxEntriesNameTheStableCommandAndTheWindowClass(t *testing.T) 
 }
 
 func TestDesktopEntryEscapesFieldCodesAndShellMetacharacters(t *testing.T) {
+	desktopSkipWithoutPOSIXPaths(t, "a Linux desktop entry")
 	e := newSentinelEnv(t)
 	p := desktopProvider(e, "linux")
 	p.StateDir = filepath.Join(e.home, `ü $x %f "x" \ state`)
@@ -204,6 +213,7 @@ func desktopApplyReplace(t *testing.T, p engine.Provider, e *sentinelEnv, id str
 }
 
 func TestDesktopMacKeyboardAutostartEntryShape(t *testing.T) {
+	desktopSkipWithoutPOSIXPaths(t, "the Linux autostart entry")
 	e := newSentinelEnv(t)
 	p := desktopProvider(e, "linux")
 	p.Folders.Config = filepath.Join(e.home, "xdg config")
@@ -281,7 +291,7 @@ func TestDesktopWindowsShortcutIsPreparedOneTimeAfterApproval(t *testing.T) {
 		t.Fatal("setup invented a Start menu known folder", err)
 	}
 	runner := &desktopPowerShell{t: t, corrupt: true}
-	p.Folders.Programs, p.PowerShell, p.Runner = filepath.Join(e.home, "Programs"), "/fake/powershell.exe", runner
+	p.Folders.Programs, p.PowerShell, p.Runner = filepath.Join(e.home, "Programs"), filepath.Join(e.home, "powershell.exe"), runner
 	desktopBuild(t, e.state, "tool.vscode")
 	finding := desktopInspect(t, p, e, "desktop.vscode", true)
 	if finding.Status != engine.Missing || !strings.Contains(finding.Reason, "prepares the Start menu shortcut") || runner.runs != 0 || sentinelExists(filepath.Join(e.state, "desktop")) {
@@ -332,6 +342,7 @@ func (c *desktopCasks) Cask(_ context.Context, r catalog.Resource) (system.CaskS
 }
 
 func TestDesktopMacCommandLinksPointIntoTheCaskApplications(t *testing.T) {
+	desktopSkipWithoutPOSIXPaths(t, "a macOS cask application")
 	e := newSentinelEnv(t)
 	p := desktopProvider(e, "darwin")
 	casks := &desktopCasks{specs: system.MacCasks(e.home, "/opt/homebrew"), installed: map[string]string{}}

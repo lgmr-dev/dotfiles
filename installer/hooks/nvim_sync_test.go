@@ -23,6 +23,7 @@ type nvimFixture struct {
 	*sentinelEnv
 	provider *hooks.NvimSync
 	checkout string
+	system   []string
 	phases   []platform.Command
 	checks   []platform.Command
 	phase    func(step int, runtime string) error
@@ -94,7 +95,7 @@ var (
 func newNvimFixture(t *testing.T) *nvimFixture {
 	t.Helper()
 	e := newSentinelEnv(t)
-	f := &nvimFixture{sentinelEnv: e, checkout: filepath.Join(e.home, "repository")}
+	f := &nvimFixture{sentinelEnv: e, checkout: filepath.Join(e.home, "repository"), system: []string{filepath.Join(e.home, "system", "usr", "bin"), filepath.Join(e.home, "system", "bin")}}
 	sentinelWrite(t, filepath.Join(f.checkout, "nvim", "init.lua"), "-- fixture\n", 0644)
 	sentinelWrite(t, filepath.Join(f.checkout, "nvim", "lazy-lock.json"), "{}\n", 0644)
 	sentinelWrite(t, filepath.Join(f.checkout, "nvim", "mason-registry", "registry.json"), "[]\n", 0644)
@@ -104,7 +105,7 @@ func newNvimFixture(t *testing.T) *nvimFixture {
 	}
 	f.provider = &hooks.NvimSync{Context: platform.Context{OS: "linux", Arch: "amd64"}, Checkout: f.checkout, StateDir: e.state, RuntimeDirectory: runtime,
 		Pins: map[string]catalog.ArchivePin{hooks.NvimExecutable: nvimPin, "tool.node": nodePin}, Tools: []string{hooks.NvimExecutable, "tool.node"},
-		Directories: []string{"/usr/bin", "/bin"}, Runner: f, Query: f.query}
+		Directories: f.system, Runner: f, Query: f.query}
 	f.tool(hooks.NvimExecutable, "0.12.0", nvimPin)
 	f.tool("tool.node", "24.0.0", nodePin)
 	return f
@@ -176,7 +177,7 @@ func TestNvimSyncRunsTheLockedPhasesInANewBuildAndPublishesBothLinks(t *testing.
 			t.Fatal("unexpected phase command", i, c.Path, c.Args)
 		}
 		for name, want := range map[string]string{
-			"PATH":                 strings.Join([]string{filepath.Join(nvim, "bin"), filepath.Join(node, "bin"), "/usr/bin", "/bin"}, string(os.PathListSeparator)),
+			"PATH":                 strings.Join(append([]string{filepath.Join(nvim, "bin"), filepath.Join(node, "bin")}, f.system...), string(os.PathListSeparator)),
 			"DOTFILES_NVIM_CONFIG": config, "DOTFILES_NVIM_RUNTIME": build, "DOTFILES_NVIM_LOCKFILE": filepath.Join(build, ".lazy-lock-0.json"), "DOTFILES_NVIM_SYNC": "1",
 			"XDG_CONFIG_HOME": f.checkout, "HOME": filepath.Join(build, ".home"), "XDG_DATA_HOME": filepath.Join(build, ".data"), "XDG_STATE_HOME": filepath.Join(build, ".state"),
 			"XDG_CACHE_HOME": filepath.Join(build, ".cache"), "CARGO_HOME": filepath.Join(build, ".cargo"), "RUSTUP_HOME": filepath.Join(build, ".rustup"), "NVIM_APPNAME": "nvim",

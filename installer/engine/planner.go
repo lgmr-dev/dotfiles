@@ -145,8 +145,8 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 		}
 	}
 	for _, id := range request.RemoveShared {
-		if r, ok := c.Resource(id); !ok || !Recorded(st, r, ctx) {
-			return plan, fmt.Errorf("cannot remove unrecorded resource %q", id)
+		if _, ok := c.Resource(id); !ok {
+			return plan, fmt.Errorf("cannot remove unknown resource %q", id)
 		}
 	}
 	requiredBy := map[string][]string{}

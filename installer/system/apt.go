@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
@@ -108,16 +109,25 @@ func QueryAPT(ctx context.Context, program string, args ...string) ([]byte, erro
 // read-only inspection command. Authenticate asks for the sudo password one
 // time in the foreground before the first privileged command. Download
 // fetches a URL to a file and verifies its SHA-256 and size.
+//
+// DpkgConfiguration is the folder of dpkg.cfg and dpkg.cfg.d, /etc/dpkg when
+// empty. The provider reads its path-exclude and path-include options one
+// time: a file that dpkg did not install because of them is not a changed
+// package file.
 type APT struct {
-	Location     APTLocation
-	Arch         string
-	Directory    string
-	Temporary    string
-	Pins         catalog.Pins
-	Query        func(ctx context.Context, program string, args ...string) ([]byte, error)
-	Runner       platform.Runner
-	Authenticate func(context.Context) error
-	Download     func(ctx context.Context, url, sha256 string, size int64, destination string) error
+	Location          APTLocation
+	Arch              string
+	Directory         string
+	Temporary         string
+	DpkgConfiguration string
+	Pins              catalog.Pins
+	Query             func(ctx context.Context, program string, args ...string) ([]byte, error)
+	Runner            platform.Runner
+	Authenticate      func(context.Context) error
+	Download          func(ctx context.Context, url, sha256 string, size int64, destination string) error
+
+	pathFiltersOnce sync.Once
+	pathFilters     []aptPathFilter
 }
 
 // NewAPT returns the provider for the discovered location. It is pure.
@@ -193,7 +203,7 @@ func (a *APT) health(ctx context.Context, r catalog.Resource, name, version stri
 	unreadable := []string{}
 	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
 		switch {
-		case line == "":
+		case line == "", a.excludedMissing(line):
 		case vendorPackage && len(line) > 12 && line[9:12] == " c " && line[12] == '/':
 		case name == "code" && strings.HasPrefix(line, "?????????   /"):
 			unreadable = append(unreadable, line[12:])

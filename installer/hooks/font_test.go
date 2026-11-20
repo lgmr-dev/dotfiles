@@ -57,7 +57,7 @@ func (f *fontEngine) query(_ context.Context, c platform.Command) ([]byte, error
 	}
 	switch f.os {
 	case "linux":
-		if c.Path != "/usr/bin/fc-match" || len(c.Args) != 3 || c.Args[0] != "-f" || c.Args[1] != "%{postscriptname}\n%{file}\n%{charset}\n" {
+		if filepath.Base(c.Path) != "fc-match" || len(c.Args) != 3 || c.Args[0] != "-f" || c.Args[1] != "%{postscriptname}\n%{file}\n%{charset}\n" {
 			f.t.Fatal("unexpected fc-match command", c)
 		}
 		for _, face := range fontFixtureFaces() {
@@ -155,6 +155,9 @@ var fontResource = catalog.Resource{ID: hooks.FontResource, Name: "Hack Nerd Fon
 
 func newFontFixture(t *testing.T, system string) *fontFixture {
 	t.Helper()
+	if system == "linux" {
+		desktopSkipWithoutPOSIXPaths(t, "fontconfig on Linux")
+	}
 	e := newSentinelEnv(t)
 	native := &fontEngine{t: t, os: system, charset: "20-7e e000-f8ff", selected: map[string]string{}, registry: map[string]string{}, loaded: map[string]bool{}}
 	files := []string{}
@@ -164,6 +167,8 @@ func newFontFixture(t *testing.T, system string) *fontFixture {
 	p := &hooks.Fonts{Context: platform.Context{OS: system, Arch: "amd64"}, Folders: platform.Folders{Home: e.home, LocalAppData: filepath.Join(e.home, "AppData", "Local")}, StateDir: e.state,
 		Pins: map[string]catalog.ArchivePin{hooks.FontArchive: {Version: "3.5.1", RequiredFiles: files}}, PowerShell: "/fake/powershell.exe", FontCache: "/usr/bin/fc-cache", FontMatch: "/usr/bin/fc-match",
 		Runner: native, Query: native.query}
+	p.FontMatch = filepath.Join(filepath.Dir(e.home), "bin", "fc-match")
+	sentinelWrite(t, p.FontMatch, "#!/bin/sh\n", 0755)
 	folder := filepath.Join(e.home, ".local", "share", "fonts", "Dotfiles-HackNerdFont")
 	if system == "windows" {
 		folder = filepath.Join(p.Folders.LocalAppData, "Microsoft", "Windows", "Fonts")
@@ -510,5 +515,52 @@ func TestFontKindReadsARegistrationThroughTheWriter(t *testing.T) {
 	}
 	if _, has := f.engine.registry["Dotfiles "+face.file+" (TrueType)"]; has || len(f.engine.registry) != 11 || len(f.records("font")) != 11 {
 		t.Fatal("the release of one registration record changed another registration", f.engine.registry)
+	}
+}
+
+func TestFontWithoutFcMatchIsMissingOnlyWhenNothingOfSetupIsInstalled(t *testing.T) {
+	f := newFontFixture(t, "linux")
+	f.archive()
+	match := f.provider.FontMatch
+	if err := os.Remove(match); err != nil {
+		t.Fatal(err)
+	}
+	f.engine.queryErr = errors.New("fork/exec fc-match: no such file or directory")
+	before := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if before.Status != engine.Missing {
+		t.Fatal("fonts without fc-match, without a file and without a record are not missing", before)
+	}
+	personal := filepath.Join(f.folder, "HackNerdFont-Regular.ttf")
+	sentinelWrite(t, personal, "personal", 0644)
+	if _, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f); err == nil {
+		t.Fatal("a present font file without fc-match gave a result")
+	}
+	if err := os.RemoveAll(filepath.Join(f.home, ".local")); err != nil {
+		t.Fatal(err)
+	}
+	key := targets.Key(personal, hooks.FontSlot)
+	if err := f.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.FontResource, Kind: "font", Next: "font:fixture", Before: "absent"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f); err == nil {
+		t.Fatal("a font record without fc-match gave a result")
+	}
+	if err := f.Update(func(s *state.State) error { s.Drop(key); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	sentinelWrite(t, match, "#!/bin/sh\n", 0755)
+	f.engine.queryErr = nil
+	after := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if after.Status != engine.Missing || after.Token != before.Token {
+		t.Fatal("the install of fc-match changed the token of the fonts", before, after)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, before, f); err != nil {
+		t.Fatal(err)
+	}
+	if finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true); finding.Status != engine.Satisfied || len(f.records("font")) != 12 {
+		t.Fatal("the apply after the install of fc-match did not verify the fonts", finding)
 	}
 }

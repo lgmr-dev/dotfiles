@@ -289,7 +289,7 @@ func (w *wiring) route(r catalog.Resource) (engine.Provider, error) {
 	case r.ID == hooks.FontResource:
 		return w.fonts, nil
 	case hooks.DesktopResource(r.ID):
-		return w.desktop, nil
+		return w.deferred(r, w.desktop), nil
 	case r.ID == "infra.apple-clt" && goos == "darwin":
 		return w.appleCLT, nil
 	case r.ID == hooks.NvimResource:
@@ -301,7 +301,7 @@ func (w *wiring) route(r catalog.Resource) (engine.Provider, error) {
 	case r.ID == "infra.homebrew" && goos == "darwin":
 		return w.homebrew, nil
 	case goos == "darwin" && homebrewBinding(binding):
-		return w.brew, nil
+		return w.deferred(r, w.brew), nil
 	case r.ID == "system.keyboard-access" && goos == "linux":
 		return w.keyboard, nil
 	case goos == "linux" && binding == "apt" && r.ID == "tool.clipboard":

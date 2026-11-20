@@ -31,6 +31,7 @@ var caskTestRequirements = map[string]struct{ token, application, command, requi
 }
 
 func TestCaskRecipesHoldTheReviewedSigningRequirements(t *testing.T) {
+	macTestSkipWithoutPOSIXPaths(t)
 	specs := MacCasks("/Users/fixture", "/opt/homebrew")
 	if len(specs) != len(caskTestRequirements) || len(specs) != len(catalog.ReviewedCasks) {
 		t.Fatal("the reviewed casks, their recipes and this table differ", len(specs), len(catalog.ReviewedCasks))
@@ -129,6 +130,7 @@ func caskTestJSON(t *testing.T, document any, replace ...string) []byte {
 }
 
 func TestCaskMetadataAcceptsTheReviewedRecipesInBothPathForms(t *testing.T) {
+	macTestSkipWithoutPOSIXPaths(t)
 	for id, spec := range MacCasks("/Users/fixture", "/opt/homebrew") {
 		document := caskTestMetadata(t, spec.Token)
 		for _, installed := range []bool{false, true} {
@@ -175,6 +177,7 @@ func TestCaskMetadataAcceptsTheReviewedRecipesInBothPathForms(t *testing.T) {
 }
 
 func TestCaskMetadataRefusesEachChangeOfTheReviewedContract(t *testing.T) {
+	macTestSkipWithoutPOSIXPaths(t)
 	specs := MacCasks("/Users/fixture", "/opt/homebrew")
 	artifacts := func(d map[string]any) []any { return d["artifacts"].([]any) }
 	find := func(d map[string]any, kind string) map[string]any {

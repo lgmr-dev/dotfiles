@@ -645,8 +645,8 @@ func TestSentinelSendsTheGitHubTokenOnlyToTheGitHubAPI(t *testing.T) {
 			switch r.URL.String() {
 			case sentinelReleases:
 				status = http.StatusFound
-				header.Set("Location", "https://releases.example/latest")
-			case "https://releases.example/latest":
+				header.Set("Location", "https://uploads.api.github.com/latest")
+			case "https://uploads.api.github.com/latest":
 				body = `{"tag_name":"v0.5.0","draft":false,"prerelease":false,"immutable":true}`
 			case tags:
 				body = strings.Repeat("4", 40)
@@ -664,7 +664,7 @@ func TestSentinelSendsTheGitHubTokenOnlyToTheGitHubAPI(t *testing.T) {
 		if token != "" {
 			bearer = "Bearer " + token
 		}
-		if want := map[string]string{sentinelReleases: bearer, "https://releases.example/latest": "", tags: bearer}; !maps.Equal(sent, want) {
+		if want := map[string]string{sentinelReleases: bearer, "https://uploads.api.github.com/latest": "", tags: bearer}; !maps.Equal(sent, want) {
 			t.Fatal("setup sent the wrong Authorization headers", sent)
 		}
 	}

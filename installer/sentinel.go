@@ -395,7 +395,7 @@ func (d *SentinelDriver) target(ctx context.Context, record *sentinelRecord) (se
 	latest, err := d.resolve(ctx)
 	if record == nil {
 		if err != nil {
-			return sentinelRelease{}, "", "Setup cannot find the latest Sentinel release: " + err.Error() + ". Check the network and the proxy settings (HTTPS_PROXY), then apply again."
+			return sentinelRelease{}, "", "Setup cannot find the latest Sentinel release: " + err.Error() + ". Check the network, the proxy settings (HTTPS_PROXY) and GITHUB_TOKEN, then apply again."
 		}
 		return latest, "", ""
 	}

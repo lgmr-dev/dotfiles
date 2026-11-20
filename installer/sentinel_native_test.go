@@ -309,7 +309,7 @@ func releasedDotfiles(t *testing.T, repository, base, tag string) (checkout, bin
 		t.Fatal("the "+tag+" tag is required", string(output), err)
 	}
 	binary = filepath.Join(base, "dotfiles-"+tag)
-	build := exec.Command("go", "build", "-trimpath", "-o", binary, "./cmd/dotfiles")
+	build := exec.Command("go", "build", "-trimpath", "-tags", "sentinelfixedrelease", "-o", binary, "./cmd/dotfiles")
 	build.Dir = filepath.Join(checkout, "installer")
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatal(string(output), err)

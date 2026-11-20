@@ -34,6 +34,7 @@ type NativePlatform struct {
 	LinuxClipboard             LinuxClipboardCapability
 	Sentinel                   SentinelLocations
 	DpkgDeb                    string
+	GitHubToken                string
 }
 
 // DiscoverPlatform observes the native machine without running shell input or

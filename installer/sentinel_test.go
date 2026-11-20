@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -627,6 +629,43 @@ func TestSentinelAsksGitHubForAnImmutableRelease(t *testing.T) {
 			t.Fatal("setup did not take the commit of the latest release", o)
 		case want != "" && (o.Desired != "" || !strings.Contains(o.ApplyBlocked, want)):
 			t.Fatal("setup accepted a release that it must refuse", name, o)
+		}
+	}
+}
+
+func TestSentinelSendsTheGitHubTokenOnlyToTheGitHubAPI(t *testing.T) {
+	tags := strings.TrimSuffix(sentinelReleases, "/releases/latest") + "/commits/refs/tags/v0.5.0"
+	for _, token := range []string{"", "fixture-token"} {
+		sent := map[string]string{}
+		d, _ := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
+		d.Latest, d.Releases, d.Token = nil, sentinelReleases, token
+		d.Client = &http.Client{Transport: bootstrapTransport(func(r *http.Request) (*http.Response, error) {
+			sent[r.URL.String()] = r.Header.Get("Authorization")
+			status, header, body := http.StatusOK, http.Header{}, ""
+			switch r.URL.String() {
+			case sentinelReleases:
+				status = http.StatusFound
+				header.Set("Location", "https://releases.example/latest")
+			case "https://releases.example/latest":
+				body = `{"tag_name":"v0.5.0","draft":false,"prerelease":false,"immutable":true}`
+			case tags:
+				body = strings.Repeat("4", 40)
+			default:
+				status = http.StatusNotFound
+			}
+			return &http.Response{StatusCode: status, Status: fmt.Sprint(status), Header: header, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
+		})}
+		writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
+		o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
+		if err != nil || o.Desired != strings.Repeat("4", 40) {
+			t.Fatal("setup did not take the commit of the latest release", o, err)
+		}
+		bearer := ""
+		if token != "" {
+			bearer = "Bearer " + token
+		}
+		if want := map[string]string{sentinelReleases: bearer, "https://releases.example/latest": "", tags: bearer}; !maps.Equal(sent, want) {
+			t.Fatal("setup sent the wrong Authorization headers", sent)
 		}
 	}
 }

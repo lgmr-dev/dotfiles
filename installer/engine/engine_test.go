@@ -265,6 +265,25 @@ func TestUpdateDoesNotRemoveADeselectedResource(t *testing.T) {
 	}
 }
 
+func TestAStepThatAnEarlierStepCompletedIsDone(t *testing.T) {
+	e, w := fixture(t)
+	request := selection("editor")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	editor := w.resource("tool.editor")
+	editor.generation++
+	editor.present = true
+	result, err := e.Apply(context.Background(), request, plan)
+	if err != nil || result.Status == "failed" {
+		t.Fatal("a step that is already in its wanted state stopped the pass", result, err)
+	}
+	if got := w.calls("apply:"); slices.Contains(got, "tool.editor") {
+		t.Fatal("setup applied a resource that was already ready", got)
+	}
+}
+
 func TestChangedTokenStopsTheStep(t *testing.T) {
 	e, w := fixture(t)
 	request := selection("editor")

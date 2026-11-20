@@ -350,6 +350,10 @@ func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (res
 		if err == nil {
 			fresh, err = provider.Inspect(ctx, r, want, rec)
 		}
+		if err == nil && !removal && fresh.Token != op.Finding.Token && fresh.Status == Satisfied {
+			ReportStep(ctx, "[%d/%d] %s is already ready", step, total, r.Name)
+			continue
+		}
 		if err == nil && fresh.Token != op.Finding.Token {
 			ReportStep(ctx, "[%d/%d] %s changed after approval", step, total, r.Name)
 			result.Message = strings.Join(append(failures, r.Name+" changed after approval; review a new plan"), "\n")

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -71,6 +72,26 @@ func names(text, folder string) bool {
 	return false
 }
 
+func backupTexts(backup string) ([]string, error) {
+	texts := []string{}
+	err := filepath.WalkDir(backup, func(path string, entry fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case entry.IsDir():
+			return nil
+		case entry.Type()&fs.ModeSymlink != 0:
+			target, err := os.Readlink(path)
+			texts = append(texts, target)
+			return err
+		}
+		data, err := readBounded(path)
+		texts = append(texts, string(data))
+		return err
+	})
+	return texts, err
+}
+
 func v2References(st state.State, folders []string) (users map[string]string, unreadable string) {
 	users = map[string]string{}
 	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
@@ -81,6 +102,13 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 				if decoded, err := base64.StdEncoding.DecodeString(encoded); err == nil {
 					value = string(decoded)
 				}
+			}
+			if backup, saved := strings.CutPrefix(value, "backup:"); saved {
+				contents, err := backupTexts(backup)
+				if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
+					unreadable = key + " (its backup " + backup + "): " + err.Error()
+				}
+				texts = append(texts, contents...)
 			}
 			texts = append(texts, value)
 		}

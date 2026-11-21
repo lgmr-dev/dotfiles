@@ -287,3 +287,76 @@ func TestAFailedFirstStepWithoutAChangeLeavesTheFallbackOpen(t *testing.T) {
 		t.Fatal("a failed step that changed the state left the fallback open", saved(t, e).V2Restore, result.Message)
 	}
 }
+
+func TestOnlyAStepThatRunsTheProviderShowsTheCommandsOfSetup(t *testing.T) {
+	st := state.State{Schema: 2, Target: target, Selected: []string{"other"}, Keep: []string{}, System: map[string][]string{}, Targets: map[string]state.Record{}}
+	blocks := []engine.CommandBlock{
+		{Title: "Update Other tool", Lines: []string{"sudo apt-get install other"}, By: "setup"},
+		{Title: "Repair Other tool", Lines: []string{"sudo apt-get install --reinstall other"}, By: "you"},
+	}
+	found := engine.Findings{Wanted: map[string]engine.Finding{
+		"tool.other": {Status: engine.Outdated, Notes: []string{"Other tool 2.0 is available"}, Commands: blocks, Token: "1.0"},
+	}}
+	for mode, want := range map[string][]engine.CommandBlock{"apply": blocks[1:], "update": blocks} {
+		plan, err := engine.PlanChanges(fixtureCatalog(), linux, st, engine.Request{Mode: mode}, found, "fixture")
+		if err != nil {
+			t.Fatal(err)
+		}
+		op := operation(t, plan, "tool.other")
+		if !slices.EqualFunc(op.Commands, want, func(a, b engine.CommandBlock) bool { return a.Title == b.Title && a.By == b.By }) {
+			t.Fatalf("%s %s shows %+v", mode, op.Action, op.Commands)
+		}
+		if !slices.Equal(op.Finding.Notes, []string{"Other tool 2.0 is available"}) {
+			t.Fatalf("%s lost the note of the update: %+v", mode, op.Finding.Notes)
+		}
+	}
+}
+
+func TestCheckKeepsAV2FolderThatOnlyASavedBaselineNames(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	packages, recovery := v2Folder(t, e, "packages"), v2Folder(t, e, "recovery")
+	baselines := filepath.Join(w.home, "baselines")
+	if err := os.MkdirAll(filepath.Join(baselines, "folder", "nested"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(baselines, "file")
+	nested := filepath.Join(baselines, "folder", "nested", "init")
+	err := errors.Join(
+		os.WriteFile(file, []byte("source "+filepath.Join(packages, "tool.zsh", "current", "init.zsh")), 0600),
+		os.WriteFile(nested, []byte("dofile('"+filepath.Join(recovery, "old", "init.lua")+"')"), 0600),
+		os.WriteFile(filepath.Join(w.home, "profile"), []byte("plain"), 0600),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edit(t, e, func(s *state.State) {
+		s.Targets[filepath.Join(w.home, "profile")] = state.Record{Resource: "config.editor", Kind: "file", Applied: "fp:abc", Before: "backup:" + file}
+		s.Targets[filepath.Join(w.home, "nvim")] = state.Record{Resource: "config.editor", Kind: "tree", Applied: "fp:abc", Before: "backup:" + filepath.Join(baselines, "folder")}
+	})
+	check, err := e.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Note: " + packages + " is a folder of release v2 still in use by " + filepath.Join(w.home, "profile") + "; keep it",
+		"Note: " + recovery + " is a folder of release v2 still in use by " + filepath.Join(w.home, "nvim") + "; keep it",
+	} {
+		if !strings.Contains(check.Message, want) {
+			t.Fatalf("check lacks %q:\n%s", want, check.Message)
+		}
+	}
+	if err := os.Chmod(nested, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(nested, 0600) })
+	if _, err := os.ReadFile(nested); err == nil {
+		t.Skip("this account reads a file without read permission")
+	}
+	if check, err = e.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(check.Message, "Owner cleanup") || !strings.Contains(check.Message, "Note: setup cannot say if "+recovery+" is still in use, because it could not read "+filepath.Join(w.home, "nvim")) {
+		t.Fatal("check gave a cleanup instruction although a saved baseline is unreadable", check.Message)
+	}
+}

@@ -48,19 +48,20 @@ func sentinelCommit(value string) bool {
 	return len(value) == 40 && strings.Trim(value, "0123456789abcdef") == ""
 }
 
-func sentinelGitPart(relative string) bool {
-	if relative == ".git/HEAD" || relative == ".git/packed-refs" || relative == ".git/refs" || relative == ".git/objects" {
+func sentinelGitWork(relative string) bool {
+	switch relative {
+	case ".git/index", ".git/logs", ".git/FETCH_HEAD", ".git/ORIG_HEAD":
 		return true
 	}
-	return strings.HasPrefix(relative, ".git/refs/") || strings.HasPrefix(relative, ".git/objects/")
+	return strings.HasPrefix(relative, ".git/") && strings.HasSuffix(relative, ".lock")
 }
 
 // SentinelCheckoutFingerprint returns the fingerprint of a Sentinel checkout,
 // or targets.Absent when path does not exist. It covers the raw bytes, the
-// executable bit and the entry kind of each worktree entry. Of the .git
-// folder it covers HEAD, packed-refs, refs and objects, which hold each
-// commit, branch and stash. It excludes the other entries of .git, such as
-// index, logs and FETCH_HEAD, which Git rewrites in normal use.
+// executable bit and the entry kind of each entry of the worktree and of the
+// .git folder, such as config, hooks, info, refs and objects. It excludes
+// only the entries of .git that Git rewrites in normal use: index, logs,
+// FETCH_HEAD, ORIG_HEAD and each lock file.
 func SentinelCheckoutFingerprint(path string) (string, error) {
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -82,7 +83,7 @@ func SentinelCheckoutFingerprint(path string) (string, error) {
 			return err
 		}
 		relative = filepath.ToSlash(relative)
-		if strings.HasPrefix(relative, ".git/") && !sentinelGitPart(relative) {
+		if sentinelGitWork(relative) {
 			if entry.IsDir() {
 				return filepath.SkipDir
 			}

@@ -2,9 +2,11 @@ package builds
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -19,16 +21,19 @@ import (
 // Sweep removes the unused private builds. The roots are the targets of the
 // current links and of each staged link, the builds that a recorded target
 // names, and the builds that the manifests of those builds use. A recorded
-// target names a build in its record values, in the live target of a recorded
-// link and in the complete live content of a recorded file, block or field,
-// or of a regular file in the place of a recorded link. A folder in the place
-// of a target names no build. When a read of a recorded target fails, Sweep
-// removes no build and returns the reason. It removes an unused build only
-// while its tree still equals its manifest, then the manifest of that build
-// and an empty resource folder. It leaves a changed build, a folder without a valid
-// manifest, a manifest file without its build, a staged link that no
-// unfinished publication records and each entry that it does not know, and
-// returns them in left. An entry that appears during the removal also stays.
+// target names a build in its record values, in its decoded inline baseline
+// value, in each file and link of its backup baseline, in the live target of
+// a recorded link, in the complete live content of a recorded file, block or
+// field, or of a regular file in the place of a recorded link, and in each
+// file and link of a recorded tree. A folder in the place of a target of
+// another kind names no build. When a read of a recorded target or of its
+// baseline fails, Sweep removes no build and returns the reason. It removes
+// an unused build only while its tree still equals its manifest, then the
+// manifest of that build and an empty resource folder. It leaves a changed
+// build, a folder without a valid manifest, a manifest file without its
+// build, a staged link that no unfinished publication records and each entry
+// that it does not know, and returns them in left. An entry that appears
+// during the removal also stays.
 func Sweep(ctx context.Context, stateDir string, st state.State) (removed, left []string, err error) {
 	return sweep(ctx, stateDir, st, true)
 }
@@ -170,10 +175,26 @@ func recordedBuilds(key string, record state.Record, all []string) ([]string, er
 		}
 	}
 	result := func() []string { return slices.Sorted(maps.Keys(named)) }
+	overlap := 0
+	for _, build := range all {
+		overlap = max(overlap, len(strings.ReplaceAll(build, `\`, `\\`))+1)
+	}
 	for _, value := range []string{record.Applied, record.Next, record.Before} {
 		scan(value)
 	}
-	if !slices.Contains([]string{"link", "file", "block", "field"}, record.Kind) {
+	if encoded, ok := strings.CutPrefix(record.Before, "value:"); ok {
+		value, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return nil, fmt.Errorf("the baseline value is not base64: %w", err)
+		}
+		scan(string(value))
+	}
+	if backup, ok := strings.CutPrefix(record.Before, "backup:"); ok {
+		if err := scanTree(backup, scan, overlap); err != nil {
+			return nil, err
+		}
+	}
+	if !slices.Contains([]string{"link", "file", "block", "field", "tree"}, record.Kind) {
 		return result(), nil
 	}
 	path := key
@@ -190,15 +211,16 @@ func recordedBuilds(key string, record state.Record, all []string) ([]string, er
 	if err != nil {
 		return nil, err
 	}
-	if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
-		target, err := os.Readlink(path)
-		if err != nil {
+	if record.Kind == "tree" {
+		if err := scanTree(path, scan, overlap); err != nil {
 			return nil, err
 		}
-		if !filepath.IsAbs(target) {
-			target = filepath.Join(filepath.Dir(path), target)
+		return result(), nil
+	}
+	if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+		if err := scanLink(path, scan); err != nil {
+			return nil, err
 		}
-		scan(filepath.Clean(target))
 		if record.Kind == "link" {
 			return result(), nil
 		}
@@ -213,13 +235,45 @@ func recordedBuilds(key string, record state.Record, all []string) ([]string, er
 	if !info.Mode().IsRegular() {
 		return result(), nil
 	}
-	overlap := 0
-	for _, build := range all {
-		overlap = max(overlap, len(strings.ReplaceAll(build, `\`, `\\`))+1)
+	if err := scanFile(path, scan, overlap); err != nil {
+		return nil, err
 	}
+	return result(), nil
+}
+
+func scanTree(root string, scan func(string), overlap int) error {
+	if _, err := os.Lstat(root); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case entry.Type()&(fs.ModeSymlink|fs.ModeIrregular) != 0:
+			return scanLink(path, scan)
+		case entry.Type().IsRegular():
+			return scanFile(path, scan, overlap)
+		}
+		return nil
+	})
+}
+
+func scanLink(path string, scan func(string)) error {
+	target, err := os.Readlink(path)
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(path), target)
+	}
+	scan(filepath.Clean(target))
+	return nil
+}
+
+func scanFile(path string, scan func(string), overlap int) error {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	window := make([]byte, 0, overlap+referenceChunk)
 	for {
@@ -230,11 +284,11 @@ func recordedBuilds(key string, record state.Record, all []string) ([]string, er
 			break
 		}
 		if readErr != nil {
-			return nil, errors.Join(readErr, file.Close())
+			return errors.Join(readErr, file.Close())
 		}
 		window = window[:copy(window, window[max(0, len(window)-overlap):])]
 	}
-	return result(), file.Close()
+	return file.Close()
 }
 
 func namesBuild(text, build string) bool {

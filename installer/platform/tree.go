@@ -1,6 +1,7 @@
 package platform
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -190,6 +191,34 @@ func inspectionFailure(relative, kind string, before, after os.FileInfo, same bo
 // destination and verifies the copy against the source snapshot. It refuses
 // an existing destination and a link or special file in the source.
 func CopyTree(source, destination string) error {
+	return copyTree(source, destination, copyFileData, func(_, to string, info os.FileInfo, children func() error) error {
+		if err := children(); err != nil {
+			return err
+		}
+		return os.Chmod(to, info.Mode().Perm())
+	})
+}
+
+// CopyTreeWithMetadata copies like CopyTree, and it also keeps the metadata
+// that CopyWithMetadata keeps for each file and folder, whatever the size of
+// a file. It verifies the extended attributes that the system can read, and
+// it fails when the copy cannot keep them.
+func CopyTreeWithMetadata(ctx context.Context, source, destination string) error {
+	return copyTree(source, destination, func(from, to string, _ os.FileInfo, limit int64) (int64, error) {
+		if err := copyFileWithMetadata(ctx, from, to, limit); err != nil {
+			return 0, err
+		}
+		copied, err := os.Lstat(to)
+		if err != nil {
+			return 0, err
+		}
+		return copied.Size(), nil
+	}, func(from, to string, info os.FileInfo, children func() error) error {
+		return copyFolderMetadata(ctx, from, to, info, children)
+	})
+}
+
+func copyTree(source, destination string, file func(from, to string, info os.FileInfo, limit int64) (int64, error), folder func(from, to string, info os.FileInfo, children func() error) error) error {
 	before, err := SnapshotTree(source)
 	if err != nil {
 		return err
@@ -212,16 +241,19 @@ func CopyTree(source, destination string) error {
 			if err := os.Mkdir(to, 0700); err != nil {
 				return err
 			}
-			children, err := os.ReadDir(from)
-			if err != nil {
-				return err
-			}
-			for _, child := range children {
-				if err := copyOne(filepath.Join(from, child.Name()), filepath.Join(to, child.Name())); err != nil {
+			err := folder(from, to, info, func() error {
+				children, err := os.ReadDir(from)
+				if err != nil {
 					return err
 				}
-			}
-			if err := os.Chmod(to, info.Mode().Perm()); err != nil {
+				for _, child := range children {
+					if err := copyOne(filepath.Join(from, child.Name()), filepath.Join(to, child.Name())); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+			if err != nil {
 				return err
 			}
 			return SyncDirectory(to)
@@ -229,20 +261,7 @@ func CopyTree(source, destination string) error {
 		if !info.Mode().IsRegular() {
 			return errors.New("configuration payload contains a link or special file")
 		}
-		input, err := os.Open(from)
-		if err != nil {
-			return err
-		}
-		opened, err := input.Stat()
-		if err != nil || !os.SameFile(info, opened) {
-			return errors.Join(errors.New("payload changed while opening"), err, input.Close())
-		}
-		output, err := os.OpenFile(to, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
-		if err != nil {
-			return errors.Join(err, input.Close())
-		}
-		count, copyErr := io.Copy(output, io.LimitReader(input, remainingBytes+1))
-		err = errors.Join(copyErr, output.Chmod(info.Mode().Perm()), output.Sync(), output.Close(), input.Close())
+		count, err := file(from, to, info, remainingBytes)
 		remainingBytes -= count
 		if remainingBytes < 0 {
 			err = errors.Join(err, errors.New("configuration payload grew beyond its size bound"))
@@ -257,4 +276,21 @@ func CopyTree(source, destination string) error {
 		return errors.Join(fmt.Errorf("staged configuration differs from its inspected source"), err)
 	}
 	return nil
+}
+
+func copyFileData(from, to string, info os.FileInfo, limit int64) (int64, error) {
+	input, err := os.Open(from)
+	if err != nil {
+		return 0, err
+	}
+	opened, err := input.Stat()
+	if err != nil || !os.SameFile(info, opened) {
+		return 0, errors.Join(errors.New("payload changed while opening"), err, input.Close())
+	}
+	output, err := os.OpenFile(to, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
+	if err != nil {
+		return 0, errors.Join(err, input.Close())
+	}
+	count, copyErr := io.Copy(output, io.LimitReader(input, limit+1))
+	return count, errors.Join(copyErr, output.Chmod(info.Mode().Perm()), output.Sync(), output.Close(), input.Close())
 }

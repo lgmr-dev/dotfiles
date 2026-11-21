@@ -268,5 +268,10 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 			op.Commands = slices.DeleteFunc(slices.Clone(op.Commands), func(block CommandBlock) bool { return block.By == "you" })
 		}
 	}
+	for i := range plan.Operations {
+		if op := &plan.Operations[i]; !mutating(op.Action) {
+			op.Commands = slices.DeleteFunc(slices.Clone(op.Commands), func(block CommandBlock) bool { return block.By == "setup" })
+		}
+	}
 	return plan, nil
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/state"
 )
 
@@ -154,7 +155,23 @@ type restoreScreen struct {
 	decline   bool
 	back      error
 	closed    bool
+	answers   [][]string
+	asked     []string
 }
+
+func (r *restoreScreen) Choose(_ context.Context, title string, _ []engine.Choice, _ []string, _ bool) ([]string, error) {
+	r.asked = append(r.asked, title)
+	if len(r.answers) == 0 {
+		return nil, engine.ErrCancelled
+	}
+	answer := r.answers[0]
+	r.answers = r.answers[1:]
+	return answer, nil
+}
+
+func (r *restoreScreen) BeginApply(ctx context.Context) (context.Context, error) { return ctx, nil }
+
+func (r *restoreScreen) Report(engine.Result) error { return nil }
 
 func (r *restoreScreen) Review(ctx context.Context, _ engine.Catalog, proposal engine.Proposal, revise engine.Revise) (bool, error) {
 	r.proposals = append(r.proposals, proposal)
@@ -164,6 +181,9 @@ func (r *restoreScreen) Review(ctx context.Context, _ engine.Catalog, proposal e
 	}
 	if r.decline || r.back != nil {
 		return false, r.back
+	}
+	if revise == nil {
+		return true, nil
 	}
 	revised, err := revise(ctx, choices)
 	r.proposals = append(r.proposals, revised)
@@ -306,5 +326,132 @@ func TestADeclinedRestoreReviewGoesBackToTheMenuAndChangesNothing(t *testing.T) 
 	}
 	if _, err := state.Peek(s.stateDir, s.target); !errors.Is(err, state.ErrSchema1) {
 		t.Fatal(err)
+	}
+}
+
+func editV2State(t *testing.T, s setup, edit func(*state.State)) []byte {
+	t.Helper()
+	store, err := state.Open(s.stateDir, s.target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = store.Update(func(st *state.State) error { edit(st); return nil })
+	if err = errors.Join(err, store.Close()); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(s.stateDir, state.File))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+func reportPart(t *testing.T, text string) string {
+	t.Helper()
+	at := strings.Index(text, "\n==> ")
+	if at < 0 {
+		t.Fatalf("the output has no report:\n%s", text)
+	}
+	return text[at:]
+}
+
+var fontMark = hooks.FontResource + ":activate"
+
+func TestRestoreAndTheImportCommandsStopAtAPendingMarkLikeApply(t *testing.T) {
+	s, _ := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	marked := editV2State(t, s, func(st *state.State) { st.Mark(fontMark) })
+	unchanged := func(step string, want []byte) {
+		t.Helper()
+		if data, err := os.ReadFile(filepath.Join(s.stateDir, state.File)); err != nil || string(data) != string(want) {
+			t.Fatalf("%s changed the state at a pending mark:\n%s", step, data)
+		}
+	}
+	normal, normalErr := runV2(t, s, func(ctx context.Context, s setup) error { return execute(ctx, newEngine(s), s.command, s.output) }, "apply", "--yes")
+	if normalErr == nil || !strings.Contains(normal, "An earlier step did not report its end: "+fontMark+". Open setup, confirm that its command exited, then choose the action again.") {
+		t.Fatalf("the fixture must stop a normal apply at the mark: %q %v", normal, normalErr)
+	}
+	unchanged("apply", marked)
+	text, err := runV2(t, s, restoreV2, "restore-v2", "--yes")
+	if err == nil || err.Error() != normalErr.Error() || exitCode(context.Background(), err) != exitCode(context.Background(), normalErr) || reportPart(t, text) != reportPart(t, normal) {
+		t.Fatalf("restore-v2 --yes must stop like apply at a mark:\n%s\n%v\nwant:\n%s\n%v", text, err, normal, normalErr)
+	}
+	unchanged("restore-v2 --yes", marked)
+	switching := editV2State(t, s, func(st *state.State) { st.V2Restore = "switching" })
+	text, err = runV2(t, s, importV2, "apply", "--yes")
+	if err == nil || err.Error() != normalErr.Error() || exitCode(context.Background(), err) != exitCode(context.Background(), normalErr) || reportPart(t, text) != reportPart(t, normal) {
+		t.Fatalf("apply --yes during an import must stop like apply at a mark:\n%s\n%v\nwant:\n%s\n%v", text, err, normal, normalErr)
+	}
+	unchanged("apply --yes during an import", switching)
+}
+
+func pendingQuestion(mark string) string {
+	return "An earlier step did not report its end: " + mark + ". Did its command exit?"
+}
+
+func TestTheRestoreMenuAsksForEachPendingMarkBeforeTheRestore(t *testing.T) {
+	s, original := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	marked := editV2State(t, s, func(st *state.State) { st.Mark(fontMark); st.Mark("tool.zsh:install") })
+	options, _, err := importOptions(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	output, err := os.Create(filepath.Join(t.TempDir(), "output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	s.output = output
+	screen := &restoreScreen{answers: [][]string{{"confirm"}, {"back"}}}
+	if err := restoreMenu(context.Background(), screen, s, options); !errors.Is(err, engine.ErrBack) {
+		t.Fatalf("a mark without a confirmation must go back: %v", err)
+	}
+	if data, err := os.ReadFile(filepath.Join(s.stateDir, state.File)); err != nil || string(data) != string(marked) || len(screen.proposals) != 0 {
+		t.Fatalf("a restore without the confirmation of each mark must change nothing and show no review: %v", err)
+	}
+	screen = &restoreScreen{answers: [][]string{{"confirm"}, {"confirm"}}}
+	if err := restoreMenu(context.Background(), screen, s, options); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{pendingQuestion(fontMark), pendingQuestion("tool.zsh:install")}; !slices.Equal(screen.asked, want) {
+		t.Fatalf("the menu must ask once for each mark with the words of the normal menu: %q", screen.asked)
+	}
+	if data, err := os.ReadFile(filepath.Join(s.stateDir, state.File)); err != nil || string(data) != string(original) {
+		t.Fatalf("after the confirmations the restore must publish the state of release v2: %v", err)
+	}
+}
+
+func TestTheImportMenuAsksForEachPendingMarkBeforeTheSwitch(t *testing.T) {
+	s, _ := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	marked := editV2State(t, s, func(st *state.State) { st.Mark(fontMark); st.V2Restore = "switching" })
+	options, setLegacy, err := importOptions(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const choice = "The import from release v2 is not complete. What would you like to do?"
+	screen := &restoreScreen{answers: [][]string{{"complete"}, {"back"}, {"exit"}}}
+	if open, err := reviewImport(context.Background(), screen, s, options, setLegacy); err != nil || open {
+		t.Fatalf("an exit must end the import menu: %v %v", open, err)
+	}
+	if want := []string{choice, pendingQuestion(fontMark), choice}; !slices.Equal(screen.asked, want) || len(screen.proposals) != 0 {
+		t.Fatalf("the menu must ask for the mark before the review, and go back without a confirmation: %q", screen.asked)
+	}
+	if data, err := os.ReadFile(filepath.Join(s.stateDir, state.File)); err != nil || string(data) != string(marked) {
+		t.Fatalf("a mark without a confirmation must change nothing: %v", err)
+	}
+	screen = &restoreScreen{answers: [][]string{{"complete"}, {"confirm"}}}
+	if open, err := reviewImport(context.Background(), screen, s, options, setLegacy); err != nil || !open {
+		t.Fatalf("a confirmed mark must let the switch complete: %v %v", open, err)
+	}
+	if st, err := state.Peek(s.stateDir, s.target); err != nil || len(st.Pending) != 0 || st.V2Restore != "open" {
+		t.Fatalf("the approved switch must clear the confirmed mark and complete: %+v %v", st, err)
 	}
 }

@@ -1,6 +1,7 @@
 package builds_test
 
 import (
+	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
@@ -431,8 +432,13 @@ func TestPortableDesktopBuildsDiscloseTheirRouteBeforeAnAction(t *testing.T) {
 
 func record(t *testing.T, f *fixture, key, kind string) {
 	t.Helper()
+	recordBefore(t, f, key, kind, "absent")
+}
+
+func recordBefore(t *testing.T, f *fixture, key, kind, before string) {
+	t.Helper()
 	if err := f.rec.Update(func(s *state.State) error {
-		if err := s.BeginTarget(key, state.Record{Resource: "config.fixture", Kind: kind, Next: "fp:0123456789abcdef", Before: "absent"}); err != nil {
+		if err := s.BeginTarget(key, state.Record{Resource: "config.fixture", Kind: kind, Next: "fp:0123456789abcdef", Before: before}); err != nil {
 			return err
 		}
 		return s.Promote(key)
@@ -576,19 +582,72 @@ func TestSweepKeepsABuildThatARecordedFileNames(t *testing.T) {
 	}
 }
 
+func TestSweepKeepsABuildThatABaselineNames(t *testing.T) {
+	for _, test := range []struct {
+		name, kind, slot string
+		before           func(t *testing.T, f *fixture, first string) string
+	}{
+		{"an inline value", "field", "#terminal.path", func(_ *testing.T, _ *fixture, first string) string {
+			return "value:" + base64.StdEncoding.EncodeToString([]byte(`"`+filepath.ToSlash(filepath.Join(first, "tool"))+`"`))
+		}},
+		{"a backup file", "file", "", func(t *testing.T, f *fixture, first string) string {
+			backup := filepath.Join(f.provider.StateDir, "baselines", "settings.json-backup")
+			write(t, backup, `{"path": "`+filepath.ToSlash(filepath.Join(first, "tool"))+`"}`)
+			return "backup:" + backup
+		}},
+		{"a file in a backup folder", "tree", "", func(t *testing.T, f *fixture, first string) string {
+			backup := filepath.Join(f.provider.StateDir, "baselines", "nvim-backup")
+			write(t, filepath.Join(backup, "lua", "runtime.lua"), "return '"+filepath.Join(first, "tool")+"'\n")
+			return "backup:" + backup
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f, first, second, _ := threeBuilds(t)
+			target := filepath.Join(filepath.Dir(f.provider.StateDir), "absent-target")
+			recordBefore(t, f, target+test.slot, test.kind, test.before(t, f, first))
+			removed, left := f.sweep()
+			if !slices.Equal(removed, []string{second}) || len(left) != 0 || read(t, filepath.Join(first, "tool")) != "version one" {
+				t.Fatal("the sweep did not keep exactly the build that the baseline names", removed, left)
+			}
+		})
+	}
+}
+
+func TestSweepKeepsABuildThatAFileOfARecordedTreeNames(t *testing.T) {
+	f, first, second, _ := threeBuilds(t)
+	tree := filepath.Join(filepath.Dir(f.provider.StateDir), "nvim")
+	write(t, filepath.Join(tree, "init.lua"), "vim.opt.number = true\n")
+	write(t, filepath.Join(tree, "lua", "runtime.lua"), "return '"+filepath.Join(first, "tool")+"'\n")
+	record(t, f, tree, "tree")
+	removed, left := f.sweep()
+	if !slices.Equal(removed, []string{second}) || len(left) != 0 || read(t, filepath.Join(first, "tool")) != "version one" {
+		t.Fatal("the sweep did not keep exactly the build that the tree names", removed, left)
+	}
+}
+
 func TestSweepRemovesNoBuildWhenItCannotReadARecordedTarget(t *testing.T) {
 	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
 		t.Skip("the fixture needs a file mode that stops a read")
 	}
-	for _, kind := range []string{"link", "file"} {
-		t.Run(kind, func(t *testing.T) {
+	for _, test := range []struct{ name, kind, key, file string }{
+		{"link", "link", "target", "target"},
+		{"file", "file", "target", "target"},
+		{"tree", "tree", "nvim", "nvim/lua/runtime.lua"},
+		{"backup", "file", "settings.json", "backup"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			f, first, second, _ := threeBuilds(t)
-			target := filepath.Join(filepath.Dir(f.provider.StateDir), "target")
+			home := filepath.Dir(f.provider.StateDir)
+			target := filepath.Join(home, test.file)
 			write(t, target, "content that setup cannot read")
 			if err := os.Chmod(target, 0); err != nil {
 				t.Fatal(err)
 			}
-			record(t, f, target, kind)
+			before := "absent"
+			if test.name == "backup" {
+				before = "backup:" + target
+			}
+			recordBefore(t, f, filepath.Join(home, test.key), test.kind, before)
 			removed, _, err := builds.Sweep(t.Context(), f.provider.StateDir, f.rec.State())
 			if err == nil || !strings.Contains(err.Error(), target) || len(removed) != 0 {
 				t.Fatal("the sweep continued without a readable recorded target", removed, err)

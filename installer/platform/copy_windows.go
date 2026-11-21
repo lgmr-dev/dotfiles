@@ -41,6 +41,54 @@ func CopyWithMetadata(ctx context.Context, from, to string) (copyErr error) {
 			copyErr = errors.Join(copyErr, removeFailedCopy(to, created))
 		}
 	}()
+	return copySecurity(from, to)
+}
+
+func copyFileWithMetadata(ctx context.Context, from, to string, _ int64) error {
+	return CopyWithMetadata(ctx, from, to)
+}
+
+const folderAttributes = windows.FILE_ATTRIBUTE_READONLY | windows.FILE_ATTRIBUTE_HIDDEN | windows.FILE_ATTRIBUTE_SYSTEM | windows.FILE_ATTRIBUTE_ARCHIVE | windows.FILE_ATTRIBUTE_NOT_CONTENT_INDEXED
+
+func copyFolderMetadata(ctx context.Context, from, to string, _ os.FileInfo, children func() error) error {
+	if err := copySecurity(from, to); err != nil {
+		return err
+	}
+	if err := children(); err != nil {
+		return err
+	}
+	source, err := windows.UTF16PtrFromString(WindowsExtendedPath(from))
+	if err != nil {
+		return err
+	}
+	target, err := windows.UTF16PtrFromString(WindowsExtendedPath(to))
+	if err != nil {
+		return err
+	}
+	want, err := windows.GetFileAttributes(source)
+	if err != nil {
+		return err
+	}
+	have, err := windows.GetFileAttributes(target)
+	if err != nil {
+		return err
+	}
+	if have&folderAttributes != want&folderAttributes {
+		if err := windows.SetFileAttributes(target, have&^folderAttributes|want&folderAttributes); err != nil {
+			return err
+		}
+	}
+	copied, err := windows.GetFileAttributes(target)
+	if err != nil {
+		return err
+	}
+	if copied&folderAttributes != want&folderAttributes {
+		return fmt.Errorf("cannot preserve the attributes of the folder %s", from)
+	}
+	return ctx.Err()
+}
+
+func copySecurity(from, to string) error {
 	const parts = windows.OWNER_SECURITY_INFORMATION | windows.GROUP_SECURITY_INFORMATION | windows.DACL_SECURITY_INFORMATION
 	original, err := windows.GetNamedSecurityInfo(WindowsExtendedPath(from), windows.SE_FILE_OBJECT, parts)
 	if err != nil || original == nil {

@@ -72,7 +72,7 @@ func importPreview(options v2import.Options, proposal *v2import.Proposal) string
 	return strings.Join(terminal.PlanText(options.Engine.Catalog, proposal.Plan), "\n") + "\n\n" + proposal.Details + "\n"
 }
 
-func reportImport(ui *terminal.Workflow, result engine.Result, err error) error {
+func reportImport(ui importUI, result engine.Result, err error) error {
 	if err != nil && !errors.Is(err, engine.ErrReplan) && !errors.Is(err, engine.ErrPending) {
 		result.Status, result.Message = "failed", strings.TrimSpace(err.Error()+"\n"+result.Message)
 	}
@@ -133,11 +133,45 @@ func runImportV2(ctx context.Context, s setup) error {
 func importMenu(ctx context.Context, s setup, options v2import.Options, setLegacy func([]string)) (resultErr error) {
 	ui := &terminal.Workflow{Input: os.Stdin, Output: s.output}
 	defer func() { resultErr = errors.Join(resultErr, ui.Close()) }()
+	open, err := reviewImport(ctx, ui, s, options, setLegacy)
+	if err != nil || !open {
+		return err
+	}
+	if err := ui.Close(); err != nil {
+		return err
+	}
+	return menu(ctx, newEngine(s), os.Stdin, s.output)
+}
+
+type importUI interface {
+	restoreUI
+	BeginApply(ctx context.Context) (context.Context, error)
+	Report(result engine.Result) error
+}
+
+func confirmPending(ctx context.Context, ui restoreUI, marks []string) ([]string, error) {
+	options := []engine.Choice{
+		{ID: "confirm", Label: "Yes, the command exited", Detail: "Setup clears the mark when the run that you approve starts. It inspects the system again and repeats the step only if it is still necessary."},
+		{ID: "back", Label: "No, go back", Detail: "Wait until the command exits, then open setup again. Nothing changes now."},
+	}
+	for _, mark := range marks {
+		choice, err := ui.Choose(ctx, "An earlier step did not report its end: "+mark+". Did its command exit?", options, []string{"back"}, false)
+		if err != nil {
+			return nil, err
+		}
+		if len(choice) != 1 || choice[0] != "confirm" {
+			return nil, engine.ErrBack
+		}
+	}
+	return slices.Clone(marks), nil
+}
+
+func reviewImport(ctx context.Context, ui importUI, s setup, options v2import.Options, setLegacy func([]string)) (bool, error) {
 	notice := "This installation runs release v2. Review the import to release v3: setup builds the private tools first, and release v2 stays active when a build fails."
 	for {
 		proposal, err := v2import.Preview(ctx, options, setLegacy)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if proposal.Switching {
 			choices := []engine.Choice{
@@ -147,10 +181,10 @@ func importMenu(ctx context.Context, s setup, options v2import.Options, setLegac
 			}
 			choice, err := ui.Choose(ctx, "The import from release v2 is not complete. What would you like to do?", choices, []string{"complete"}, false)
 			if errors.Is(err, engine.ErrCancelled) || err == nil && (len(choice) != 1 || choice[0] == "exit") {
-				return nil
+				return false, nil
 			}
 			if err != nil {
-				return err
+				return false, err
 			}
 			if choice[0] == "restore" {
 				err := restoreMenu(ctx, ui, s, options)
@@ -158,22 +192,33 @@ func importMenu(ctx context.Context, s setup, options v2import.Options, setLegac
 					continue
 				}
 				if errors.Is(err, engine.ErrCancelled) {
-					return nil
+					return false, nil
 				}
-				return err
+				return false, err
 			}
 			notice = "The import from release v2 is not complete. Review the remaining switch."
 		}
-		accepted, err := ui.Review(ctx, options.Engine.Catalog, engine.Proposal{Plan: proposal.Plan, Details: proposal.Details, Notice: notice}, nil)
-		if errors.Is(err, engine.ErrCancelled) || err == nil && !accepted {
-			return nil
+		confirmed, err := confirmPending(ctx, ui, proposal.Plan.Pending)
+		if errors.Is(err, engine.ErrBack) {
+			continue
+		}
+		if errors.Is(err, engine.ErrCancelled) {
+			return false, nil
 		}
 		if err != nil {
-			return err
+			return false, err
+		}
+		proposal.Confirmed = confirmed
+		accepted, err := ui.Review(ctx, options.Engine.Catalog, engine.Proposal{Plan: proposal.Plan, Details: proposal.Details, Notice: notice}, nil)
+		if errors.Is(err, engine.ErrCancelled) || err == nil && !accepted {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
 		}
 		applying, err := ui.BeginApply(ctx)
 		if err != nil {
-			return err
+			return false, err
 		}
 		result, err := proposal.Run(applying)
 		if errors.Is(err, engine.ErrPlanChanged) || errors.Is(err, engine.ErrReplan) {
@@ -183,19 +228,20 @@ func importMenu(ctx context.Context, s setup, options v2import.Options, setLegac
 			}
 			continue
 		}
+		if errors.Is(err, engine.ErrPending) {
+			continue
+		}
 		if err := reportImport(ui, result, err); err != nil || result.Plan.V2Restore != "open" {
-			return err
+			return false, err
 		}
-		if err := ui.Close(); err != nil {
-			return err
-		}
-		return menu(ctx, newEngine(s), os.Stdin, s.output)
+		return true, nil
 	}
 }
 
 const restoreReplaceGroup = "Replace your changed content with the value of release v2 (setup saves your content first)"
 
 type restoreUI interface {
+	Choose(ctx context.Context, title string, choices []engine.Choice, initial []string, multiple bool) ([]string, error)
 	Review(ctx context.Context, c engine.Catalog, proposal engine.Proposal, revise engine.Revise) (bool, error)
 	Close() error
 }
@@ -224,6 +270,9 @@ func restoreProposal(restoration *v2import.Restoration, replace []string) engine
 func restoreMenu(ctx context.Context, ui restoreUI, s setup, options v2import.Options) error {
 	restoration, err := v2import.PreviewRestore(ctx, options)
 	if err != nil {
+		return err
+	}
+	if restoration.Confirmed, err = confirmPending(ctx, ui, restoration.Pending); err != nil {
 		return err
 	}
 	replace := []string{}
@@ -274,6 +323,9 @@ func runRestoreV2(ctx context.Context, s setup) error {
 		return err
 	}
 	message, err := restoration.Run(ctx, nil)
+	if errors.Is(err, engine.ErrPending) {
+		return reportImport(&terminal.Workflow{Output: s.output}, engine.Result{Status: "needs-action", Message: message}, err)
+	}
 	if err != nil {
 		return err
 	}

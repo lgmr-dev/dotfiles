@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -493,4 +494,104 @@ func TestASwitchNeverRemovesASystemResource(t *testing.T) {
 	if _, recorded := f.current().Targets[f.keyboard]; !recorded || read(t, f.keyboard) != keyboardRule(operation("keyboard")) {
 		t.Fatal("the keyboard rule and its record must stay")
 	}
+}
+
+func TestASecondStopInTheRollbackOfASwitchWriteCompletesOnTheNextRun(t *testing.T) {
+	f := linuxFixture(t)
+	before := capture(t, f, f.save())
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	saved := ""
+	editManifest(t, f, func(slots map[string]any) {
+		saved = strings.TrimPrefix(slots[env].(map[string]any)["saved"].(string), "backup:")
+	})
+	v2, v3 := editedFingerprint(t, saved), editedFingerprint(t, env)
+	editState(t, f, func(document map[string]any) {
+		record := document["targets"].(map[string]any)[env].(map[string]any)
+		record["applied"], record["next"] = v2, v3
+	})
+	f.extraKinds = map[string]targets.Kind{"file": interruptedKind{targets.FileKind("file")}}
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), env) {
+		t.Fatalf("the stop in the rollback must name the slot: %v", err)
+	}
+	f.extraKinds = nil
+	if _, err := os.Lstat(env); !errors.Is(err, os.ErrNotExist) || read(t, aside(env)) != "# v3 env\n" {
+		t.Fatal("the fixture must stop after the v3 file moved aside")
+	}
+	var manifest v2import.Manifest
+	if err := json.Unmarshal([]byte(read(t, filepath.Join(f.state, "v2-restore", "manifest.json"))), &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Restoring[env] != v3 {
+		t.Errorf("the rollback must save its intent before its first move: %v", manifest.Restoring)
+	}
+	if record := f.current().Targets[env]; record.Next != v3 || record.Release {
+		t.Fatalf("the state must keep the forward intent of the switch: %+v", record)
+	}
+	mustRestore(t, f)
+	before.restored(t, f)
+}
+
+func TestRestoreStopsWhenTheSavedStateChangedAfterTheReview(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateFile, manifest := filepath.Join(f.state, "state.json"), filepath.Join(f.state, "v2-restore", "manifest.json")
+	published, recorded := read(t, stateFile), read(t, manifest)
+	write(t, filepath.Join(f.state, "v2-restore", "state.json"), `{"schema":1}`, 0600)
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "the saved v2 state changed after the review; run restore-v2 again") {
+		t.Fatalf("a saved state that changed after the review must stop the restore: %v", err)
+	}
+	if read(t, stateFile) != published || read(t, manifest) != recorded || read(t, filepath.Join(f.state, "shells", "env.sh")) != "# v3 env\n" || read(t, f.fontPath()) != "v3 font bytes\n" {
+		t.Fatal("the stop must come before the first write")
+	}
+}
+
+func TestRestoreRefusesAnInvalidSavedStateAtTheReview(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	write(t, filepath.Join(f.state, "v2-restore", "state.json"), `{"schema":1}`, 0600)
+	if _, err := v2import.PreviewRestore(context.Background(), f.options()); err == nil || !strings.Contains(err.Error(), "the restore set has no valid state of release v2") {
+		t.Fatalf("the review must validate the saved state with the reader of release v2: %v", err)
+	}
+}
+
+func TestRestoreRechecksThePendingMarksUnderTheLock(t *testing.T) {
+	f := linuxFixture(t)
+	before := capture(t, f, f.save())
+	f.mustImport()
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil || len(restoration.Pending) != 0 {
+		t.Fatalf("%v %v", restoration, err)
+	}
+	store, err := state.Open(f.state, f.engine().Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = store.Update(func(s *state.State) error { s.Mark("tool.font:activate"); return nil })
+	if err = errors.Join(err, store.Close()); err != nil {
+		t.Fatal(err)
+	}
+	marked := read(t, filepath.Join(f.state, "state.json"))
+	message, err := restoration.Run(context.Background(), nil)
+	if !errors.Is(err, engine.ErrPending) || !strings.Contains(message, "An earlier step did not report its end: tool.font:activate.") {
+		t.Fatalf("a mark that appeared after the review must stop the restore: %q %v", message, err)
+	}
+	if read(t, filepath.Join(f.state, "state.json")) != marked || read(t, f.fontPath()) != "v3 font bytes\n" {
+		t.Fatal("the stop must come before the first write")
+	}
+	restoration.Confirmed = []string{"tool.font:activate"}
+	if _, err := restoration.Run(context.Background(), nil); err != nil {
+		t.Fatal(err)
+	}
+	before.restored(t, f)
 }

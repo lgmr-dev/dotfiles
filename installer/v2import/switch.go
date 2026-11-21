@@ -37,12 +37,15 @@ var errSwitchComplete = errors.New("the switch from release v2 is already comple
 // the imported selection. Details is the text for the review: the mapping
 // table, the builds to make, the targets that change and the folders of
 // release v2 that stay. Switching is true when the schema-2 state is
-// published and the run only completes the switch.
+// published and the run only completes the switch. Confirmed lists the
+// pending marks whose command you confirmed as exited: Run clears them when
+// the approved switch starts, and the engine stops at each other mark.
 type Proposal struct {
 	Plan      engine.Plan
 	Details   string
 	Switching bool
 	Mapping   Mapping
+	Confirmed []string
 
 	o Options
 }
@@ -390,6 +393,9 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 			return result, fmt.Errorf("the remaining switch has a change that the review did not show: %w", engine.ErrPlanChanged)
 		}
 	}
+	if err := clearConfirmed(e.StateDir, e.Target, p.Confirmed); err != nil {
+		return result, err
+	}
 	result, err = e.Apply(ctx, request, plan)
 	if err != nil {
 		return result, err
@@ -435,6 +441,23 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 	result.Plan.V2Restore = "open"
 	result.Message = strings.TrimSpace(result.Message + "\nThe import from release v2 is complete. restore-v2 can give release v2 back until your next confirmed change. Keep the folders of release v2 until then.")
 	return result, nil
+}
+
+func clearConfirmed(stateDir, target string, marks []string) error {
+	if len(marks) == 0 {
+		return nil
+	}
+	store, err := state.Open(stateDir, target)
+	if err != nil {
+		return err
+	}
+	err = store.Update(func(s *state.State) error {
+		for _, mark := range marks {
+			s.Clear(mark)
+		}
+		return nil
+	})
+	return errors.Join(err, store.Close())
 }
 
 // Run does the approved import: it builds the private tools beside release

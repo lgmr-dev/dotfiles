@@ -175,21 +175,11 @@ func copyUnit(ctx context.Context, from, to string) error {
 		if err != nil {
 			return err
 		}
-	case "file":
-		info, err := os.Lstat(from)
-		if err != nil {
-			return err
-		}
-		if info.Size() <= platform.MaxProfileBytes {
-			err = platform.CopyWithMetadata(ctx, from, to)
-		} else if err = platform.CopyTree(from, to); err != nil {
-			err = errors.Join(err, removeEntry(to))
-		}
-		if err != nil {
-			return err
-		}
-	case "directory":
-		if err := platform.CopyTree(from, to); err != nil {
+	case "file", "directory":
+		if err := platform.CopyTreeWithMetadata(ctx, from, to); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				return err
+			}
 			return errors.Join(err, removeEntry(to))
 		}
 	default:

@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -35,14 +36,21 @@ type RestoreItem struct {
 }
 
 // Restoration is the preview of restore-v2. Done is true when the schema-1
-// state is active again and nothing is left to do.
+// state is active again and nothing is left to do. Pending lists the pending
+// marks of the state. Confirmed lists the marks whose command you confirmed
+// as exited: Run stops at each other mark.
 type Restoration struct {
-	Items []RestoreItem
-	Done  bool
+	Items     []RestoreItem
+	Done      bool
+	Pending   []string
+	Confirmed []string
 
 	o        Options
 	reviewed bool
+	digest   [sha256.Size]byte
 }
+
+var errSavedChanged = errors.New("the saved v2 state changed after the review; run restore-v2 again")
 
 const afterRestore = "Release v2 is active again. Check out " + SourceCommit + " (" + SourceRelease + ") and run its setup."
 
@@ -125,9 +133,11 @@ func (r *Restoration) plan() (*restoreSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := r.original(); err != nil {
+	original, err := r.original()
+	if err != nil {
 		return nil, err
 	}
+	r.digest, r.Pending = sha256.Sum256(original), slices.Clone(st.Pending)
 	r.Items = nil
 	for _, key := range slotOrder(set.manifest.Slots) {
 		r.Items = append(r.Items, r.classify(set, st, key))
@@ -136,17 +146,39 @@ func (r *Restoration) plan() (*restoreSet, error) {
 }
 
 func (r *Restoration) original() ([]byte, error) {
-	data, err := platform.ReadDocument(filepath.Join(restoreDir(r.o.Engine.StateDir), "state.json"))
-	var header struct {
-		Schema int `json:"schema"`
-	}
-	if err == nil {
-		err = json.Unmarshal(data, &header)
-	}
-	if err != nil || header.Schema != 1 {
-		return nil, errors.Join(errors.New("the restore set has no readable state of release v2; nothing was changed"), err)
+	_, data, err := LoadState(restoreDir(r.o.Engine.StateDir), r.o.Folders.Home, r.o.Engine.Context)
+	if err != nil {
+		return nil, errors.Join(errors.New("the restore set has no valid state of release v2; nothing was changed"), err)
 	}
 	return data, nil
+}
+
+func (r *Restoration) reviewedOriginal(digest [sha256.Size]byte) ([]byte, error) {
+	data, err := platform.ReadDocument(filepath.Join(restoreDir(r.o.Engine.StateDir), "state.json"))
+	if err != nil || sha256.Sum256(data) != digest {
+		return nil, errors.Join(errSavedChanged, err)
+	}
+	return data, nil
+}
+
+func pendingStop(marks []string) (string, error) {
+	lines := []string{}
+	for _, mark := range marks {
+		lines = append(lines, "An earlier step did not report its end: "+mark+". Open setup, confirm that its command exited, then choose the action again.")
+	}
+	return strings.Join(lines, "\n"), fmt.Errorf("%w: %s", engine.ErrPending, strings.Join(marks, ", "))
+}
+
+func clearPending(stateDir, target string) error {
+	st, err := state.Peek(stateDir, target)
+	if err != nil || len(st.Pending) == 0 {
+		return err
+	}
+	data, err := encodeState(st)
+	if err != nil {
+		return err
+	}
+	return platform.SaveDocument(filepath.Join(stateDir, state.File), data)
 }
 
 // PreviewRestore plans restore-v2. It only reads. It is available while
@@ -193,9 +225,11 @@ func (r *Restoration) Changed() []RestoreItem {
 // created and its empty created folders, and keeps a target that already
 // holds its saved value. A target that changed after the switch stays,
 // unless replace names its key: then setup saves the changed content first
-// and reports where. At the end it publishes the saved schema-1 state. When
-// a step fails, the schema-2 state stays and the same command can run
-// again.
+// and reports where. At the end it publishes the saved schema-1 state,
+// exactly as the review read it. A pending mark that is not in Confirmed
+// stops it before the first write with engine.ErrPending and the report
+// text; it clears the confirmed marks before the first write. When a step
+// fails, the schema-2 state stays and the same command can run again.
 func (r *Restoration) Run(ctx context.Context, replace []string) (message string, resultErr error) {
 	e := r.o.Engine
 	release, err := platform.Lock(filepath.Join(e.StateDir, state.LockFile))
@@ -203,7 +237,12 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 		return "", err
 	}
 	defer func() { resultErr = errors.Join(resultErr, release()) }()
-	approved, reviewed := slices.Clone(r.Items), r.reviewed
+	approved, reviewed, digest := slices.Clone(r.Items), r.reviewed && !r.Done, r.digest
+	if reviewed {
+		if _, err := r.reviewedOriginal(digest); err != nil {
+			return "", err
+		}
+	}
 	set, err := r.plan()
 	if err != nil {
 		return "", err
@@ -211,13 +250,26 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	if r.Done {
 		return afterRestore, nil
 	}
+	if !reviewed {
+		digest = r.digest
+	}
+	if slices.ContainsFunc(r.Pending, func(mark string) bool { return !slices.Contains(r.Confirmed, mark) }) {
+		return pendingStop(r.Pending)
+	}
 	if reviewed && !slices.EqualFunc(approved, r.Items, func(a, b RestoreItem) bool {
 		return a.Key == b.Key && a.Action == b.Action && a.Replacement == b.Replacement && a.live == b.live && a.saved == b.saved
 	}) {
 		return "", errors.New("the files changed after the review; run restore-v2 again. Nothing was changed")
 	}
-	if failures := r.recoverSwitch(ctx, set); len(failures) != 0 {
-		return "", fmt.Errorf("restore-v2 stopped before it changed a target. An earlier switch run left an unfinished write. Resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
+	if err := clearPending(e.StateDir, e.Target); err != nil {
+		return "", err
+	}
+	failures, err := r.recoverSwitch(ctx, set)
+	if err != nil {
+		return "", err
+	}
+	if len(failures) != 0 {
+		return "", fmt.Errorf("restore-v2 stopped. An earlier switch run left an unfinished write. Resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
 	}
 	if set, err = r.plan(); err != nil {
 		return "", err
@@ -243,11 +295,7 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 			}
 			notes = append(notes, "Saved your changed content of "+item.Key+" at "+copied)
 		}
-		if set.manifest.Restoring == nil {
-			set.manifest.Restoring = map[string]string{}
-		}
-		set.manifest.Restoring[item.Key] = item.live
-		if err := set.save(); err != nil {
+		if err := set.intend(item.Key, item.live); err != nil {
 			return "", err
 		}
 		if err := hit("restore-slot:" + item.Key); err != nil {
@@ -286,7 +334,7 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	if len(failures) != 0 {
 		return "", fmt.Errorf("restore-v2 stopped before it published the state of release v2. Release v3 stays active. Resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
 	}
-	original, err := r.original()
+	original, err := r.reviewedOriginal(digest)
 	if err != nil {
 		return "", err
 	}
@@ -333,21 +381,52 @@ func (s *restoreSet) saveEdited(ctx context.Context, item RestoreItem, slot Slot
 	return path, nil
 }
 
-func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) []string {
+func (s *restoreSet) intend(key, replaced string) error {
+	if s.manifest.Restoring == nil {
+		s.manifest.Restoring = map[string]string{}
+	}
+	s.manifest.Restoring[key] = replaced
+	return s.save()
+}
+
+func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) ([]string, error) {
 	failures := []string{}
 	st, err := state.Peek(r.o.Engine.StateDir, r.o.Engine.Target)
 	if err != nil {
-		return []string{err.Error()}
+		return nil, err
 	}
 	for _, key := range slotOrder(set.manifest.Slots) {
 		record, has := st.Targets[key]
-		if !has || record.Next == "" || record.Release {
+		if _, restoring := set.manifest.Restoring[key]; !has || record.Next == "" || record.Release || restoring {
 			continue
 		}
 		forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: set.manifest.Slots[key].Saved}
-		if err := set.writer.Release(ctx, key, &memory{state.State{Targets: map[string]state.Record{key: forward}}}, targets.Preserve); err != nil {
+		if err := set.writer.Release(ctx, key, &rollback{memory{state.State{Targets: map[string]state.Record{key: forward}}}, set, key}, targets.Preserve); err != nil {
 			failures = append(failures, key+": "+err.Error())
+			continue
+		}
+		if _, intended := set.manifest.Restoring[key]; intended {
+			delete(set.manifest.Restoring, key)
+			if err := set.save(); err != nil {
+				return nil, err
+			}
 		}
 	}
-	return failures
+	return failures, nil
+}
+
+type rollback struct {
+	memory
+	set *restoreSet
+	key string
+}
+
+func (r *rollback) Update(edit func(*state.State) error) error {
+	if err := r.memory.Update(edit); err != nil {
+		return err
+	}
+	if record := r.st.Targets[r.key]; record.Release {
+		return r.set.intend(r.key, record.Applied)
+	}
+	return nil
 }

@@ -137,6 +137,45 @@ func TestSentinelMovesAsideACheckoutWithoutARecordOneTime(t *testing.T) {
 	}
 }
 
+func TestSentinelUpdateMovesAsideACheckoutWithPersonalGitContent(t *testing.T) {
+	for name, change := range map[string]func(t *testing.T, git string){
+		"an added hook": func(t *testing.T, git string) {
+			sentinelWrite(t, filepath.Join(git, "hooks", "pre-commit"), "#!/bin/sh\nexit 0\n", 0755)
+		},
+		"a changed config": func(t *testing.T, git string) {
+			config := filepath.Join(git, "config")
+			sentinelWrite(t, config, sentinelRead(t, config)+"[user]\n\tname = personal\n", 0644)
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newSentinelFixture(t)
+			f.install()
+			change(t, filepath.Join(f.checkout(), ".git"))
+			personal, err := hooks.SentinelCheckoutFingerprint(f.checkout())
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.repository.release("v0.5.0", "# second\n")
+			f.api.latest("v0.5.0")
+			p := f.provider()
+			finding, err := p.Inspect(context.Background(), sentinelResource, engine.Want{Present: true, Update: true}, f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := p.Apply(context.Background(), sentinelResource, finding, f); err != nil {
+				t.Fatal(err)
+			}
+			left := hooks.SentinelLeftovers(f.state)
+			if len(left) != 1 || !strings.HasPrefix(filepath.Base(left[0]), "checkout.preserved-") {
+				t.Fatal("setup did not move aside the checkout with personal Git content", left)
+			}
+			if kept, err := hooks.SentinelCheckoutFingerprint(left[0]); err != nil || kept != personal {
+				t.Fatal("the checkout that setup moved aside lost personal Git content", err)
+			}
+		})
+	}
+}
+
 func TestSentinelCheckoutFingerprintFollowsCommitsAndIgnoresGitWorkFiles(t *testing.T) {
 	f := newSentinelFixture(t)
 	f.install()
@@ -148,6 +187,8 @@ func TestSentinelCheckoutFingerprintFollowsCommitsAndIgnoresGitWorkFiles(t *test
 	f.repository.run(f.checkout(), "update-index", "--refresh")
 	sentinelWrite(t, filepath.Join(f.checkout(), ".git", "logs", "HEAD"), "a log line\n", 0644)
 	sentinelWrite(t, filepath.Join(f.checkout(), ".git", "FETCH_HEAD"), "", 0644)
+	sentinelWrite(t, filepath.Join(f.checkout(), ".git", "ORIG_HEAD"), f.floor+"\n", 0644)
+	sentinelWrite(t, filepath.Join(f.checkout(), ".git", "refs", "heads", "main.lock"), "", 0644)
 	if after, err := hooks.SentinelCheckoutFingerprint(f.checkout()); err != nil || after != before {
 		t.Fatal("normal Git use changed the fingerprint", err)
 	}

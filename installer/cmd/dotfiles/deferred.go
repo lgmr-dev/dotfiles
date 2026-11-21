@@ -29,6 +29,7 @@ type deferredProvider struct {
 	stateDir string
 	context  platform.Context
 	verified func(ctx context.Context, tool string, st state.State) bool
+	absent   func(ctx context.Context) bool
 }
 
 func (d deferredProvider) Inspect(ctx context.Context, r catalog.Resource, want engine.Want, rec engine.Records) (engine.Finding, error) {
@@ -48,6 +49,8 @@ func (d deferredProvider) Inspect(ctx context.Context, r catalog.Resource, want 
 	statuses := []engine.Status{engine.Missing}
 	if d.desktop {
 		statuses = append(statuses, engine.Unhealthy)
+	} else if f.Status == engine.Unknown && d.absent(ctx) {
+		statuses = append(statuses, engine.Unknown)
 	}
 	if !slices.Contains(statuses, f.Status) || !d.legacy(ctx, d.tool, st) {
 		return f, nil
@@ -83,7 +86,7 @@ func (w *wiring) deferred(r catalog.Resource, provider engine.Provider) engine.P
 	if w.setup.host.OS != "darwin" {
 		return provider
 	}
-	d := deferredProvider{Provider: provider, tool: r.ID, stateDir: w.setup.stateDir, context: w.setup.host.Context, verified: w.caskVerified}
+	d := deferredProvider{Provider: provider, tool: r.ID, stateDir: w.setup.stateDir, context: w.setup.host.Context, verified: w.caskVerified, absent: w.homebrewAbsent}
 	if tool, desktop := deferredDesktop[r.ID]; desktop {
 		d.tool, d.desktop = tool, true
 	} else if r.ID == "infra.homebrew" {
@@ -101,4 +104,9 @@ func (w *wiring) caskVerified(ctx context.Context, tool string, st state.State) 
 	}
 	_, err := w.brew.Application(ctx, r, readRecords{st})
 	return err == nil
+}
+
+func (w *wiring) homebrewAbsent(ctx context.Context) bool {
+	location, err := w.brew.Discover(ctx)
+	return err == nil && location == nil
 }

@@ -372,7 +372,7 @@ func (k slotKind) publish(ctx context.Context, d Desired, from string, value []b
 		}
 	}
 	if exists {
-		return os.Remove(aside)
+		return removeMatching(ctx, aside, file)
 	}
 	return nil
 }

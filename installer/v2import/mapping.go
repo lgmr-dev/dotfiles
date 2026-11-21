@@ -95,10 +95,12 @@ const (
 	keyboardResource = "system.keyboard-access"
 )
 
-var deferredApplications = []struct{ tool, bin, executable string }{
-	{"tool.vscode", "Visual Studio Code.app/Contents/Resources/app/bin", "Visual Studio Code.app/Contents/MacOS/Code"},
-	{"tool.ghostty", "Ghostty.app/Contents/MacOS", "Ghostty.app/Contents/MacOS/ghostty"},
-	{"tool.openwhispr", "", "OpenWhispr.app/Contents/MacOS/OpenWhispr"},
+type deferredApplication struct{ tool, desktop, bundle, bin, executable string }
+
+var deferredApplications = []deferredApplication{
+	{"tool.vscode", "desktop.vscode", "Visual Studio Code.app", "Visual Studio Code.app/Contents/Resources/app/bin", "Visual Studio Code.app/Contents/MacOS/Code"},
+	{"tool.ghostty", "integration.ghostty", "Ghostty.app", "Ghostty.app/Contents/MacOS", "Ghostty.app/Contents/MacOS/ghostty"},
+	{"tool.openwhispr", "desktop.openwhispr", "OpenWhispr.app", "", "OpenWhispr.app/Contents/MacOS/OpenWhispr"},
 }
 
 func within(folder, path string) bool {
@@ -646,8 +648,12 @@ func LegacyCommandDirectories(stateDir string, st state.State, ctx platform.Cont
 // LegacyApplications returns the macOS applications that still run from
 // their payloads of release v2: tool.vscode, tool.ghostty or tool.openwhispr.
 // An application counts while a recorded link of its desktop integration
-// points into the packages folder of release v2, each such link resolves, and
-// the bundle executable of the current payload is a regular executable file.
+// points into the packages folder of release v2 and the application can
+// start: its desktop integration has an owned record of the link
+// ~/Applications/<App>.app, that link resolves to the bundle in the current
+// payload, each other recorded link of the integration, such as the code
+// command of VS Code, resolves to an executable file, and the bundle
+// executable is a regular executable file.
 func LegacyApplications(stateDir string, st state.State, ctx platform.Context) []string {
 	return slices.DeleteFunc(legacyTools(stateDir, st, ctx), func(tool string) bool {
 		return !runnable(stateDir, st, tool)
@@ -655,20 +661,39 @@ func LegacyApplications(stateDir string, st state.State, ctx platform.Context) [
 }
 
 func runnable(stateDir string, st state.State, tool string) bool {
+	index := slices.IndexFunc(deferredApplications, func(application deferredApplication) bool { return application.tool == tool })
+	if index < 0 {
+		return false
+	}
+	application := deferredApplications[index]
+	current := filepath.Join(stateDir, "packages", tool, "current")
+	launcher := false
 	for key, record := range st.Targets {
-		if target, err := os.Readlink(key); record.Kind == "link" && err == nil && within(filepath.Join(stateDir, "packages", tool), target) {
-			if _, err := os.Stat(key); err != nil {
+		if record.Resource != application.desktop || record.Kind != "link" {
+			continue
+		}
+		info, err := os.Stat(key)
+		if err != nil {
+			return false
+		}
+		if filepath.Base(key) != application.bundle || filepath.Base(filepath.Dir(key)) != "Applications" {
+			if !executableFile(info) {
 				return false
 			}
+			continue
 		}
-	}
-	for _, application := range deferredApplications {
-		if application.tool == tool {
-			info, err := os.Stat(filepath.Join(stateDir, "packages", tool, "current", filepath.FromSlash(application.executable)))
-			return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
+		target, err := os.Readlink(key)
+		if err != nil || target != filepath.Join(current, application.bundle) || record.Applied == "" || !info.IsDir() {
+			return false
 		}
+		launcher = true
 	}
-	return false
+	info, err := os.Stat(filepath.Join(current, filepath.FromSlash(application.executable)))
+	return launcher && err == nil && executableFile(info)
+}
+
+func executableFile(info os.FileInfo) bool {
+	return info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
 }
 
 func legacyDirectories(stateDir string, tools []string) []string {
@@ -705,7 +730,8 @@ func legacyTools(stateDir string, st state.State, ctx platform.Context) []string
 
 func deferredResources(c engine.Catalog, ctx platform.Context, tools []string) []string {
 	deferred := slices.Clone(tools)
-	for _, id := range []string{"desktop.vscode", "integration.ghostty", "desktop.openwhispr"} {
+	for _, application := range deferredApplications {
+		id := application.desktop
 		r, known := c.Resource(id)
 		if !known || !r.Available(ctx) {
 			continue

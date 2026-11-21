@@ -18,6 +18,7 @@ import (
 const homebrewBootstrapCommit = "c9c975046f78e6e6d662deb801bd461ebd6a54ed"
 const homebrewBootstrapSHA256 = "8fd2f1a5287a7c2e3d7362924c677edcc04c5a0e16448c77132d056bc88cf1ed"
 const homebrewBootstrapURL = "https://raw.githubusercontent.com/Homebrew/install/" + homebrewBootstrapCommit + "/install.sh"
+const homebrewBootstrapFile = "homebrew-install.sh"
 
 // HomebrewBootstrap is the provider of infra.homebrew. It installs Homebrew
 // only into an absent or empty prefix, with the official installer at a
@@ -128,12 +129,14 @@ func (d *HomebrewBootstrap) Inspect(ctx context.Context, r catalog.Resource, _ e
 	case "absent", "empty":
 		f.Status, f.Privileged, f.Pending, f.Replan = engine.Missing, true, true, true
 		f.Reason = "install Homebrew at " + o.Location.Prefix + " with the official installer at the reviewed commit; Homebrew and any installed Command Line Tools stay after a removal"
-		lines := []string{macosShellLine(d.reserveCommand(o.Location.Prefix))}
-		if o.Kind == "empty" {
-			lines = nil
+		lines := []string{"# Setup does the preparation itself. These lines give the same file.",
+			"curl -fsSLo " + macosShellWord(homebrewBootstrapFile) + " " + macosShellWord(d.url),
+			"echo " + macosShellWord(d.sha256+"  "+homebrewBootstrapFile) + " | shasum -a 256 -c"}
+		if o.Kind == "absent" {
+			lines = append(lines, macosShellLine(d.reserveCommand(o.Location.Prefix)))
 		}
 		f.Commands = []engine.CommandBlock{{Title: "Install Homebrew (installer commit " + homebrewBootstrapCommit[:12] + ", SHA-256 " + d.sha256[:12] + ")", By: "setup",
-			Lines: append(lines, macosShellLine(d.installCommand(o.Location.Prefix, nil))+" < install.sh")}}
+			Lines: append(lines, macosShellLine(d.installCommand(o.Location.Prefix, nil))+" < "+macosShellWord(homebrewBootstrapFile))}}
 	case "occupied":
 		f.Status, f.Reason = engine.Unknown, "the Homebrew prefix "+o.Location.Prefix+" already exists with content and without a working manager; setup keeps it. Examine it, then repair Homebrew there or move its content away, and run setup again. Setup installs into an absent or empty folder"
 	case "broken":

@@ -829,6 +829,29 @@ func TestFontRemovalAfterAFailedActivationLeavesNoRegistrationWithoutARecord(t *
 	})
 }
 
+func TestFontRemovalAfterAFailedUpdateLeavesNoRegistration(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	build := filepath.Join(f.state, "tools", hooks.FontArchive, "3.5.1-aaaaaaaaaaaa-1")
+	for _, face := range fontFixtureFaces() {
+		sentinelWrite(t, filepath.Join(build, face.file), "updated font bytes of "+face.file, 0644)
+	}
+	f.engine.loadFail = "HackNerdFont-Italic.ttf"
+	err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f)
+	if err == nil || !strings.Contains(err.Error(), "registration is saved for recovery") || len(f.engine.registry) != 3 || len(f.engine.loaded) != 2 {
+		t.Fatal("the update did not stop after the registration of the face that failed to load", err, f.engine.registry)
+	}
+	if fonts := f.records("font"); len(fonts) != 12 || slices.ContainsFunc(fonts, func(r state.Record) bool { return r.Applied == "" || r.Next == "" }) {
+		t.Fatal("the failed update did not keep the applied and the intended values", fonts)
+	}
+	f.engine.loadFail = ""
+	desktopRemove(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	if len(f.engine.registry) != 0 || len(f.engine.loaded) != 0 || sentinelExists(f.folder) {
+		t.Fatal("the removal left a registration or a font file", f.engine.registry, f.engine.loaded)
+	}
+}
+
 func fontScript(t *testing.T, c platform.Command) string {
 	t.Helper()
 	data, err := base64.StdEncoding.DecodeString(c.Args[len(c.Args)-1])

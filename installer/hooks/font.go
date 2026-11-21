@@ -602,11 +602,11 @@ func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.F
 // Remove implements engine.Provider. It releases the native registrations
 // that setup recorded, then the font files through the write order, then
 // refreshes the font cache on Linux and drops the registration records. A
-// registration that an unfinished activation wrote with the path of the
-// managed file is released like a recorded one. When the native font engine
-// does not select that face, setup deletes the registration after the font
-// file. A registration value that is not the path of the managed file stays
-// and stops the removal before any change.
+// registration that an unfinished activation or update wrote with the path of
+// the managed file is released like a recorded one. When the native font
+// engine does not select that face, setup deletes the registration after the
+// font file. A registration value that is not the path of the managed file
+// stays and stops the removal before any change.
 func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -634,13 +634,7 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 		}
 		record := st.Targets[key]
 		switch {
-		case record.Applied != "" || record.Release:
-			owned = append(owned, i)
-		case record.Next == "" || values[i] == "":
-			unowned = append(unowned, i)
-		case values[i] != paths[i]:
-			retained = append(retained, "current-user font registration: "+faces[i].File)
-		default:
+		case record.Next != "" && !record.Release && values[i] == paths[i]:
 			selected, err := fontSelected(faces[i], probe[i], paths[i])
 			if err != nil {
 				return err
@@ -650,6 +644,12 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 			} else {
 				unloaded = append(unloaded, i)
 			}
+		case record.Applied != "" || record.Release:
+			owned = append(owned, i)
+		case record.Next == "" || values[i] == "":
+			unowned = append(unowned, i)
+		default:
+			retained = append(retained, "current-user font registration: "+faces[i].File)
 		}
 	}
 	if len(retained) != 0 {

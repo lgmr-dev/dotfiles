@@ -23,6 +23,8 @@ type deferredCasks struct {
 	specs     map[string]system.CaskSpec
 	installed map[string]string
 	root      string
+	homebrew  *missingHomebrew
+	issue     string
 }
 
 func (c *deferredCasks) Application(_ context.Context, r catalog.Resource, _ engine.Records) (string, error) {
@@ -38,6 +40,10 @@ func (c *deferredCasks) Cask(_ context.Context, r catalog.Resource) (system.Cask
 
 func (c *deferredCasks) Inspect(_ context.Context, r catalog.Resource, want engine.Want, _ engine.Records) (engine.Finding, error) {
 	switch {
+	case c.homebrew != nil && !c.homebrew.installed:
+		return engine.Finding{Status: engine.Unknown, Reason: "install Homebrew, then run setup again to review its package inventory", Token: "unavailable"}, nil
+	case c.issue != "":
+		return engine.Finding{Status: engine.Unknown, Reason: c.issue, Token: "unreadable"}, nil
 	case c.installed[r.ID] != "":
 		return engine.Finding{Status: engine.Satisfied, Token: "installed"}, nil
 	case want.Present:
@@ -70,6 +76,13 @@ func deferredAction(plan engine.Plan, id string) string {
 }
 
 type missingHomebrew struct{ installed bool }
+
+func (h *missingHomebrew) Discover(context.Context) (*system.HomebrewLocation, error) {
+	if !h.installed {
+		return nil, nil
+	}
+	return &system.HomebrewLocation{Program: "/opt/homebrew/bin/brew", Prefix: "/opt/homebrew", Cellar: "/opt/homebrew/Cellar"}, nil
+}
 
 func (h *missingHomebrew) Inspect(_ context.Context, _ catalog.Resource, want engine.Want, _ engine.Records) (engine.Finding, error) {
 	switch {
@@ -122,7 +135,8 @@ func newDeferredMac(t *testing.T, formulae ...string) deferredMac {
 		"tool.ghostty":    {"integration.ghostty", "Ghostty.app", "Ghostty", "ghostty"},
 		"tool.openwhispr": {"desktop.openwhispr", "OpenWhispr.app", "OpenWhispr", "OpenWhispr"},
 	}}
-	m.casks = &deferredCasks{specs: system.MacCasks(s.folders.Home, "/opt/homebrew"), installed: map[string]string{}, root: filepath.Join(root, "Applications")}
+	m.casks = &deferredCasks{specs: system.MacCasks(s.folders.Home, "/opt/homebrew"), installed: map[string]string{}, root: filepath.Join(root, "Applications"), homebrew: m.homebrew}
+	w.brew.Discover = m.homebrew.Discover
 	homebrew, _ := s.catalog.Resource("infra.homebrew")
 	resources := []catalog.Resource{homebrew, {ID: "apps", Name: "Applications", Capability: true, Requires: append([]string{"desktop.vscode", "integration.ghostty", "desktop.openwhispr"}, formulae...)}}
 	for _, formula := range formulae {
@@ -231,6 +245,21 @@ func TestDeferredMacApplicationsPassCheckAndMoveToTheirCasksWithUpdate(t *testin
 		t.Fatalf("update must plan the Homebrew install: %s", got)
 	}
 	for tool, application := range applications {
+		if got := deferredAction(plan, tool); got != "pending:unknown" {
+			t.Fatalf("update must wait for Homebrew to inspect the cask of %s: %s", tool, got)
+		}
+		if got := deferredAction(plan, application[0]); !strings.HasPrefix(got, "pending:") {
+			t.Fatalf("update must wait for the cask to move %s: %s", application[0], got)
+		}
+	}
+	result, err := e.Apply(context.Background(), request, plan)
+	if !errors.Is(err, engine.ErrReplan) || !m.homebrew.installed {
+		t.Fatalf("the Homebrew bootstrap must end with a review of the casks: %+v %v", result, err)
+	}
+	if plan, err = e.Preview(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	for tool, application := range applications {
 		if got := deferredAction(plan, tool); got != "install:missing" {
 			t.Fatalf("update must plan the cask install of %s: %s", tool, got)
 		}
@@ -290,6 +319,24 @@ func TestHomebrewIsMissingWhenAnotherSelectedToolNeedsIt(t *testing.T) {
 	}
 	if got := deferredAction(plan, "infra.homebrew"); got != "install:missing" {
 		t.Fatalf("apply must install Homebrew for the formula: %s", got)
+	}
+}
+
+func TestAnInspectionErrorOfACaskIsNotDeferred(t *testing.T) {
+	m := newDeferredMac(t)
+	m.homebrew.installed, m.casks.issue = true, "brew info --cask failed: exit status 1"
+	check, err := m.engine.Check(context.Background())
+	if err != nil || check.Status != "needs-action" || !strings.Contains(check.Message, "Ghostty (tool.ghostty): setup could not inspect this resource: "+m.casks.issue) {
+		t.Fatalf("an inspection error must stay in check: %+v %v", check, err)
+	}
+	plan, err := m.engine.Preview(context.Background(), engine.Request{Mode: "apply"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for tool := range m.applications {
+		if got := deferredAction(plan, tool); got != "pending:unknown" {
+			t.Fatalf("an inspection error of %s must stay unknown: %s", tool, got)
+		}
 	}
 }
 

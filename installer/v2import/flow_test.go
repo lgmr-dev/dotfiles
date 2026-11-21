@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/state"
@@ -606,6 +607,65 @@ func TestTheMacImportStopsWhenADeferredApplicationCannotStart(t *testing.T) {
 		if _, err := os.Lstat(filepath.Join(f.state, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("the stop must come before the builds and the restore set: %s %v", name, err)
 		}
+	}
+}
+
+func TestTheMacImportStopsWhenALauncherOfADeferredApplicationIsMissing(t *testing.T) {
+	for name, c := range map[string]struct {
+		prepare func(f *fx) string
+		named   string
+	}{
+		"OpenWhispr.app": {named: "OpenWhispr program (tool.openwhispr)", prepare: func(f *fx) string {
+			f.catalog.Resources = append(f.catalog.Resources,
+				catalog.Resource{ID: "openwhispr", Name: "OpenWhispr", Capability: true, Requires: []string{"tool.openwhispr", "desktop.openwhispr"}},
+				catalog.Resource{ID: "tool.openwhispr", Name: "OpenWhispr program", Action: "package",
+					Bindings:         map[string]catalog.Binding{"darwin": {Provider: "homebrew-cask", Package: "openwhispr"}},
+					PlatformRequires: map[string][]string{"darwin": {"infra.homebrew"}}},
+				catalog.Resource{ID: "desktop.openwhispr", Name: "OpenWhispr launcher", Action: "desktop", Requires: []string{"tool.openwhispr"}})
+			payload := filepath.Join(f.state, "packages", "tool.openwhispr", "versions", "dddd", "payload")
+			write(t, filepath.Join(payload, "OpenWhispr.app", "Contents", "MacOS", "OpenWhispr"), "v2 openwhispr\n", 0755)
+			link(t, payload, filepath.Join(f.state, "packages", "tool.openwhispr", "current"))
+			f.receipt("tool.openwhispr", "archive", "created", true)
+			launcher := filepath.Join(f.home, "Applications", "OpenWhispr.app")
+			f.configuration("desktop.openwhispr", "configuration", map[string]func(string){
+				launcher: func(path string) {
+					link(t, filepath.Join(f.state, "packages", "tool.openwhispr", "current", "OpenWhispr.app"), path)
+				}})
+			f.v1.Selected = append(f.v1.Selected, "openwhispr")
+			return launcher
+		}},
+		"code": {named: "VS Code program (tool.vscode)", prepare: func(f *fx) string {
+			launcher := filepath.Join(f.home, "Applications", "Visual Studio Code.app")
+			command := filepath.Join(f.home, ".local", "bin", "code")
+			if err := os.Remove(launcher); err != nil {
+				t.Fatal(err)
+			}
+			bundle := filepath.Join(f.state, "packages", "tool.vscode", "current", "Visual Studio Code.app")
+			f.configuration("desktop.vscode", "configuration", map[string]func(string){
+				launcher: func(path string) { link(t, bundle, path) },
+				command:  func(path string) { link(t, filepath.Join(bundle, "Contents", "Resources", "app", "bin", "code"), path) }})
+			return command
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := darwinFixture(t)
+			if err := os.Remove(c.prepare(f)); err != nil {
+				t.Fatal(err)
+			}
+			before := capture(t, f, f.save())
+			proposal, err := f.preview()
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := proposal.Run(context.Background())
+			if err == nil || !strings.Contains(err.Error(), "do not start: "+c.named+". Repair them with the setup of "+v2import.SourceCommit) {
+				t.Fatalf("the import must stop and name the application without its launcher: %v\n%s", err, result.Message)
+			}
+			before.restored(t, f)
+			if _, err := os.Lstat(filepath.Join(f.state, "v2-restore")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("the stop must come before the restore set: %v", err)
+			}
+		})
 	}
 }
 

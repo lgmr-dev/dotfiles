@@ -458,7 +458,14 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 			continue
 		}
 		ReportStep(ctx, "[%d/%d] %s done in %s", step, total, r.Name, platform.FormatElapsed(time.Since(started)))
-		if (r.ReplanAfter || op.Finding.Replan) && !removal && slices.ContainsFunc(approved.Operations[index+1:], func(later Operation) bool { return mutating(later.Action) }) {
+		if !(r.ReplanAfter || op.Finding.Replan) || removal {
+			continue
+		}
+		replan, err := e.laterWork(approved.Operations[index+1:], r.ID)
+		if err != nil {
+			return result, err
+		}
+		if replan {
 			result.Status = "needs-action"
 			result.Message = strings.TrimSpace(strings.Join(failures, "\n") + "\n" + r.Name + " is ready. Review the newly available provider inventory before continuing.")
 			return result, ErrReplan
@@ -483,6 +490,25 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 	}
 	result.Message += e.disclosures(approved)
 	return result, nil
+}
+
+func (e *Engine) laterWork(later []Operation, bootstrap string) (bool, error) {
+	for _, op := range later {
+		if mutating(op.Action) {
+			return true, nil
+		}
+		if op.Action != "pending" {
+			continue
+		}
+		closure, err := e.Catalog.Closure([]string{op.Resource}, e.Context)
+		if err != nil {
+			return false, err
+		}
+		if slices.Contains(closure, bootstrap) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (e *Engine) verify(ctx context.Context, provider Provider, r catalog.Resource, op Operation, want Want, rec Records) error {

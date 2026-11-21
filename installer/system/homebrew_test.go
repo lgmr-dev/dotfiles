@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -254,7 +255,7 @@ func TestHomebrewBootstrapFreshLifecycleUsesThePendingMarkAndReplans(t *testing.
 	if !slices.Equal(f.pending[0], []string{"infra.homebrew:install"}) || !slices.Equal(f.pending[1], []string{"infra.homebrew:install"}) || len(f.rec.State().Pending) != 0 {
 		t.Fatal("the pending mark must cover the prefix reservation and the installer", f.pending, f.rec.State().Pending)
 	}
-	if shown := missing.Commands[0].Lines; !slices.Equal(shown, []string{macTestLine(reserve), macTestLine(install) + " < install.sh"}) {
+	if shown := missing.Commands[0].Lines; len(shown) != 5 || !slices.Equal(shown[3:], []string{macTestLine(reserve), macTestLine(install) + " < homebrew-install.sh"}) {
 		t.Fatal("the approved lines differ from the commands that ran", shown)
 	}
 	if len(f.rec.State().System) != 0 {
@@ -269,6 +270,38 @@ func TestHomebrewBootstrapFreshLifecycleUsesThePendingMarkAndReplans(t *testing.
 	}
 	if err := f.d.Remove(context.Background(), f.r, after, f.rec); err == nil {
 		t.Fatal("Homebrew was removed")
+	}
+}
+
+func TestHomebrewBootstrapBlockDownloadsAndVerifiesItsInputBeforeThePrivilegedLines(t *testing.T) {
+	f := newHomebrewBootstrapFixture(t)
+	lines := f.inspect().Commands[0].Lines
+	if len(lines) < 4 || !strings.HasPrefix(lines[1], "curl ") || !strings.HasSuffix(lines[2], " | shasum -a 256 -c") || !strings.HasPrefix(lines[3], "/usr/bin/sudo ") {
+		t.Fatal("the block must download and verify the installer before the first privileged line", lines)
+	}
+	checked, ok := strings.CutPrefix(strings.TrimSuffix(lines[2], " | shasum -a 256 -c"), "echo '"+f.d.sha256+"  ")
+	file, quoted := strings.CutSuffix(checked, "'")
+	if !ok || !quoted || file == "" || lines[1] != "curl -fsSLo "+file+" "+homebrewBootstrapURL || !strings.HasSuffix(lines[len(lines)-1], " < "+file) {
+		t.Fatal("the downloaded and verified file must be the input of the installer line", lines)
+	}
+	if _, err := exec.LookPath("shasum"); err != nil {
+		t.Log("shasum is not on this host; the check line was verified by structure only")
+		return
+	}
+	directory := t.TempDir()
+	check := func(content string) error {
+		if err := os.WriteFile(filepath.Join(directory, file), []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		command := exec.Command("/bin/sh", "-c", lines[2])
+		command.Dir = directory
+		return command.Run()
+	}
+	if err := check(f.payload); err != nil {
+		t.Fatal("the shown check refused the pinned installer bytes", err)
+	}
+	if err := check(f.payload + "changed"); err == nil {
+		t.Fatal("the shown check accepted changed installer bytes")
 	}
 }
 
@@ -322,7 +355,7 @@ func TestHomebrewBootstrapMarkLifecycleOnFailure(t *testing.T) {
 	if err := f.apply(); err == nil || !strings.Contains(err.Error(), "did not start") || len(f.rec.State().Pending) != 0 {
 		t.Fatal("an installer that did not start kept its mark", err, f.rec.State().Pending)
 	}
-	if found := f.inspect(); found.Status != engine.Missing || len(found.Commands[0].Lines) != 1 || strings.Contains(found.Commands[0].Lines[0], "mkdir") {
+	if found := f.inspect(); found.Status != engine.Missing || len(found.Commands[0].Lines) != 4 || strings.Contains(strings.Join(found.Commands[0].Lines, "\n"), "mkdir") {
 		t.Fatal("an empty reserved prefix must permit the installer without a second reservation", found)
 	}
 	f.fail = ""
@@ -356,7 +389,7 @@ func TestHomebrewBootstrapNamesTheFolderWhenTheReservedPrefixChanged(t *testing.
 		t.Fatal(err)
 	}
 	f.fail = ""
-	if found := f.inspect(); found.Status != engine.Missing || len(found.Commands[0].Lines) != 1 {
+	if found := f.inspect(); found.Status != engine.Missing || len(found.Commands[0].Lines) != 4 {
 		t.Fatal("an empty reserved prefix must permit a retry without a second reservation", found)
 	}
 	if err := f.apply(); err != nil || len(f.runner.commands) != 2 || f.runner.commands[1].Path != "/usr/bin/env" || len(f.rec.State().Pending) != 0 {

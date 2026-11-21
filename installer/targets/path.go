@@ -69,10 +69,14 @@ func removeEntry(path string) error {
 	return errors.Join(root.RemoveAll(filepath.Base(path)), root.Close())
 }
 
-func removeMatching(path, fingerprint string) error {
+func removeMatching(ctx context.Context, path, fingerprint string) error {
 	current, err := snapshot(path)
-	if err != nil || current != fingerprint {
-		return errors.Join(fmt.Errorf("%s changed; setup keeps it: examine it, move it away, then run setup again", path), err)
+	if err != nil {
+		return errors.Join(fmt.Errorf("cannot inspect %s; setup keeps it: examine it, move it away, then run setup again", path), err)
+	}
+	if current != fingerprint {
+		platform.Detail(ctx, "Kept %s: it changed after setup moved it aside; examine it, then remove it", path)
+		return nil
 	}
 	return removeEntry(path)
 }
@@ -282,7 +286,7 @@ func (k pathKind) Recover(ctx context.Context, d Desired, record state.Record) e
 	return removeEntry(staged)
 }
 
-func (k pathKind) swap(d Desired, from, want string, stage func(staged string) error) error {
+func (k pathKind) swap(ctx context.Context, d Desired, from, want string, stage func(staged string) error) error {
 	staged, aside := siblings(d)
 	clean := func() error { return nil }
 	if stage != nil {
@@ -320,7 +324,7 @@ func (k pathKind) swap(d Desired, from, want string, stage func(staged string) e
 		}
 	}
 	if from != Absent {
-		return removeMatching(aside, from)
+		return removeMatching(ctx, aside, from)
 	}
 	return nil
 }
@@ -336,24 +340,24 @@ func moveIn(staged, path string) error {
 	return errors.Join(err, removeEntry(staged))
 }
 
-func (k pathKind) Write(_ context.Context, d Desired, from string) error {
+func (k pathKind) Write(ctx context.Context, d Desired, from string) error {
 	want, err := k.Fingerprint(d)
 	if err != nil {
 		return err
 	}
-	return k.swap(d, from, want, func(staged string) error { return k.stage(d, staged) })
+	return k.swap(ctx, d, from, want, func(staged string) error { return k.stage(d, staged) })
 }
 
 func (k pathKind) Restore(ctx context.Context, d Desired, record state.Record, from string) error {
 	backup, ok := strings.CutPrefix(record.Before, "backup:")
 	if !ok {
-		return k.swap(d, from, Absent, nil)
+		return k.swap(ctx, d, from, Absent, nil)
 	}
 	want, err := k.Baseline(record.Before)
 	if err != nil {
 		return err
 	}
-	return k.swap(d, from, want, func(staged string) error { return copyUnit(ctx, backup, staged) })
+	return k.swap(ctx, d, from, want, func(staged string) error { return copyUnit(ctx, backup, staged) })
 }
 
 func (k pathKind) Discard(before, dir string) error {

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/state"
 )
@@ -426,6 +427,34 @@ func TestReplanEndsThePassAfterSuccess(t *testing.T) {
 	w.resource("tool.afterboot").present = true
 	if result := mustApply(t, e, selection("packages")); result.Status != "ready" || w.swept != 1 {
 		t.Fatal("a replan step without later work stopped the pass", result)
+	}
+}
+
+func TestReplanReviewsAPendingDependentAfterTheBootstrap(t *testing.T) {
+	e, w := fixture(t)
+	w.resource("tool.afterboot").unknown = true
+	request := selection("packages")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil || !slices.Equal(actions(plan), []string{"install:infra.boot", "pending:tool.afterboot"}) {
+		t.Fatal(actions(plan), err)
+	}
+	result, err := e.Apply(context.Background(), request, plan)
+	if !errors.Is(err, engine.ErrReplan) || result.Status != "needs-action" || !strings.Contains(result.Message, "Package manager is ready") {
+		t.Fatal("the bootstrap ended without a review of its pending dependent", result, err)
+	}
+
+	e, w = fixture(t)
+	e.Catalog = &fakeCatalog{resources: append(fixtureCatalog().resources,
+		catalog.Resource{ID: "unrelated", Name: "Unrelated", Capability: true, Category: "Tools", Requires: []string{"tool.unrelated"}},
+		catalog.Resource{ID: "tool.unrelated", Name: "Unrelated tool", Action: "archive"})}
+	w.resource("tool.afterboot").present = true
+	w.resource("tool.unrelated").unknown = true
+	request = selection("packages", "unrelated")
+	if plan, err = e.Preview(context.Background(), request); err != nil || !slices.Equal(actions(plan), []string{"install:infra.boot", "keep:tool.afterboot", "pending:tool.unrelated"}) {
+		t.Fatal(actions(plan), err)
+	}
+	if result, err = e.Apply(context.Background(), request, plan); err != nil || result.Status != "needs-action" || strings.Contains(result.Message, "Package manager is ready") {
+		t.Fatal("a pending resource that does not need the bootstrap asked for a review", result, err)
 	}
 }
 

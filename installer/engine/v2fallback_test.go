@@ -166,10 +166,10 @@ func TestCheckListsTheV2FoldersOnlyAfterTheFallbackCloses(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"Note: " + packages + " is a folder of release v2 that a recorded target or baseline still uses; keep it",
+		"Note: " + packages + " is a folder of release v2 still in use by " + link + "; keep it",
 		"Owner cleanup: " + recovery + " is a folder of release v2 that setup no longer uses; inspect it, then delete it yourself",
 		"Owner cleanup: " + restore + " is a folder of release v2 that setup no longer uses; inspect it, then delete it yourself",
-		"Note: the reference check of the v2 folders covers the recorded link targets and baselines only. A file that you changed can still name a path in these folders.",
+		"Note: the reference check of the v2 folders covers the recorded link targets, the content of the recorded file, block and field targets, and the baselines. Another file can still name a path in these folders.",
 	} {
 		if !strings.Contains(check.Message, want) {
 			t.Fatalf("check lacks %q:\n%s", want, check.Message)

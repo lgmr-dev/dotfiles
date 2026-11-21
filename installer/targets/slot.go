@@ -155,7 +155,7 @@ func (k slotKind) valueOf(data []byte, d Desired) (string, []byte, error) {
 	return k.fingerprint(raw), raw, nil
 }
 
-func (k slotKind) Recover(_ context.Context, d Desired, record state.Record) error {
+func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) error {
 	staged, aside := siblings(d)
 	earlier, moved, err := readSlotFile(aside)
 	if err != nil {
@@ -173,8 +173,16 @@ func (k slotKind) Recover(_ context.Context, d Desired, record state.Record) err
 					return err
 				}
 			}
-			value, _, err := k.valueOf(earlier, d)
-			if err != nil || value != expected || value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path {
+			value, part, err := k.valueOf(earlier, d)
+			replaced := err == nil && part != nil && savedIn(ctx, func(saved string) bool {
+				info, err := os.Lstat(saved)
+				if err != nil || !info.Mode().IsRegular() || info.Size() != int64(len(part)) {
+					return false
+				}
+				copied, err := os.ReadFile(saved)
+				return err == nil && bytes.Equal(copied, part)
+			})
+			if err != nil || !replaced && (value != expected || value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path) {
 				return errors.Join(leftover(aside), err)
 			}
 			err = platform.MoveNoReplace(aside, d.Path)
@@ -197,7 +205,11 @@ func (k slotKind) Recover(_ context.Context, d Desired, record state.Record) err
 		return nil
 	}
 	value, raw, err := k.valueOf(left, d)
-	if err != nil || value != expectedStage(k, record) {
+	expected := expectedStage(k, record)
+	if record.Release && expected == "" {
+		expected = Absent
+	}
+	if err != nil || value != expected {
 		return errors.Join(leftover(staged), err)
 	}
 	current, file, _, _, err := k.read(d)
@@ -207,7 +219,7 @@ func (k slotKind) Recover(_ context.Context, d Desired, record state.Record) err
 	if file == Absent && d.BOM {
 		current = []byte{0xef, 0xbb, 0xbf}
 	}
-	rendered, err := k.slot.Replace(current, d, raw, true)
+	rendered, err := k.slot.Replace(current, d, raw, raw != nil)
 	if err != nil || !bytes.Equal(rendered, left) {
 		return errors.Join(leftover(staged), err)
 	}

@@ -370,3 +370,127 @@ func TestRestoreStopsWhenAFileChangedAfterTheReview(t *testing.T) {
 		t.Fatal("the stop must come before the first write")
 	}
 }
+
+func editState(t *testing.T, f *fx, edit func(document map[string]any)) {
+	t.Helper()
+	path := filepath.Join(f.state, "state.json")
+	var document map[string]any
+	if err := json.Unmarshal([]byte(read(t, path)), &document); err != nil {
+		t.Fatal(err)
+	}
+	edit(document)
+	data, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, path, string(data)+"\n", 0600)
+}
+
+func TestRestoreRecoversAnInterruptedSwitchWriteBeforeItRollsBack(t *testing.T) {
+	f := linuxFixture(t)
+	before := capture(t, f, f.save())
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	saved := ""
+	editManifest(t, f, func(slots map[string]any) {
+		saved = strings.TrimPrefix(slots[env].(map[string]any)["saved"].(string), "backup:")
+	})
+	v2, v3 := editedFingerprint(t, saved), editedFingerprint(t, env)
+	editState(t, f, func(document map[string]any) {
+		record := document["targets"].(map[string]any)[env].(map[string]any)
+		record["applied"], record["next"] = v2, v3
+	})
+	if err := os.Rename(env, strings.TrimSuffix(aside(env), ".previous")+".next"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(saved, aside(env)); err != nil {
+		t.Fatal(err)
+	}
+	mustRestore(t, f)
+	before.restored(t, f)
+}
+
+func TestASwitchRunDoesNotReopenAClosedFallback(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.verify = func(context.Context) error {
+		store, err := state.Open(f.state, f.engine().Target)
+		if err != nil {
+			return err
+		}
+		err = store.Update(func(s *state.State) error { s.V2Restore = ""; return nil })
+		return errors.Join(err, store.Close())
+	}
+	result := f.mustImport()
+	if st := f.current(); st.V2Restore != "" {
+		t.Fatalf("a switch run reopened a fallback that another run closed: %+v", st)
+	}
+	if !strings.Contains(result.Message, "The switch from release v2 is already complete") || strings.Contains(result.Message, "restore-v2 can give release v2 back") {
+		t.Fatalf("the report must say that the switch is already complete:\n%s", result.Message)
+	}
+}
+
+func TestRestoreStopsWhenASavedCopyChangedAfterTheReview(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	env := filepath.Join(f.state, "shells", "env.sh")
+	saved := ""
+	editManifest(t, f, func(slots map[string]any) {
+		saved = strings.TrimPrefix(slots[env].(map[string]any)["saved"].(string), "backup:")
+	})
+	write(t, saved, "tampered copy\n", 0644)
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "the files changed after the review; run restore-v2 again") {
+		t.Fatalf("a saved copy that changed after the review must stop the restore: %v", err)
+	}
+	if st := f.current(); st.V2Restore != "open" || read(t, env) != "# v3 env\n" {
+		t.Fatalf("the stop must change nothing: %+v %q", st, read(t, env))
+	}
+}
+
+func TestASwitchNeverRemovesASystemResource(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	f := linuxFixture(t)
+	f.save()
+	proposal, err := f.preview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2import.SetFault(func(at string) error {
+		if at == "published" {
+			return errors.New("interrupted after the publication")
+		}
+		return nil
+	})
+	if _, err := proposal.Run(context.Background()); err == nil {
+		t.Fatal("the interruption did not stop the import")
+	}
+	v2import.SetFault(nil)
+	editState(t, f, func(document map[string]any) {
+		selected := []any{}
+		for _, id := range document["selected"].([]any) {
+			if id != "keyboard" {
+				selected = append(selected, id)
+			}
+		}
+		document["selected"] = selected
+	})
+	next, err := f.preview()
+	if err != nil || action(next.Plan, "system.keyboard-access") != "remove" {
+		t.Fatalf("the fixture must plan the removal of the keyboard rule: %q %v", action(next.Plan, "system.keyboard-access"), err)
+	}
+	result, err := next.Run(context.Background())
+	if err == nil || len(f.systemChanges) != 0 {
+		t.Fatalf("the switch removed a system resource: %v %v", f.systemChanges, err)
+	}
+	if !strings.Contains(result.Message, "system.keyboard-access needs a system change or the Sentinel installer") {
+		t.Fatalf("the report must name the blocker:\n%s", result.Message)
+	}
+	if _, recorded := f.current().Targets[f.keyboard]; !recorded || read(t, f.keyboard) != keyboardRule(operation("keyboard")) {
+		t.Fatal("the keyboard rule and its record must stay")
+	}
+}

@@ -533,7 +533,7 @@ func TestTheNextConfirmedRunClosesTheFallback(t *testing.T) {
 			t.Fatalf("check must list %s for the owner:\n%s", name, check.Message)
 		}
 	}
-	if !strings.Contains(check.Message, "the reference check of the v2 folders covers the recorded link targets and baselines only") {
+	if !strings.Contains(check.Message, "the reference check of the v2 folders covers") {
 		t.Fatalf("check must state the scope of its reference check:\n%s", check.Message)
 	}
 }

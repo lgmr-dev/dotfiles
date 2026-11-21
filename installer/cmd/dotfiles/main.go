@@ -241,6 +241,15 @@ func run(ctx context.Context, args []string) error {
 	if c.name != "" {
 		return execute(ctx, e, c, s.output)
 	}
+	e.RestoreV2 = func(ctx context.Context, ui engine.Interaction) (engine.Result, error) {
+		options, _, err := importOptions(s)
+		if surface, ok := ui.(restoreUI); err == nil && ok {
+			err = restoreMenu(ctx, surface, s, options)
+		} else if err == nil {
+			err = errors.New("the restore of release v2 needs the terminal menu; run restore-v2")
+		}
+		return engine.Result{Status: "ready"}, err
+	}
 	return menu(ctx, e, os.Stdin, s.output)
 }
 

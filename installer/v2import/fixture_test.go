@@ -61,6 +61,7 @@ type fx struct {
 	legacy                      []string
 	nl                          string
 	systemChanges               []string
+	verify                      func(context.Context) error
 	extraKinds                  map[string]targets.Kind
 	captureKinds                map[string]targets.Kind
 	inspected                   []string
@@ -490,8 +491,16 @@ func (p systemProvider) Apply(_ context.Context, r catalog.Resource, _ engine.Fi
 	return nil
 }
 
-func (p systemProvider) Remove(context.Context, catalog.Resource, engine.Finding, engine.Records) error {
-	return errors.New("the import must never remove a system item")
+func (p systemProvider) Remove(_ context.Context, r catalog.Resource, _ engine.Finding, rec engine.Records) error {
+	p.f.systemChanges = append(p.f.systemChanges, "remove:"+r.ID)
+	return rec.Update(func(s *state.State) error {
+		for key, record := range s.Targets {
+			if record.Resource == r.ID {
+				s.Drop(key)
+			}
+		}
+		return nil
+	})
 }
 
 func (f *fx) route(r catalog.Resource) (engine.Provider, error) {
@@ -519,7 +528,7 @@ func (f *fx) engine() *engine.Engine {
 func (f *fx) options() v2import.Options {
 	kinds := f.kinds()
 	maps.Copy(kinds, f.captureKinds)
-	return v2import.Options{Engine: f.engine(), Folders: f.folders(), Kinds: kinds, KeyboardRule: f.keyboard}
+	return v2import.Options{Engine: f.engine(), Folders: f.folders(), Kinds: kinds, KeyboardRule: f.keyboard, VerifyNvim: f.verify}
 }
 
 func (f *fx) preview() (*v2import.Proposal, error) {

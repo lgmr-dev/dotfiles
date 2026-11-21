@@ -360,8 +360,11 @@ func (e *Engine) Run(ctx context.Context) (result Result, resultErr error) {
 		{ID: "apply", Label: "Choose tools", Detail: "Install, remove or repair tools; required dependencies are included automatically."},
 		{ID: "update", Label: "Update tools", Detail: "Apply this checkout's reviewed versions and the latest Sentinel release, and repair failed checks; your selection stays the same."},
 		{ID: "check", Label: "Check installation", Detail: "Inspect health and required actions without changing anything."},
-		{ID: "exit", Label: "Exit"},
 	}
+	if e.RestoreV2 != nil && st.V2Restore == "open" {
+		actions = append(actions, Choice{ID: "restore-v2", Label: "Restore release v2", Detail: "Give back the files and state of release v2; changed files stay unless you choose to replace them"})
+	}
+	actions = append(actions, Choice{ID: "exit", Label: "Exit"})
 	session := &menuSession{e: e, state: st, drafts: map[string][]string{}, inspected: map[string]inspection{}}
 	defer session.close()
 	if st.Schema != 0 && len(st.Selected)+len(st.Keep) != 0 {
@@ -390,6 +393,15 @@ func (e *Engine) Run(ctx context.Context) (result Result, resultErr error) {
 		menu = true
 		if mode == "exit" {
 			return result, nil
+		}
+		if mode == "restore-v2" {
+			session.close()
+			result, resultErr = e.RestoreV2(ctx, ui)
+			if !errors.Is(resultErr, ErrBack) {
+				return result, resultErr
+			}
+			result = Result{Status: "cancelled"}
+			continue
 		}
 		result, resultErr = e.runMode(ctx, ui, session, mode)
 		if !errors.Is(resultErr, ErrBack) && (mode != "check" || resultErr != nil) {

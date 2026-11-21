@@ -598,3 +598,42 @@ func TestSweepRemovesNoBuildWhenItCannotReadARecordedTarget(t *testing.T) {
 		})
 	}
 }
+
+func TestSweepFindsABuildPathAtAnyOffsetOfARecordedFile(t *testing.T) {
+	for name, offset := range map[string]int{"after 1 MiB": 3 << 20, "across a chunk boundary": 64<<10 - 10, "at the end of a chunk": 64<<10 - 200} {
+		t.Run(name, func(t *testing.T) {
+			f, first, second, _ := threeBuilds(t)
+			file := filepath.Join(filepath.Dir(f.provider.StateDir), "large.conf")
+			write(t, file, strings.Repeat("x", offset)+first+strings.Repeat("y", 200<<10))
+			record(t, f, file, "file")
+			removed, left := f.sweep()
+			if !slices.Equal(removed, []string{second}) || len(left) != 0 || read(t, filepath.Join(first, "tool")) != "version one" {
+				t.Fatal("the sweep did not keep exactly the build that the file names", removed, left)
+			}
+		})
+	}
+}
+
+func TestSweepLeavesAManifestFileWithoutItsBuild(t *testing.T) {
+	f, first, second, _ := threeBuilds(t)
+	dir := builds.ResourceDir(f.provider.StateDir, shared)
+	personal := filepath.Join(dir, "9.0-0123456789ab-1.manifest.json")
+	write(t, personal, "personal notes")
+	if err := os.RemoveAll(first); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{first + ".manifest.json", personal}
+	slices.Sort(want)
+	leftovers, err := builds.Leftovers(t.Context(), f.provider.StateDir, f.rec.State())
+	if err != nil || !slices.Equal(leftovers, want) {
+		t.Fatal("the manifest files without a build are not reported", leftovers, err)
+	}
+	removed, left := f.sweep()
+	if !slices.Equal(removed, []string{second}) || !slices.Equal(left, want) {
+		t.Fatal(removed, left)
+	}
+	if read(t, personal) != "personal notes" || read(t, first+".manifest.json") == "" {
+		t.Fatal("the sweep deleted a manifest file by its name")
+	}
+	absent(t, second+".manifest.json")
+}

@@ -591,3 +591,22 @@ func TestSentinelRecordWithoutOwnershipMakesAnImportedCheckoutRemovable(t *testi
 		t.Fatal("the removal deleted a checkout without ownership, or left a record", f.State().Targets, hooks.SentinelLeftovers(f.state))
 	}
 }
+
+func TestSentinelFinishesTheCheckoutRecordAfterAnInterruptedPublication(t *testing.T) {
+	f := newSentinelFixture(t)
+	p := f.install()
+	key := hooks.SentinelCheckoutKey(f.state)
+	live := f.State().Targets[key].Applied
+	if err := f.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.SentinelResource, Kind: "tree", Next: live, Before: "absent"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Apply(context.Background(), sentinelResource, engine.Finding{Status: engine.Unhealthy}, f); err != nil {
+		t.Fatal(err)
+	}
+	if record := f.State().Targets[key]; record.Applied != live || record.Next != "" || len(hooks.SentinelLeftovers(f.state)) != 0 {
+		t.Fatal("the checkout record stays unfinished after the next run", record)
+	}
+}

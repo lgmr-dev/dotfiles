@@ -31,7 +31,7 @@ type RestoreItem struct {
 	Key, Resource, Action, Detail string
 	Replacement                   string
 
-	live string
+	live, saved string
 }
 
 // Restoration is the preview of restore-v2. Done is true when the schema-1
@@ -76,7 +76,7 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 	}
 	switch {
 	case live.Fingerprint == live.Want && !restoring:
-		item.Action, item.Detail = "none", "it holds its value of release v2"
+		item.Action, item.Detail, item.saved = "none", "it holds its value of release v2", live.Want
 		return item
 	case strings.HasPrefix(slot.Saved, "fp:"):
 		item.Action, item.Detail = "manual", "setup has no copy of its value of release v2; Update tools of release v2 repairs it"
@@ -85,6 +85,7 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 	if restoring {
 		candidates = append(candidates, started)
 	}
+	item.saved = live.Want
 	item.Replacement = "restore"
 	if slot.Saved == targets.Absent {
 		item.Replacement = "remove"
@@ -210,8 +211,16 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	if r.Done {
 		return afterRestore, nil
 	}
-	if reviewed && !slices.EqualFunc(approved, r.Items, func(a, b RestoreItem) bool { return a.Key == b.Key && a.Action == b.Action && a.live == b.live }) {
+	if reviewed && !slices.EqualFunc(approved, r.Items, func(a, b RestoreItem) bool {
+		return a.Key == b.Key && a.Action == b.Action && a.Replacement == b.Replacement && a.live == b.live && a.saved == b.saved
+	}) {
 		return "", errors.New("the files changed after the review; run restore-v2 again. Nothing was changed")
+	}
+	if failures := r.recoverSwitch(ctx, set); len(failures) != 0 {
+		return "", fmt.Errorf("restore-v2 stopped before it changed a target. An earlier switch run left an unfinished write. Resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
+	}
+	if set, err = r.plan(); err != nil {
+		return "", err
 	}
 	notes, failures, kept := []string{}, []string{}, map[string]string{}
 	for _, item := range r.Items {
@@ -322,4 +331,23 @@ func (s *restoreSet) saveEdited(ctx context.Context, item RestoreItem, slot Slot
 	}
 	s.manifest.Edited[item.Key] = saved
 	return path, nil
+}
+
+func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) []string {
+	failures := []string{}
+	st, err := state.Peek(r.o.Engine.StateDir, r.o.Engine.Target)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	for _, key := range slotOrder(set.manifest.Slots) {
+		record, has := st.Targets[key]
+		if !has || record.Next == "" || record.Release {
+			continue
+		}
+		forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: set.manifest.Slots[key].Saved}
+		if err := set.writer.Release(ctx, key, &memory{state.State{Targets: map[string]state.Record{key: forward}}}, targets.Preserve); err != nil {
+			failures = append(failures, key+": "+err.Error())
+		}
+	}
+	return failures
 }

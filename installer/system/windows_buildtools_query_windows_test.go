@@ -94,13 +94,20 @@ func TestWindowsBuildToolsQueryContainsOnlyItsOwnProcessTree(t *testing.T) {
 			if err := windowsBuildToolsWaitQueryFixtureFile(ctx, pidFile); err != nil {
 				t.Fatal(err)
 			}
-			pidText, err := os.ReadFile(pidFile)
-			if err != nil {
-				t.Fatal(err)
-			}
-			pid, err := strconv.ParseUint(string(pidText), 10, 32)
-			if err != nil {
-				t.Fatal(err)
+			var pid uint64
+			for {
+				pidText, err := os.ReadFile(pidFile)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if pid, err = strconv.ParseUint(string(pidText), 10, 32); err == nil {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					t.Fatal("the fixture did not write its process ID", err)
+				case <-time.After(10 * time.Millisecond):
+				}
 			}
 			child, err := windows.OpenProcess(windows.SYNCHRONIZE|windows.PROCESS_TERMINATE|windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(pid))
 			if err != nil {

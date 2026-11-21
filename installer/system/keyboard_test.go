@@ -94,7 +94,13 @@ func (f *keyboardFixture) Run(ctx context.Context, c platform.Command) ([]byte, 
 			return nil, err
 		}
 	case "mv":
-		return nil, os.Rename(args[1], args[2])
+		if !slices.Equal(args[:2], []string{"-n", "-T"}) {
+			f.t.Fatal("the move must never replace a file", args)
+		}
+		if _, err := os.Lstat(args[3]); err == nil {
+			return nil, nil
+		}
+		return nil, os.Rename(args[2], args[3])
 	}
 	return nil, nil
 }
@@ -216,7 +222,7 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 	}
 
 	found = f.inspect(false)
-	if found.Status != engine.Satisfied || len(found.Commands) != 1 || !strings.HasPrefix(found.Commands[0].Lines[0], "LC_ALL=C /fake/sudo -n -- /usr/bin/mv -T ") {
+	if found.Status != engine.Satisfied || len(found.Commands) != 1 || !strings.HasPrefix(found.Commands[0].Lines[0], "LC_ALL=C /fake/sudo -n -- /usr/bin/mv -n -T ") {
 		t.Fatal(found)
 	}
 	f.during = func(name string) {
@@ -232,7 +238,7 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	aside := filepath.Join(filepath.Dir(f.k.Rules), ".dotfiles-mac-keyboard.removing")
-	if !slices.Equal(f.log, append([]string{"mv -T " + f.k.Rules + " " + aside, "rm -f -- " + aside}, keyboardFixtureReload...)) {
+	if !slices.Equal(f.log, append([]string{"mv -n -T " + f.k.Rules + " " + aside, "rm -f -- " + aside}, keyboardFixtureReload...)) {
 		t.Fatal("the removal must move, delete and reload in order", f.log)
 	}
 	st = f.rec.State()
@@ -321,8 +327,7 @@ func TestKeyboardAccessRetryRepeatsTheReloadWhenTheBytesMatch(t *testing.T) {
 	if err := f.k.Apply(ctx, r, found, f.rec); err != nil {
 		t.Fatal(err)
 	}
-	tmp := filepath.Join(filepath.Dir(f.k.Rules), ".dotfiles-mac-keyboard.tmp")
-	if !slices.Equal(f.log, append([]string{"rm -f -- " + tmp}, keyboardFixtureReload...)) {
+	if !slices.Equal(f.log, keyboardFixtureReload) {
 		t.Fatal("the retry must repeat the reload and the triggers and must not write the rule again", f.log)
 	}
 	st = f.rec.State()
@@ -450,4 +455,70 @@ func TestKeyboardAccessMarksBeforeTheFirstPrivilegedCommand(t *testing.T) {
 	if err := f.k.Apply(ctx, r, f.inspect(true), f.rec); err == nil || len(f.rec.State().Pending) != 1 {
 		t.Fatal("a write that started and failed must keep its mark", err, f.rec.State().Pending)
 	}
+}
+
+func TestKeyboardAccessNeverOverwritesAnUnrecordedStagingName(t *testing.T) {
+	ctx := context.Background()
+	r := keyboardFixtureResource
+
+	f := newKeyboardFixture(t)
+	tmp := filepath.Join(filepath.Dir(f.k.Rules), ".dotfiles-mac-keyboard.tmp")
+	if err := os.WriteFile(tmp, []byte("# personal\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	found := f.inspect(true)
+	if found.Status != engine.Blocked || !strings.Contains(found.Reason, tmp) {
+		t.Fatal("an unrecorded file at the temporary name must stop the step and be named", found)
+	}
+	if err := f.k.Apply(ctx, r, found, f.rec); err == nil || !strings.Contains(err.Error(), tmp) || len(f.log) != 0 || len(f.rec.State().Pending) != 0 {
+		t.Fatal(err, f.log)
+	}
+	if data, err := os.ReadFile(tmp); err != nil || string(data) != "# personal\n" {
+		t.Fatal("setup overwrote an unrecorded file", string(data), err)
+	}
+
+	f = newKeyboardFixture(t)
+	if err := f.k.Apply(ctx, r, f.inspect(true), f.rec); err != nil {
+		t.Fatal(err)
+	}
+	rule, _ := os.ReadFile(f.k.Rules)
+	aside := filepath.Join(filepath.Dir(f.k.Rules), ".dotfiles-mac-keyboard.removing")
+	if err := os.WriteFile(aside, append(slices.Clone(rule), "# local\n"...), 0644); err != nil {
+		t.Fatal(err)
+	}
+	f.log = nil
+	found = f.inspect(false)
+	if found.Status != engine.Blocked || !strings.Contains(found.Reason, aside) {
+		t.Fatal("a changed moved copy must stop the removal and be named", found)
+	}
+	if err := f.k.Remove(ctx, r, found, f.rec); err == nil || !strings.Contains(err.Error(), aside) || len(f.log) != 0 || len(f.rec.State().Pending) != 0 {
+		t.Fatal(err, f.log)
+	}
+	if data, err := os.ReadFile(aside); err != nil || !strings.HasSuffix(string(data), "# local\n") {
+		t.Fatal("setup overwrote the preserved moved copy", string(data), err)
+	}
+	if data, err := os.ReadFile(f.k.Rules); err != nil || string(data) != string(rule) {
+		t.Fatal("the rule must stay while the moved copy blocks its removal", err)
+	}
+
+	f = newKeyboardFixture(t)
+	f.fail["ln"] = aptFixtureExit(1)
+	if err := f.k.Apply(ctx, r, f.inspect(true), f.rec); err == nil {
+		t.Fatal("the link step must fail")
+	}
+	if err := f.rec.Update(func(s *state.State) error { s.Clear(keyboardFixtureMark); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	f.fail, f.log = map[string]error{}, nil
+	found = f.inspect(true)
+	if found.Status != engine.Missing {
+		t.Fatal("a temporary copy that equals the recorded intended value must be recovered", found)
+	}
+	if err := f.k.Apply(ctx, r, found, f.rec); err != nil || f.log[0] != "rm -f -- "+tmpOf(f) || len(f.entries()) != 1 {
+		t.Fatal(err, f.log, f.entries())
+	}
+}
+
+func tmpOf(f *keyboardFixture) string {
+	return filepath.Join(filepath.Dir(f.k.Rules), ".dotfiles-mac-keyboard.tmp")
 }

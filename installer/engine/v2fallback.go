@@ -1,6 +1,10 @@
 package engine
 
 import (
+	"encoding/base64"
+	"errors"
+	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -37,26 +41,72 @@ func FallbackNotice(plan Plan) string {
 	return ""
 }
 
-func within(folder, path string) bool {
-	relative, err := filepath.Rel(folder, path)
-	return err == nil && filepath.IsAbs(path) && (relative == "." || filepath.IsLocal(relative))
+const maxReferenceBytes = 8 << 20
+
+func readBounded(path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, errors.New("it is not a regular file")
+	}
+	if info.Size() > maxReferenceBytes {
+		return nil, errors.New("it is larger than 8 MiB")
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	data, err := io.ReadAll(io.LimitReader(file, maxReferenceBytes))
+	return data, errors.Join(err, file.Close())
 }
 
-func v2References(st state.State) []string {
-	paths := []string{}
-	for key, record := range st.Targets {
-		for _, value := range []string{record.Applied, record.Next, strings.TrimPrefix(record.Before, "backup:")} {
-			if filepath.IsAbs(value) {
-				paths = append(paths, value)
-			}
+func names(text, folder string) bool {
+	for _, form := range []string{folder, strings.ReplaceAll(folder, `\`, `\\`), filepath.ToSlash(folder)} {
+		if strings.Contains(text, form) {
+			return true
 		}
-		if record.Kind == "link" {
-			if target, err := os.Readlink(key); err == nil {
-				paths = append(paths, target)
+	}
+	return false
+}
+
+func v2References(st state.State, folders []string) (users map[string]string, unreadable string) {
+	users = map[string]string{}
+	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
+		record := st.Targets[key]
+		texts := []string{}
+		for _, value := range []string{record.Applied, record.Next, record.Before} {
+			if encoded, inline := strings.CutPrefix(value, "value:"); inline {
+				if decoded, err := base64.StdEncoding.DecodeString(encoded); err == nil {
+					value = string(decoded)
+				}
+			}
+			texts = append(texts, value)
+		}
+		path := key
+		if cut := strings.LastIndex(key, "#"); cut > 0 && (record.Kind == "block" || record.Kind == "field") {
+			path = key[:cut]
+		}
+		switch record.Kind {
+		case "link":
+			if target, err := os.Readlink(path); err == nil {
+				texts = append(texts, target)
+			}
+		case "file", "block", "field":
+			data, err := readBounded(path)
+			if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
+				unreadable = key + ": " + err.Error()
+			}
+			texts = append(texts, string(data))
+		}
+		for _, folder := range folders {
+			if _, found := users[folder]; !found && slices.ContainsFunc(texts, func(text string) bool { return names(text, folder) }) {
+				users[folder] = key
 			}
 		}
 	}
-	return paths
+	return users, unreadable
 }
 
 func (e *Engine) v2FolderReport(fallback string) string {
@@ -77,14 +127,17 @@ func (e *Engine) v2FolderReport(fallback string) string {
 	if err != nil {
 		return "\nNote: setup could not examine the folders of release v2: " + err.Error()
 	}
-	references := v2References(st)
+	users, unreadable := v2References(st, present)
 	message := ""
 	for _, folder := range present {
-		if slices.ContainsFunc(references, func(path string) bool { return within(folder, path) }) {
-			message += "\nNote: " + folder + " is a folder of release v2 that a recorded target or baseline still uses; keep it"
-			continue
+		switch {
+		case users[folder] != "":
+			message += "\nNote: " + folder + " is a folder of release v2 still in use by " + users[folder] + "; keep it"
+		case unreadable != "":
+			message += "\nNote: setup cannot say if " + folder + " is still in use, because it could not read " + unreadable + "; keep it until check can read that target"
+		default:
+			message += "\nOwner cleanup: " + folder + " is a folder of release v2 that setup no longer uses; inspect it, then delete it yourself"
 		}
-		message += "\nOwner cleanup: " + folder + " is a folder of release v2 that setup no longer uses; inspect it, then delete it yourself"
 	}
-	return message + "\nNote: the reference check of the v2 folders covers the recorded link targets and baselines only. A file that you changed can still name a path in these folders."
+	return message + "\nNote: the reference check of the v2 folders covers the recorded link targets, the content of the recorded file, block and field targets, and the baselines. Another file can still name a path in these folders."
 }

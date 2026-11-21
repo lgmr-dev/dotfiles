@@ -22,9 +22,14 @@ func (a *APT) privileged(program string, environment []string, args ...string) p
 	return platform.Command{Path: a.Location.Sudo, Args: slices.Concat([]string{"-n"}, environment, []string{program}, args), Elevated: true}
 }
 
+var aptAssignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
+
 func aptShellWord(word string) string {
 	if aptPlainWord.MatchString(word) {
 		return word
+	}
+	if name := aptAssignment.FindString(word); name != "" {
+		return name + aptShellLiteral(word[len(name):])
 	}
 	return aptShellLiteral(word)
 }

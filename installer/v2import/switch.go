@@ -30,6 +30,8 @@ func hit(point string) error {
 
 var errSwitchOnly = errors.New("this change belongs to the switch")
 
+var errSwitchComplete = errors.New("the switch from release v2 is already complete")
+
 // Proposal is the preview of the import, or of the completion of a switch
 // that an earlier run left unfinished. Plan is the plan of the closure of
 // the imported selection. Details is the text for the review: the mapping
@@ -416,8 +418,18 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 	if err != nil {
 		return result, err
 	}
-	err = store.Update(func(s *state.State) error { s.V2Restore = "open"; return nil })
-	if err = errors.Join(err, store.Close()); err != nil {
+	err = store.Update(func(s *state.State) error {
+		if s.V2Restore != "switching" {
+			return errSwitchComplete
+		}
+		s.V2Restore = "open"
+		return nil
+	})
+	if err = errors.Join(err, store.Close()); errors.Is(err, errSwitchComplete) {
+		result.Message = strings.TrimSpace(result.Message + "\nThe switch from release v2 is already complete. Setup did not change the v2 fallback.")
+		return result, nil
+	}
+	if err != nil {
 		return result, err
 	}
 	result.Plan.V2Restore = "open"

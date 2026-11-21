@@ -232,7 +232,7 @@ func expectedStage(kind Kind, record state.Record) string {
 	return baseline
 }
 
-func (k pathKind) Recover(_ context.Context, d Desired, record state.Record) error {
+func (k pathKind) Recover(ctx context.Context, d Desired, record state.Record) error {
 	staged, aside := siblings(d)
 	moved, err := snapshot(aside)
 	if err != nil {
@@ -243,7 +243,10 @@ func (k pathKind) Recover(_ context.Context, d Desired, record state.Record) err
 		if record.Before != "" {
 			baseline, _ = k.Baseline(record.Before)
 		}
-		if moved != record.Applied && moved != baseline {
+		if moved != record.Applied && moved != baseline && !savedIn(ctx, func(saved string) bool {
+			copied, err := snapshot(saved)
+			return err == nil && copied == moved
+		}) {
 			return leftover(aside)
 		}
 		current, err := snapshot(d.Path)

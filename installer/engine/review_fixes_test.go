@@ -2,7 +2,11 @@ package engine_test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -126,5 +130,96 @@ func TestARunWithoutAChangeLeavesTheFallbackOpen(t *testing.T) {
 	}
 	if saved(t, e).V2Restore != "" {
 		t.Fatal("the first step that ran did not close the fallback")
+	}
+}
+
+func TestActionMenuOffersTheRestoreOnlyWhileTheFallbackIsOpen(t *testing.T) {
+	e, _ := fixture(t)
+	mustApply(t, e, selection("editor"))
+	called := 0
+	e.RestoreV2 = func(_ context.Context, ui engine.Interaction) (engine.Result, error) {
+		called++
+		if ui == nil {
+			t.Error("the restore received no interface")
+		}
+		return engine.Result{Status: "ready", Message: "restored"}, nil
+	}
+	ui := &scriptedUI{t: t, answers: []string{"exit"}}
+	e.UI = ui
+	if _, err := e.Run(context.Background()); err != nil || slices.Contains(ui.menus[0].labels, "Restore release v2") {
+		t.Fatal("the restore was offered without an open fallback", ui.menus, err)
+	}
+	setFallback(t, e, "open")
+	ui = &scriptedUI{t: t, answers: []string{"restore-v2"}}
+	e.UI = ui
+	result, err := e.Run(context.Background())
+	if err != nil || result.Status != "ready" || result.Message != "restored" || called != 1 {
+		t.Fatal("the restore choice did not call the restore", result, err, called)
+	}
+	if want := []string{"Choose tools", "Update tools", "Check installation", "Restore release v2", "Exit"}; !slices.Equal(ui.menus[0].labels, want) {
+		t.Fatal(ui.menus[0].labels)
+	}
+	e.RestoreV2 = func(context.Context, engine.Interaction) (engine.Result, error) {
+		return engine.Result{}, engine.ErrBack
+	}
+	ui = &scriptedUI{t: t, answers: []string{"restore-v2", "exit"}}
+	e.UI = ui
+	if result, err := e.Run(context.Background()); err != nil || result.Status != "cancelled" || len(ui.menus) != 2 {
+		t.Fatal("going back from the restore did not return to the menu", result, err)
+	}
+	e.RestoreV2 = nil
+	ui = &scriptedUI{t: t, answers: []string{"exit"}}
+	e.UI = ui
+	if _, err := e.Run(context.Background()); err != nil || slices.Contains(ui.menus[0].labels, "Restore release v2") {
+		t.Fatal("the restore was offered without a restore function", err)
+	}
+}
+
+func TestCheckKeepsAV2FolderThatARecordedTargetStillNames(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	packages, recovery, restore := v2Folder(t, e, "packages"), v2Folder(t, e, "recovery"), v2Folder(t, e, "v2-restore")
+	settings := filepath.Join(w.home, "settings.json")
+	content, err := json.Marshal(map[string]string{"commandline": filepath.Join(packages, "tool.powershell", "current", "pwsh")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := errors.Join(os.MkdirAll(w.home, 0700), os.WriteFile(settings, content, 0600)); err != nil {
+		t.Fatal(err)
+	}
+	profile := filepath.Join(w.home, "profile")
+	if err := os.WriteFile(profile, []byte("plain"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	baseline := base64.StdEncoding.EncodeToString([]byte("source " + filepath.Join(recovery, "old", "init")))
+	edit(t, e, func(s *state.State) {
+		s.Targets[settings+"#windows-terminal"] = state.Record{Resource: "config.editor", Kind: "field", Before: "fp:abc"}
+		s.Targets[profile+"#block"] = state.Record{Resource: "config.editor", Kind: "block", Applied: "fp:abc", Before: "value:" + baseline}
+	})
+	check, err := e.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"Note: " + packages + " is a folder of release v2 still in use by " + settings + "#windows-terminal; keep it",
+		"Note: " + recovery + " is a folder of release v2 still in use by " + profile + "#block; keep it",
+		"Owner cleanup: " + restore + " is a folder of release v2 that setup no longer uses; inspect it, then delete it yourself",
+	} {
+		if !strings.Contains(check.Message, want) {
+			t.Fatalf("check lacks %q:\n%s", want, check.Message)
+		}
+	}
+	if strings.Contains(check.Message, "Owner cleanup: "+packages) || strings.Contains(check.Message, "Owner cleanup: "+recovery) {
+		t.Fatal("check told the owner to delete a folder that a recorded target still names", check.Message)
+	}
+	if err := errors.Join(os.Remove(profile), os.Mkdir(profile, 0700)); err != nil {
+		t.Fatal(err)
+	}
+	if check, err = e.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(check.Message, "Owner cleanup") || !strings.Contains(check.Message, "Note: setup cannot say if "+restore+" is still in use, because it could not read "+profile+"#block") ||
+		!strings.Contains(check.Message, "Note: "+packages+" is a folder of release v2 still in use by ") {
+		t.Fatal("check gave a cleanup instruction although a recorded target is unreadable", check.Message)
 	}
 }

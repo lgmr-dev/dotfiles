@@ -15,7 +15,6 @@ import (
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -205,8 +204,8 @@ func (c captureProvider) Apply(ctx context.Context, r catalog.Resource, approved
 }
 
 func (c captureProvider) Remove(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
-	if r.Action == "sentinel" || r.ID == hooks.SentinelResource {
-		return outsideSwitch(r, c.context)
+	if err := outsideSwitch(r, c.context); err != nil {
+		return err
 	}
 	return c.Provider.Remove(ctx, r, approved, captureRecords{rec, ctx, c.set})
 }

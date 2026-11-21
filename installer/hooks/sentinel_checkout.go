@@ -321,6 +321,14 @@ func (p *Sentinel) verify(ctx context.Context, directory string) (string, error)
 
 func (p *Sentinel) prepare(ctx context.Context, want string, rec engine.Records) (_ string, err error) {
 	if commit, err := p.verify(ctx, p.checkout()); err == nil && commit == want {
+		key := SentinelCheckoutKey(p.StateDir)
+		if record, has := rec.State().Targets[key]; has && record.Next != "" && !record.Release {
+			if live, err := SentinelCheckoutFingerprint(p.checkout()); err == nil && live == record.Next {
+				if err := rec.Update(func(s *state.State) error { return s.Promote(key) }); err != nil {
+					return "", err
+				}
+			}
+		}
 		return p.checkout(), nil
 	}
 	if p.Runner == nil {

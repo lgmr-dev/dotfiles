@@ -153,7 +153,14 @@ func importMenu(ctx context.Context, s setup, options v2import.Options, setLegac
 				return err
 			}
 			if choice[0] == "restore" {
-				return restoreMenu(ctx, ui, s, options)
+				err := restoreMenu(ctx, ui, s, options)
+				if errors.Is(err, engine.ErrBack) {
+					continue
+				}
+				if errors.Is(err, engine.ErrCancelled) {
+					return nil
+				}
+				return err
 			}
 			notice = "The import from release v2 is not complete. Review the remaining switch."
 		}
@@ -233,11 +240,11 @@ func restoreMenu(ctx context.Context, ui restoreUI, s setup, options v2import.Op
 		return restoreProposal(restoration, replace), nil
 	}
 	accepted, err := ui.Review(ctx, options.Engine.Catalog, restoreProposal(restoration, replace), revise)
-	if errors.Is(err, engine.ErrCancelled) || err == nil && !accepted {
-		return nil
-	}
 	if err != nil {
 		return err
+	}
+	if !accepted {
+		return engine.ErrBack
 	}
 	if err := ui.Close(); err != nil {
 		return err

@@ -125,7 +125,7 @@ func (k *KeyboardAccess) writeCommands() []platform.Command {
 
 func (k *KeyboardAccess) removeCommands() []platform.Command {
 	aside := k.sibling(".removing")
-	return []platform.Command{k.command(k.Programs.Move, "-T", k.Rules, aside), k.command(k.Programs.Remove, "-f", "--", aside)}
+	return []platform.Command{k.command(k.Programs.Move, "-n", "-T", k.Rules, aside), k.command(k.Programs.Remove, "-f", "--", aside)}
 }
 
 func (k *KeyboardAccess) reloadCommands() []platform.Command {
@@ -172,6 +172,9 @@ type keyboardObservation struct {
 	Fingerprint              string
 	Record                   state.Record
 	Unreadable               string
+	Temporary, Aside         string
+	TemporaryIssue           string
+	AsideIssue               string
 	exact                    bool
 }
 
@@ -188,7 +191,46 @@ func (k *KeyboardAccess) observe(st state.State) keyboardObservation {
 		owner, _, mode, ownerErr := platform.FileOwner(k.Rules)
 		o.Sound = ownerErr == nil && int(owner) == k.Owner && mode == 0644 && info.Mode().Perm() == 0644
 	}
+	o.Temporary, o.TemporaryIssue = o.sibling(k.sibling(".tmp"))
+	o.Aside, o.AsideIssue = o.sibling(k.sibling(".removing"))
 	return o
+}
+
+func (o keyboardObservation) sibling(path string) (fingerprint, issue string) {
+	data, _, err := keyboardRead(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", ""
+	}
+	if err != nil {
+		return "", "cannot inspect " + path + "; nothing was changed: " + err.Error()
+	}
+	fingerprint = KeyboardRuleFingerprint(data)
+	if !o.Recorded || fingerprint != o.Record.Applied && fingerprint != o.Record.Next {
+		return fingerprint, path + " exists, and the record of the keyboard access rule does not identify it; setup never replaces or deletes it. Examine it, and move or delete it yourself to continue"
+	}
+	return fingerprint, ""
+}
+
+func (k *KeyboardAccess) applyCommands(o keyboardObservation) []platform.Command {
+	commands, write := []platform.Command{}, k.writeCommands()
+	if o.Temporary != "" {
+		commands = append(commands, write[2])
+	}
+	if !o.Present {
+		commands = append(commands, write...)
+	}
+	return append(commands, k.reloadCommands()...)
+}
+
+func (k *KeyboardAccess) releaseCommands(o keyboardObservation) []platform.Command {
+	commands, remove := []platform.Command{}, k.removeCommands()
+	if o.Aside != "" {
+		commands = append(commands, remove[1])
+	}
+	if o.Present {
+		commands = append(commands, remove...)
+	}
+	return append(commands, k.reloadCommands()...)
 }
 
 func (o keyboardObservation) owned() bool {
@@ -196,6 +238,13 @@ func (o keyboardObservation) owned() bool {
 		return false
 	}
 	return o.Record.Applied == o.Fingerprint || !o.Record.Release && o.Record.Next == o.Fingerprint
+}
+
+func (o keyboardObservation) stagingIssue(write bool) string {
+	if write {
+		return o.TemporaryIssue
+	}
+	return o.AsideIssue
 }
 
 func (o keyboardObservation) settled() bool {
@@ -233,25 +282,25 @@ func (k *KeyboardAccess) Inspect(ctx context.Context, r catalog.Resource, want e
 		f.Status, f.Reason = engine.Absent, "the rule is not installed"
 		if o.Recorded && o.Record.Release {
 			f.Privileged, f.Pending = true, true
-			f.Commands = []engine.CommandBlock{k.block("Complete the removal of the keyboard access rule", append(k.removeCommands()[1:], k.reloadCommands()...)...)}
+			f.Commands = []engine.CommandBlock{k.block("Complete the removal of the keyboard access rule", k.releaseCommands(o)...)}
 		}
 	case !want.Present && o.owned():
 		f.Status, f.Privileged, f.Pending = engine.Satisfied, true, true
-		f.Commands = []engine.CommandBlock{k.block("Remove the keyboard access rule", append(k.removeCommands(), k.reloadCommands()...)...)}
+		f.Commands = []engine.CommandBlock{k.block("Remove the keyboard access rule", k.releaseCommands(o)...)}
 	case !want.Present && o.Recorded:
 		f.Status, f.Reason, f.Preserved = engine.Changed, changed, []string{k.Rules}
 	case !want.Present:
 		f.Status = engine.Satisfied
 	case !o.Present:
 		f.Status, f.Reason, f.Privileged, f.Pending = engine.Missing, detail, true, true
-		block := k.block("Install the keyboard access rule", append(k.writeCommands(), k.reloadCommands()...)...)
+		block := k.block("Install the keyboard access rule", k.applyCommands(o)...)
 		block.Lines = append([]string{"# Setup first writes the rule to " + k.stage() + ". It deletes the file after the step."}, block.Lines...)
 		f.Commands = []engine.CommandBlock{block}
 	case o.settled():
 		f.Status = engine.Satisfied
 	case o.owned():
 		f.Status, f.Reason, f.Privileged, f.Pending = engine.Unhealthy, "the rule is in place, and its udev reload did not finish; setup repeats the reload", true, true
-		f.Commands = []engine.CommandBlock{k.block("Reload the keyboard access rule", append(k.writeCommands()[2:], k.reloadCommands()...)...)}
+		f.Commands = []engine.CommandBlock{k.block("Reload the keyboard access rule", k.applyCommands(o)...)}
 	case o.Recorded:
 		f.Status, f.Reason, f.Preserved = engine.Changed, changed, []string{k.Rules}
 	case o.exact && o.Sound:
@@ -260,6 +309,9 @@ func (k *KeyboardAccess) Inspect(ctx context.Context, r catalog.Resource, want e
 	default:
 		f.Status = engine.Blocked
 		f.Reason = k.Rules + " exists but is not the exact rule dotfiles installs; dotfiles never replaces or removes it. Inspect it, and remove it yourself to let setup install its rule"
+	}
+	if issue := o.stagingIssue(want.Present); issue != "" && len(f.Commands) != 0 {
+		f = engine.Finding{Token: token, Status: engine.Blocked, Reason: issue}
 	}
 	return f, nil
 }
@@ -313,6 +365,9 @@ func (k *KeyboardAccess) Apply(ctx context.Context, r catalog.Resource, approved
 	case o.Present:
 		return errors.New(k.Rules + " is not the rule that setup installed; setup cannot repair it in place. Remove it yourself if it changed, then apply again")
 	}
+	if issue := o.stagingIssue(true); issue != "" {
+		return errors.New(issue)
+	}
 	if err := k.authenticate(ctx); err != nil {
 		return err
 	}
@@ -323,19 +378,31 @@ func (k *KeyboardAccess) Apply(ctx context.Context, r catalog.Resource, approved
 	}); err != nil {
 		return err
 	}
-	commands := k.writeCommands()
-	if o.Present {
-		commands = commands[2:]
-	} else {
+	write, tmp := k.writeCommands(), k.sibling(".tmp")
+	if o.Temporary != "" {
+		if err := k.run(ctx, rec, mark, "the earlier temporary copy "+tmp+" was not deleted", write[2]); err != nil {
+			return err
+		}
+	}
+	if !o.Present {
 		if _, err := os.Lstat(k.Rules); !errors.Is(err, os.ErrNotExist) {
 			return errors.Join(errors.New(k.Rules+" changed since approval; review a fresh plan"), err, keyboardClear(rec, mark))
+		}
+		if _, err := os.Lstat(tmp); !errors.Is(err, os.ErrNotExist) {
+			return errors.Join(errors.New(tmp+" appeared since approval; setup never replaces it. Review a fresh plan"), err, keyboardClear(rec, mark))
 		}
 		if err := errors.Join(os.MkdirAll(k.Directory, 0700), os.WriteFile(k.stage(), content, 0600)); err != nil {
 			return errors.Join(err, keyboardClear(rec, mark))
 		}
-	}
-	if err := k.run(ctx, rec, mark, "the keyboard access rule was not written", commands...); err != nil {
-		return err
+		if err := k.run(ctx, rec, mark, "the keyboard access rule was not written", write[0]); err != nil {
+			return err
+		}
+		if data, _, err := keyboardRead(tmp); err != nil || KeyboardRuleFingerprint(data) != next {
+			return errors.Join(errors.New(tmp+" is not the copy that this step wrote; it is preserved for inspection"), err)
+		}
+		if err := k.run(ctx, rec, mark, "the keyboard access rule was not written", write[1:]...); err != nil {
+			return err
+		}
 	}
 	if err := k.run(ctx, rec, mark, "the udev reload of the keyboard access rule failed", k.reloadCommands()...); err != nil {
 		return err
@@ -377,6 +444,9 @@ func (k *KeyboardAccess) Remove(ctx context.Context, r catalog.Resource, approve
 	case !o.Present && !o.Record.Release:
 		return rec.Update(func(s *state.State) error { s.Drop(k.Rules); return nil })
 	}
+	if issue := o.stagingIssue(false); issue != "" {
+		return errors.New(issue)
+	}
 	if err := k.authenticate(ctx); err != nil {
 		return err
 	}
@@ -399,20 +469,26 @@ func (k *KeyboardAccess) Remove(ctx context.Context, r catalog.Resource, approve
 	}); err != nil {
 		return err
 	}
+	aside := k.sibling(".removing")
+	if o.Aside != "" {
+		if err := k.run(ctx, rec, mark, "the earlier moved copy "+aside+" was not deleted", commands[1]); err != nil {
+			return err
+		}
+	}
 	if o.Present {
 		if data, _, err := keyboardRead(k.Rules); err != nil || KeyboardRuleFingerprint(data) != expected {
 			return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+k.Rules), err, keyboardClear(rec, mark))
 		}
+		if _, err := os.Lstat(aside); !errors.Is(err, os.ErrNotExist) {
+			return errors.Join(errors.New(aside+" appeared since approval; setup never replaces it. Review a fresh plan"), err, keyboardClear(rec, mark))
+		}
 		if err := k.run(ctx, rec, mark, "the keyboard access rule was not moved", commands[0]); err != nil {
 			return err
 		}
-	}
-	aside := k.sibling(".removing")
-	data, _, err := keyboardRead(aside)
-	if err != nil && !errors.Is(err, os.ErrNotExist) || err == nil && KeyboardRuleFingerprint(data) != expected {
-		return errors.Join(errors.New("the keyboard access rule changed during removal; preserve "+aside), err)
-	}
-	if err == nil {
+		data, _, err := keyboardRead(aside)
+		if _, present := os.Lstat(k.Rules); err != nil || KeyboardRuleFingerprint(data) != expected || !errors.Is(present, os.ErrNotExist) {
+			return errors.Join(errors.New("the move of the keyboard access rule did not give the expected copy; preserve "+k.Rules+" and "+aside), err)
+		}
 		if err := k.run(ctx, rec, mark, "the moved keyboard access rule "+aside+" was not deleted", commands[1]); err != nil {
 			return err
 		}

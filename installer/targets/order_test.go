@@ -222,7 +222,7 @@ func TestInterruptedWriteNeverReplacesContentThatChangedMeanwhile(t *testing.T) 
 
 func TestInterruptedReleaseCompletesOnTheNextRun(t *testing.T) {
 	for _, f := range fixtures() {
-		for _, start := range []string{"absent", "personal"} {
+		for _, start := range []string{"absent", "personal", "owned"} {
 			for _, point := range []string{"release", "move", "restore", "made"} {
 				t.Run(f.name+"/"+start+"/"+point, func(t *testing.T) {
 					e := newEnv(t)

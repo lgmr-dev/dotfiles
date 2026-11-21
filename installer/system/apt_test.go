@@ -675,7 +675,11 @@ func aptFixtureLine(c platform.Command) string {
 		if word != "" && strings.Trim(word, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_@%+=:,./-") == "" {
 			return word
 		}
-		return "'" + strings.ReplaceAll(word, "'", `'"'"'`) + "'"
+		prefix := ""
+		if name, value, ok := strings.Cut(word, "="); ok && name != "" && strings.Trim(name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ_") == "" {
+			prefix, word = name+"=", value
+		}
+		return prefix + "'" + strings.ReplaceAll(word, "'", `'"'"'`) + "'"
 	}
 	words := []string{}
 	for _, word := range slices.Concat(c.Env, []string{c.Path}, c.Args) {
@@ -687,7 +691,7 @@ func aptFixtureLine(c platform.Command) string {
 func aptFixtureShellLines(block engine.CommandBlock) []string {
 	lines := []string{}
 	for _, line := range block.Lines {
-		if !strings.HasPrefix(line, "# ") {
+		if strings.Contains(line, "apt-get") || strings.Contains(line, "/fake/sudo") {
 			lines = append(lines, line)
 		}
 	}

@@ -151,6 +151,8 @@ func TestWiringKeepsTheLegacyCommandFoldersOfDeferredMacApplications(t *testing.
 type restoreScreen struct {
 	proposals []engine.Proposal
 	check     []string
+	decline   bool
+	back      error
 	closed    bool
 }
 
@@ -159,6 +161,9 @@ func (r *restoreScreen) Review(ctx context.Context, _ engine.Catalog, proposal e
 	choices := slices.Clone(proposal.Choices)
 	for i := range choices {
 		choices[i].Checked = slices.Contains(r.check, choices[i].ID)
+	}
+	if r.decline || r.back != nil {
+		return false, r.back
 	}
 	revised, err := revise(ctx, choices)
 	r.proposals = append(r.proposals, revised)
@@ -267,5 +272,39 @@ func TestTheRestoreMenuUsesTheReviewScreenWithTheFullListAndTheReplacementChoice
 	}
 	if data, err := os.ReadFile(filepath.Join(s.stateDir, state.File)); err != nil || string(data) != string(original) {
 		t.Fatalf("the restore must publish the state of release v2: %v", err)
+	}
+}
+
+func TestADeclinedRestoreReviewGoesBackToTheMenuAndChangesNothing(t *testing.T) {
+	s, _ := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	options, _, err := importOptions(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, screen := range map[string]*restoreScreen{"declined": {decline: true}, "back": {back: engine.ErrBack}} {
+		if err := restoreMenu(context.Background(), screen, s, options); !errors.Is(err, engine.ErrBack) {
+			t.Fatalf("%s: a restore that did not run must go back to the menu: %v", name, err)
+		}
+		if st, err := state.Peek(s.stateDir, s.target); err != nil || st.V2Restore != "open" || screen.closed {
+			t.Fatalf("%s: a declined restore must change nothing: %+v %v", name, st, err)
+		}
+	}
+	if err := restoreMenu(context.Background(), &restoreScreen{back: engine.ErrCancelled}, s, options); !errors.Is(err, engine.ErrCancelled) || errors.Is(err, engine.ErrBack) {
+		t.Fatalf("a quit must stay a cancellation: %v", err)
+	}
+	output, err := os.Create(filepath.Join(t.TempDir(), "output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer output.Close()
+	s.output = output
+	if err := restoreMenu(context.Background(), &restoreScreen{}, s, options); err != nil {
+		t.Fatalf("a completed restore returns no error: %v", err)
+	}
+	if _, err := state.Peek(s.stateDir, s.target); !errors.Is(err, state.ErrSchema1) {
+		t.Fatal(err)
 	}
 }

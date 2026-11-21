@@ -27,7 +27,9 @@ import (
 // is permitted while v2_restore is "switching", and it does not close the v2
 // fallback. Each other confirmed apply or update closes an open fallback
 // immediately before its first step that applies or removes; a run without
-// such a step leaves the fallback open.
+// such a step leaves the fallback open. RestoreV2, when set, is the restore
+// of release v2 that asks before it replaces a changed slot: the action menu
+// offers it while v2_restore is "open".
 type Engine struct {
 	Catalog  Catalog
 	Router   Router
@@ -42,6 +44,7 @@ type Engine struct {
 	Selection func(wanted []string)
 	Leftovers func(ctx context.Context) ([]string, error)
 	Switch    bool
+	RestoreV2 func(ctx context.Context, ui Interaction) (Result, error)
 }
 
 type viewRecords struct{ st state.State }

@@ -146,6 +146,29 @@ var builtin = map[string]Kind{
 	"field": SlotKind("field", Field{}),
 }
 
+type baselinesKey struct{}
+
+func withBaselines(ctx context.Context, dir string) context.Context {
+	return context.WithValue(ctx, baselinesKey{}, dir)
+}
+
+func savedIn(ctx context.Context, match func(path string) bool) bool {
+	dir, _ := ctx.Value(baselinesKey{}).(string)
+	if dir == "" {
+		return false
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if match(filepath.Join(dir, entry.Name())) {
+			return true
+		}
+	}
+	return false
+}
+
 var fault func(point string) error
 
 func hit(point string) error {
@@ -392,7 +415,10 @@ func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Re
 // baseline only: there is no applied value, and a release leaves the unit.
 // The first baseline of a record stays as it is, and a unit without a record
 // gets the live unit as its baseline. A later different d against such a
-// record is changed content. A baseline that is a fingerprint only is never
+// record is changed content. A write that stops because the destination
+// changed after the approval takes its intended value out of the record
+// again, so a later run cannot take that changed content for its own write.
+// A baseline that is a fingerprint only is never
 // a copy: an approved replacement saves the live unit first and records that
 // copy as the baseline, except for a kind that declares Uncopyable. A run after an interruption completes or repeats the
 // write.
@@ -416,7 +442,7 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 		return err
 	}
 	if has {
-		if err := kind.Recover(ctx, d, record); err != nil {
+		if err := kind.Recover(withBaselines(ctx, w.baselines()), d, record); err != nil {
 			return err
 		}
 	}
@@ -488,6 +514,21 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 			return err
 		}
 	}
+	prior := rec.State().Targets[d.Key]
+	reject := func(cause error) error {
+		return errors.Join(cause, rec.Update(func(s *state.State) error {
+			restored := prior
+			if !restored.Release {
+				restored.Next = ""
+			}
+			if restored.Applied == "" && restored.Next == "" && restored.Before == "" {
+				s.Drop(d.Key)
+			} else {
+				s.Targets[d.Key] = restored
+			}
+			return nil
+		}))
+	}
 	if err := rec.Update(func(s *state.State) error {
 		return s.BeginTarget(d.Key, state.Record{Resource: d.Resource, Kind: d.Kind, Next: want})
 	}); err != nil {
@@ -497,17 +538,21 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 		return err
 	}
 	if err := bound(d.Path); err != nil {
-		return err
+		return reject(err)
 	}
 	if again, err := kind.Observe(d); err != nil || again != live.Fingerprint {
-		return errors.Join(fmt.Errorf("%s changed after approval: %w", d.Key, ErrChanged), err)
+		return reject(errors.Join(fmt.Errorf("%s changed after approval: %w", d.Key, ErrChanged), err))
 	}
 	if err := hit("recheck"); err != nil {
 		return err
 	}
 	if live.Fingerprint != want {
 		if err := kind.Write(ctx, d, live.Fingerprint); err != nil {
-			return fmt.Errorf("%s: %w", d.Key, err)
+			err = fmt.Errorf("%s: %w", d.Key, err)
+			if errors.Is(err, ErrChanged) {
+				return reject(err)
+			}
+			return err
 		}
 	}
 	if err := hit("write"); err != nil {
@@ -555,7 +600,7 @@ func (w *Writer) Release(ctx context.Context, key string, rec engine.Records, c 
 	if err := bound(d.Path); err != nil {
 		return err
 	}
-	if err := kind.Recover(ctx, d, record); err != nil {
+	if err := kind.Recover(withBaselines(ctx, w.baselines()), d, record); err != nil {
 		return err
 	}
 	live := w.live(kind, d, record, true)

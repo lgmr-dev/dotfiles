@@ -367,12 +367,12 @@ func TestCodeShownCommandsAreTheCommandsThatRunWithTheDebconfInput(t *testing.T)
 		t.Fatal(found, err)
 	}
 	shown := aptFixtureShellLines(found.Commands[0])
-	if len(shown) != 2 || !strings.Contains(shown[1], "DEBCONF_DB_OVERRIDE=File{filename:") || !strings.Contains(shown[1], "DEBIAN_FRONTEND=noninteractive") {
+	if len(shown) != 2 || !strings.Contains(shown[1], "DEBCONF_DB_OVERRIDE='File{filename:") || !strings.Contains(shown[1], "DEBIAN_FRONTEND=noninteractive") {
 		t.Fatal("the shown Code install must carry the debconf override that setup uses", shown)
 	}
 	answers := ""
 	for _, line := range found.Commands[0].Lines {
-		if strings.HasPrefix(line, "# ") && strings.Contains(line, "debconf answers") {
+		if strings.HasPrefix(line, "printf ") {
 			answers = line
 		}
 	}
@@ -392,7 +392,59 @@ func TestCodeShownCommandsAreTheCommandsThatRunWithTheDebconfInput(t *testing.T)
 	if !slices.Equal(ran, shown) {
 		t.Fatal("the shown lines differ from the commands that ran", ran, shown)
 	}
-	if database == "" || !strings.Contains(answers, database) || !strings.Contains(answers, "code/add-microsoft-repo=false") || !strings.Contains(answers, "code/add-copilot-command=false") {
+	if database == "" || !strings.Contains(answers, database) || !strings.Contains(answers, "code/add-microsoft-repo") || !strings.Contains(answers, "code/add-copilot-command") || strings.Count(answers, "Value: false") != 2 {
 		t.Fatal("the block must say where setup writes the debconf answers and what they are", answers, database)
+	}
+}
+
+func TestShownEnvironmentAndPreparationLinesRunInAShell(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "dotfiles-code-debconf-1")
+	override := debCodeOverride(directory)
+	for name, c := range map[string]platform.Command{
+		"root form": {Path: "/usr/bin/env", Env: []string{"LC_ALL=C", override}},
+		"sudo form": {Path: "/usr/bin/env", Args: []string{"LC_ALL=C", override, "/usr/bin/env"}},
+	} {
+		output, err := exec.Command("/bin/sh", "-c", aptShellLine(c)).CombinedOutput()
+		if err != nil || !slices.Contains(strings.Split(string(output), "\n"), override) {
+			t.Fatal(name, "the pasted line did not deliver the debconf override", aptShellLine(c), string(output), err)
+		}
+	}
+
+	f := newDebFixture(t)
+	found, err := f.apt.Inspect(context.Background(), debFixtureCode, engine.Want{Present: true}, f.rec)
+	if err != nil || len(found.Commands) != 1 {
+		t.Fatal(found, err)
+	}
+	ran, curl, check := 0, "", ""
+	for _, line := range found.Commands[0].Lines {
+		switch {
+		case strings.HasPrefix(line, "curl "):
+			curl = line
+		case strings.Contains(line, "sha256sum -c"):
+			check = line
+		case strings.HasPrefix(line, "mkdir ") || strings.HasPrefix(line, "printf "):
+			if output, err := exec.Command("/bin/sh", "-c", line).CombinedOutput(); err != nil {
+				t.Fatal("a shown preparation line failed in a shell", line, string(output), err)
+			}
+			ran++
+		}
+	}
+	pin := f.apt.Pins.LinuxCode["amd64"]
+	file := filepath.Join(f.apt.Directory, "payloads", pin.SHA256, "code.deb")
+	if ran != 3 || curl != "curl -fLo "+file+" "+pin.URL || check != "echo '"+pin.SHA256+"  "+file+"' | sha256sum -c" {
+		t.Fatal("the block must show executable preparation steps", found.Commands[0].Lines)
+	}
+	answers := debCodeAnswers(debCodeDirectory(f.apt.Temporary))
+	if data, err := os.ReadFile(answers); err != nil || string(data) != debCodeDatabase {
+		t.Fatal("the shown printf must write the debconf answers that setup uses", string(data), err)
+	}
+	if info, err := os.Stat(filepath.Dir(file)); err != nil || !info.IsDir() {
+		t.Fatal("the shown mkdir must make the folder of the download", err)
+	}
+	if err := os.RemoveAll(filepath.Join(f.apt.Directory, "payloads")); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.apt.Apply(context.Background(), debFixtureCode, found, f.rec); err != nil {
+		t.Fatal("setup must replace the answers folder that the pasted block wrote", err)
 	}
 }

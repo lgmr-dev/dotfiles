@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -19,14 +20,14 @@ import (
 // current links and of each staged link, the builds that a recorded target
 // names, and the builds that the manifests of those builds use. A recorded
 // target names a build in its record values, in the live target of a recorded
-// link and in the live content, up to 1 MiB, of a recorded file, block or
-// field. When Sweep cannot read a recorded target that exists, it removes no
-// build and returns the reason. It
-// removes an unused build only while its tree still equals its manifest, and
-// then the manifest and an empty resource folder. It leaves a changed build, a
-// folder without a valid manifest, a staged link that no unfinished
-// publication records and each entry that it does not know, and returns them
-// in left. An entry that appears during the removal also stays.
+// link and in the complete live content of a recorded file, block or field.
+// When Sweep cannot read a recorded target that exists, it removes no build
+// and returns the reason. It removes an unused build only while its tree
+// still equals its manifest, then the manifest of that build and an empty
+// resource folder. It leaves a changed build, a folder without a valid
+// manifest, a manifest file without its build, a staged link that no
+// unfinished publication records and each entry that it does not know, and
+// returns them in left. An entry that appears during the removal also stays.
 func Sweep(ctx context.Context, stateDir string, st state.State) (removed, left []string, err error) {
 	return sweep(ctx, stateDir, st, true)
 }
@@ -96,15 +97,11 @@ func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (r
 		all = append(all, folder.builds...)
 	}
 	for key, record := range st.Targets {
-		text, err := recordedReferences(key, record)
+		named, err := recordedBuilds(key, record, all)
 		if err != nil {
 			return nil, nil, fmt.Errorf("setup cannot read the recorded target %s, which can name a build, so it removed no build: %w", key, err)
 		}
-		for _, build := range all {
-			if slices.ContainsFunc(text, func(value string) bool { return namesBuild(value, build) }) {
-				roots = append(roots, build)
-			}
-		}
+		roots = append(roots, named...)
 	}
 	used := map[string]bool{}
 	for len(roots) != 0 {
@@ -143,18 +140,11 @@ func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (r
 			left = append(left, kept...)
 		}
 		for _, path := range folder.manifests {
-			build := strings.TrimSuffix(path, manifestSuffix)
-			if used[build] {
+			if _, err := os.Lstat(strings.TrimSuffix(path, manifestSuffix)); !errors.Is(err, os.ErrNotExist) {
 				continue
 			}
-			if _, err := os.Lstat(build); !errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			if !remove {
-				continue
-			}
-			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return removed, sortedUnique(left), err
+			if _, err := os.Lstat(path); err == nil {
+				left = append(left, path)
 			}
 		}
 		if !remove {
@@ -167,12 +157,23 @@ func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (r
 	return removed, sortedUnique(left), nil
 }
 
-const maxReferenceBytes = 1 << 20
+const referenceChunk = 64 << 10
 
-func recordedReferences(key string, record state.Record) ([]string, error) {
-	text := []string{record.Applied, record.Next, record.Before}
+func recordedBuilds(key string, record state.Record, all []string) ([]string, error) {
+	named := map[string]bool{}
+	scan := func(text string) {
+		for _, build := range all {
+			if !named[build] && namesBuild(text, build) {
+				named[build] = true
+			}
+		}
+	}
+	result := func() []string { return slices.Sorted(maps.Keys(named)) }
+	for _, value := range []string{record.Applied, record.Next, record.Before} {
+		scan(value)
+	}
 	if !slices.Contains([]string{"link", "file", "block", "field"}, record.Kind) {
-		return text, nil
+		return result(), nil
 	}
 	path := key
 	info, err := os.Lstat(path)
@@ -183,7 +184,7 @@ func recordedReferences(key string, record state.Record) ([]string, error) {
 		}
 	}
 	if errors.Is(err, os.ErrNotExist) {
-		return text, nil
+		return result(), nil
 	}
 	if err != nil {
 		return nil, err
@@ -196,13 +197,13 @@ func recordedReferences(key string, record state.Record) ([]string, error) {
 		if !filepath.IsAbs(target) {
 			target = filepath.Join(filepath.Dir(path), target)
 		}
-		text = append(text, filepath.Clean(target))
+		scan(filepath.Clean(target))
 		if record.Kind == "link" {
-			return text, nil
+			return result(), nil
 		}
 		info, err = os.Stat(path)
 		if errors.Is(err, os.ErrNotExist) {
-			return text, nil
+			return result(), nil
 		}
 		if err != nil {
 			return nil, err
@@ -211,18 +212,28 @@ func recordedReferences(key string, record state.Record) ([]string, error) {
 	if !info.Mode().IsRegular() {
 		return nil, errors.New("it is not a regular file")
 	}
-	if info.Size() > maxReferenceBytes {
-		return text, nil
+	overlap := 0
+	for _, build := range all {
+		overlap = max(overlap, len(strings.ReplaceAll(build, `\`, `\\`))+1)
 	}
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
-	data, err := io.ReadAll(io.LimitReader(file, maxReferenceBytes))
-	if err := errors.Join(err, file.Close()); err != nil {
-		return nil, err
+	window := make([]byte, 0, overlap+referenceChunk)
+	for {
+		n, readErr := io.ReadFull(file, window[len(window):cap(window)])
+		window = window[:len(window)+n]
+		scan(string(window))
+		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
+			break
+		}
+		if readErr != nil {
+			return nil, errors.Join(readErr, file.Close())
+		}
+		window = window[:copy(window, window[max(0, len(window)-overlap):])]
 	}
-	return append(text, string(data)), nil
+	return result(), file.Close()
 }
 
 func namesBuild(text, build string) bool {
@@ -266,7 +277,14 @@ func discardBuild(stateDir, id, build string, remove bool) ([]string, error) {
 	if !remove {
 		return nil, nil
 	}
-	return discardRecordedTree(build, entries, fetch.MaxPackageBytes, fetch.MaxPackageEntries)
+	kept, err := discardRecordedTree(build, entries, fetch.MaxPackageBytes, fetch.MaxPackageEntries)
+	if err != nil || len(kept) != 0 {
+		return kept, err
+	}
+	if err := os.Remove(manifestPath(build)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	return nil, nil
 }
 
 func preserved(path string, kept []string) bool {

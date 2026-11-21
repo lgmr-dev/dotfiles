@@ -364,15 +364,29 @@ func (a *APT) planned(o aptObservation, pin debPin, action string) (refresh, cha
 func (a *APT) setupCommands(o aptObservation, pin debPin, action string) engine.CommandBlock {
 	titles := map[string]string{"install": "Install ", "update": "Update ", "repair": "Repair "}
 	block := engine.CommandBlock{Title: titles[action] + o.Name + " with APT", By: "setup"}
+	if o.Pin != "" || o.Name == "code" {
+		block.Lines = append(block.Lines, "# Setup does the preparation itself. These lines give the same files.")
+	}
 	if o.Pin != "" {
-		block.Lines = append(block.Lines, "# Setup first downloads "+pin.URL+" to "+a.debFile(pin)+" and verifies its SHA-256 "+pin.SHA256+".")
+		file := a.debFile(pin)
+		block.Lines = append(block.Lines,
+			"mkdir -p "+aptShellWord(filepath.Dir(file)),
+			"curl -fLo "+aptShellWord(file)+" "+aptShellWord(pin.URL),
+			"echo "+aptShellLiteral(pin.SHA256+"  "+file)+" | sha256sum -c")
 	}
 	if o.Name == "code" {
-		block.Lines = append(block.Lines, "# Setup first writes the debconf answers to "+debCodeAnswers(debCodeDirectory(a.Temporary))+
-			": code/add-copilot-command=false, code/add-microsoft-repo=false. It deletes the file after the command.")
+		directory := debCodeDirectory(a.Temporary)
+		answers := aptShellWord(debCodeAnswers(directory))
+		format := strings.ReplaceAll(strings.ReplaceAll(debCodeDatabase, "%", "%%"), "\n", `\n`)
+		block.Lines = append(block.Lines,
+			"mkdir -m 0700 "+aptShellWord(directory),
+			"printf "+aptShellLiteral(format)+" > "+answers+" && chmod 0644 "+answers)
 	}
 	refresh, change := a.planned(o, pin, action)
 	block.Lines = append(block.Lines, aptShellLine(refresh), aptShellLine(change))
+	if o.Name == "code" {
+		block.Lines = append(block.Lines, "# Setup deletes the debconf answers in "+debCodeDirectory(a.Temporary)+" after the command.")
+	}
 	return block
 }
 

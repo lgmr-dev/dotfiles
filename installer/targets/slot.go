@@ -253,7 +253,7 @@ func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) e
 	if err != nil {
 		return err
 	}
-	if file == Absent && d.BOM {
+	if file == Absent && bytes.HasPrefix(left, []byte{0xef, 0xbb, 0xbf}) {
 		current = []byte{0xef, 0xbb, 0xbf}
 	}
 	present := raw != nil

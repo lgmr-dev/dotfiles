@@ -3,15 +3,21 @@ package hooks_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf16"
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
@@ -48,6 +54,24 @@ type fontEngine struct {
 	changes  []platform.Command
 	fail     error
 	queryErr error
+	loadFail string
+}
+
+func (f *fontEngine) valueName(name string) (string, bool) {
+	for key := range f.registry {
+		if strings.EqualFold(key, name) {
+			return key, true
+		}
+	}
+	return name, false
+}
+
+func (f *fontEngine) registration(name string) string {
+	key, present := f.valueName(name)
+	if value := f.registry[key]; present && value == "" {
+		return "(empty registry value)"
+	}
+	return f.registry[key]
 }
 
 func (f *fontEngine) query(_ context.Context, c platform.Command) ([]byte, error) {
@@ -80,8 +104,8 @@ func (f *fontEngine) query(_ context.Context, c platform.Command) ([]byte, error
 		result := []map[string]any{}
 		for _, face := range input.Faces {
 			name := "Dotfiles " + face.File + " (TrueType)"
-			item := map[string]any{"name": "", "path": "", "hash": "", "glyph": false, "registration": f.registry[name]}
-			if path := f.registry[name]; path != "" && f.loaded[path] {
+			item := map[string]any{"name": "", "path": "", "hash": "", "glyph": false, "registration": f.registration(name)}
+			if path := f.registration(name); path != "" && f.loaded[path] {
 				if data, err := os.ReadFile(path); err == nil {
 					item["name"], item["hash"], item["glyph"] = face.PostScript, fontHash(data), true
 				}
@@ -122,20 +146,28 @@ func (f *fontEngine) Run(_ context.Context, c platform.Command) ([]byte, error) 
 		}
 		for i, face := range input.Faces {
 			name := "Dotfiles " + face.File + " (TrueType)"
-			if f.registry[name] != input.Before[i] {
+			if f.registration(name) != input.Before[i] {
 				return nil, errors.New("Font registration changed after approval")
 			}
 		}
 		for i, face := range input.Faces {
-			name, path := "Dotfiles "+face.File+" (TrueType)", input.Paths[i]
+			path := input.Paths[i]
+			name, _ := f.valueName("Dotfiles " + face.File + " (TrueType)")
 			switch {
 			case input.Install:
 				data, err := os.ReadFile(path)
 				if err != nil || fontHash(data) != input.Hashes[i] {
 					return nil, errors.New("Owned font file changed before registration")
 				}
-				f.registry[name], f.loaded[path] = path, true
+				f.registry[name] = path
+				if face.File == f.loadFail {
+					return nil, errors.New("Native font activation failed; registration is saved for recovery")
+				}
+				f.loaded[path] = true
 			case input.Before[i] != "":
+				if input.Hashes[i] != "absent" && !f.loaded[path] {
+					return nil, errors.New("Native font is still loaded or could not be released")
+				}
 				delete(f.registry, name)
 				delete(f.loaded, path)
 			}
@@ -725,4 +757,126 @@ func TestFontRetryCompletesAnActivationAfterTheConfirmedMarkIsGone(t *testing.T)
 	if record := f.State().Targets[key]; record.Next != "" || record.Applied == "" {
 		t.Fatal("the activation record is not finished", record)
 	}
+}
+
+func TestFontKeepsARegistrationWithAnotherCaseOrAnEmptyValue(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	f.engine.registry["DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)"] = `C:\personal\Hack.ttf`
+	f.engine.registry["Dotfiles HackNerdFont-Bold.ttf (TrueType)"] = ""
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status != engine.Blocked || !slices.Equal(finding.Preserved, []string{"current-user font registration: HackNerdFont-Regular.ttf", "current-user font registration: HackNerdFont-Bold.ttf"}) {
+		t.Fatal("a registration with another case or an empty value does not block the install", finding)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err == nil || len(f.engine.changes) != 0 {
+		t.Fatal("setup installed over a registration with another case or an empty value", err)
+	}
+	if len(f.engine.registry) != 2 || f.engine.registry["DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)"] != `C:\personal\Hack.ttf` || f.engine.registry["Dotfiles HackNerdFont-Bold.ttf (TrueType)"] != "" {
+		t.Fatal("the refused install changed a registration", f.engine.registry)
+	}
+}
+
+func TestFontRetryLoadsAFaceThatAFailedActivationRegistered(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	f.engine.loadFail = "HackNerdFont-Italic.ttf"
+	err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f)
+	if err == nil || !strings.Contains(err.Error(), "registration is saved for recovery") || len(f.engine.registry) != 3 || len(f.engine.loaded) != 2 {
+		t.Fatal("the activation did not stop after the registration of the face that failed to load", err, f.engine.registry)
+	}
+	f.engine.loadFail = ""
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	if len(f.engine.registry) != 12 || len(f.engine.loaded) != 12 {
+		t.Fatal("the retry did not register and load every face", f.engine.registry, f.engine.loaded)
+	}
+}
+
+func fontScript(t *testing.T, c platform.Command) string {
+	t.Helper()
+	data, err := base64.StdEncoding.DecodeString(c.Args[len(c.Args)-1])
+	if err != nil || len(c.Args) != 5 || c.Args[3] != "-EncodedCommand" || len(data)%2 != 0 {
+		t.Fatal("unexpected encoded font command", c.Args, err)
+	}
+	units := make([]uint16, len(data)/2)
+	for i := range units {
+		units[i] = binary.LittleEndian.Uint16(data[i*2:])
+	}
+	return string(utf16.Decode(units))
+}
+
+func fontEncodedArguments(script string) []string {
+	units := utf16.Encode([]rune(script))
+	data := make([]byte, len(units)*2)
+	for i, unit := range units {
+		binary.LittleEndian.PutUint16(data[i*2:], unit)
+	}
+	return []string{"-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(data)}
+}
+
+func TestFontWindowsScriptsKeepARegistrationWithAnotherCaseOrAnEmptyValue(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the current-user registry exists only on Windows")
+	}
+	program := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	key := fmt.Sprintf(`Software\DotfilesFontTest-%d-%d`, os.Getpid(), time.Now().UnixNano())
+	registry := func(script string) string {
+		t.Helper()
+		command := exec.CommandContext(t.Context(), program, fontEncodedArguments("$ErrorActionPreference='Stop'\n$ProgressPreference='SilentlyContinue'\n$key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('"+key+"')\ntry {\n"+script+"\n} finally { $key.Dispose() }")...)
+		var stderr strings.Builder
+		command.Stderr = &stderr
+		output, err := command.Output()
+		if err != nil {
+			t.Fatal("the registry fixture failed", err, stderr.String())
+		}
+		return string(output)
+	}
+	t.Cleanup(func() {
+		if output, err := exec.Command(program, fontEncodedArguments("[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('"+key+"',$false)")...).CombinedOutput(); err != nil {
+			t.Error("the registry fixture stays", string(output), err)
+		}
+	})
+	registry(`$key.SetValue('DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)','C:\personal\Hack.ttf',[Microsoft.Win32.RegistryValueKind]::String)
+$key.SetValue('Dotfiles HackNerdFont-Bold.ttf (TrueType)','',[Microsoft.Win32.RegistryValueKind]::String)`)
+	const values = `[Console]::Out.Write((@($key.GetValueNames() | Sort-Object | ForEach-Object { $_ + '=' + [string]$key.GetValue($_) }) -join '|'))`
+	before := registry(values)
+	if !strings.Contains(before, `DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)=C:\personal\Hack.ttf`) {
+		t.Fatal("the registry fixture is not there", before)
+	}
+	redirect := func(c platform.Command) platform.Command {
+		const fonts = `$fontKey='Software\Microsoft\Windows NT\CurrentVersion\Fonts'`
+		script := fontScript(t, c)
+		if strings.Count(script, fonts) != 1 {
+			t.Fatal("the font script does not name the current-user Fonts key exactly once")
+		}
+		c.Args = append(slices.Clone(c.Args[:4]), fontEncodedArguments(strings.Replace(script, fonts, "$fontKey='"+key+"'", 1))[4])
+		return c
+	}
+
+	f := newFontFixture(t, "windows")
+	f.provider.PowerShell = program
+	f.provider.Query = func(ctx context.Context, c platform.Command) ([]byte, error) {
+		return hooks.FontQuery(ctx, redirect(c))
+	}
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status != engine.Blocked || !slices.Equal(finding.Preserved, []string{"current-user font registration: HackNerdFont-Regular.ttf", "current-user font registration: HackNerdFont-Bold.ttf"}) {
+		t.Fatal("the font query does not report a registration with another case or an empty value", finding)
+	}
+
+	g := newFontFixture(t, "windows")
+	g.archive()
+	g.provider.PowerShell = program
+	g.provider.Runner = fontRedirectRunner(redirect)
+	err := g.provider.Apply(context.Background(), fontResource, desktopInspect(t, g.provider, g.sentinelEnv, hooks.FontResource, true), g)
+	if err == nil || !strings.Contains(err.Error(), "Font registration changed after approval") {
+		t.Fatal("the font change script did not refuse a registration with another case", err)
+	}
+	if after := registry(values); after != before {
+		t.Fatal("the font change script changed a registration that setup does not own", before, after)
+	}
+}
+
+type fontRedirectRunner func(platform.Command) platform.Command
+
+func (r fontRedirectRunner) Run(ctx context.Context, c platform.Command) ([]byte, error) {
+	return platform.Exec{}.Run(ctx, r(c))
 }

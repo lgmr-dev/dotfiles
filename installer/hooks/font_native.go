@@ -274,7 +274,14 @@ $fontKey='Software\Microsoft\Windows NT\CurrentVersion\Fonts'
 function Get-Registration([string]$name) {
 	$key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($fontKey)
 	if (!$key) { return '' }
-	try { if ($key.GetValueNames() -cnotcontains $name) { return '' }; if ($key.GetValueKind($name) -ne [Microsoft.Win32.RegistryValueKind]::String) { throw 'Font registration has an unexpected native type' }; return [string]$key.GetValue($name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames) } finally {$key.Dispose()}
+	try {
+		$found=@($key.GetValueNames() | Where-Object { [string]::Equals($_,$name,[StringComparison]::OrdinalIgnoreCase) })
+		if ($found.Count -eq 0) { return '' }
+		if ($key.GetValueKind($found[0]) -ne [Microsoft.Win32.RegistryValueKind]::String) { throw 'Font registration has an unexpected native type' }
+		$value=[string]$key.GetValue($found[0],$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+		if ($value -ceq '') { return '(empty registry value)' }
+		return $value
+	} finally {$key.Dispose()}
 }
 `
 

@@ -330,6 +330,45 @@ func TestNewBlockFileGetsItsByteOrderMarkAndRemovalDeletesOnlyANewEmptyFile(t *t
 	}
 }
 
+func TestStagedNewByteOrderMarkFileRecoversWithoutTheSetting(t *testing.T) {
+	for _, release := range []bool{true, false} {
+		e := newEnv(t)
+		path := filepath.Join(e.root, "PowerShell", "profile.ps1")
+		d := targets.Desired{Resource: "profile.test", Kind: "block", Path: path, Slot: "profile.test", Content: []byte("# first version"), BOM: true}
+		staged, _ := targets.Siblings(d)
+		targets.SetFault(func(point string) error {
+			if point != "write" {
+				return nil
+			}
+			if err := os.Rename(path, staged); err != nil {
+				t.Fatal(err)
+			}
+			return errFault
+		})
+		if err := e.converge(d, targets.Preserve); !errors.Is(err, errFault) {
+			t.Fatal(err)
+		}
+		targets.SetFault(nil)
+		if !strings.HasPrefix(read(t, staged), "\xef\xbb\xbf") {
+			t.Fatalf("the fixture needs a staged file with a byte order mark: %q", read(t, staged))
+		}
+		if release {
+			e.mustRelease(d, targets.Preserve)
+			if _, err := os.Lstat(e.root); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("the release left the staged file or the folders that setup created", err)
+			}
+			continue
+		}
+		e.mustConverge(d, targets.Preserve)
+		if _, err := os.Lstat(staged); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("the retry left the staged file", err)
+		}
+		if want := "\xef\xbb\xbf\n# >>> dotfiles:profile.test >>>\n# first version\n# <<< dotfiles:profile.test <<<\n"; read(t, path) != want {
+			t.Fatalf("got %q", read(t, path))
+		}
+	}
+}
+
 func TestSlotWriteKeepsTheModeOfAReadOnlyFile(t *testing.T) {
 	e := newEnv(t)
 	path := filepath.Join(e.root, ".profile")

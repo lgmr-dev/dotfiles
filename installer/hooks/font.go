@@ -481,12 +481,13 @@ func fontNativeFailure(rec engine.Records, mark string, err error) error {
 // Apply implements engine.Provider. Before the first native command it
 // publishes, in one state update, the intended value of each registration
 // record and the pending mark "<resource>:activate". On Windows it then
-// releases the registrations that setup recorded, so the font files can
-// change. It converges the twelve font files, activates the faces in one
-// native command, clears the mark and promotes each record whose face the
-// native font engine then selects. A
-// failed activation leaves the registration records unfinished, and the
-// next apply completes them.
+// releases each registered face that the native font engine selects from the
+// managed file, so the font files can change. A registered face that is not
+// loaded keeps its registration and loads in the activation. It converges the
+// twelve font files, activates the faces in one native command, clears the
+// mark and promotes each record whose face the native font engine then
+// selects. A failed activation leaves the registration records unfinished,
+// and the next apply completes them.
 func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -521,11 +522,28 @@ func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.F
 	}); err != nil {
 		return err
 	}
-	if p.Context.OS == "windows" && slices.ContainsFunc(values, func(value string) bool { return value != "" }) {
-		if err := p.activate(ctx, all, o.paths, values, false); err != nil {
-			return fontNativeFailure(rec, mark, err)
+	if p.Context.OS == "windows" {
+		loaded := []int{}
+		for i, value := range values {
+			if value == "" {
+				continue
+			}
+			hash, err := fontFileHash(o.paths[i])
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				return errors.Join(err, fontClearMark(rec, mark))
+			}
+			if o.probe[i].Name == faces[i].PostScript && o.probe[i].Hash == hash {
+				loaded = append(loaded, i)
+			}
 		}
-		values = make([]string, len(values))
+		if len(loaded) != 0 {
+			if err := p.activate(ctx, loaded, o.paths, values, false); err != nil {
+				return fontNativeFailure(rec, mark, err)
+			}
+			for _, i := range loaded {
+				values[i] = ""
+			}
+		}
 	}
 	w := p.writer(nil)
 	for _, d := range o.units {

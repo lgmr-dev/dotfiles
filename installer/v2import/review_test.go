@@ -788,6 +788,80 @@ func TestRestoreKeepsATargetThatYouDeletedAfterTheSwitch(t *testing.T) {
 	}
 }
 
+func TestARestoreRetryKeepsATargetThatYouDeletedAfterAStop(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	for _, replace := range []bool{false, true} {
+		t.Run(fmt.Sprint(replace), func(t *testing.T) {
+			f := linuxFixture(t)
+			f.save()
+			v2env := read(t, filepath.Join(f.state, "shells", "env.sh"))
+			f.mustImport()
+			env := filepath.Join(f.state, "shells", "env.sh")
+			restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+			if err != nil {
+				t.Fatal(err)
+			}
+			v2import.SetFault(func(at string) error {
+				if at == "restore-slot:"+env {
+					return errors.New("interrupted before the move")
+				}
+				return nil
+			})
+			if _, err := restoration.Run(context.Background(), nil); err == nil {
+				t.Fatal("the interruption did not stop the restore")
+			}
+			v2import.SetFault(nil)
+			if err := os.Remove(env); err != nil {
+				t.Fatal(err)
+			}
+			if !replace {
+				_, message := mustRestore(t, f)
+				if _, err := os.Lstat(env); !errors.Is(err, os.ErrNotExist) || !strings.Contains(message, "Kept your changed content: "+env) {
+					t.Fatalf("a saved intent alone must not accept your deletion: %v %q", err, message)
+				}
+				return
+			}
+			restoration, err = v2import.PreviewRestore(context.Background(), f.options())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if changed := restoration.Changed(); len(changed) != 1 || changed[0].Key != env || changed[0].Replacement != "restore" {
+				t.Fatalf("a deletion after a stop is changed content: %+v", restoration.Items)
+			}
+			if _, err := restoration.Run(context.Background(), []string{env}); err != nil {
+				t.Fatal(err)
+			}
+			if read(t, env) != v2env {
+				t.Fatalf("an approved replacement must give back the value of release v2: %q", read(t, env))
+			}
+		})
+	}
+}
+
+func TestRestoreKeepsATargetThatYouDeleteAtTheWrite(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2import.SetFault(func(at string) error {
+		if at == "restore-slot:"+env {
+			return os.Remove(env)
+		}
+		return nil
+	})
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), env) {
+		t.Fatalf("a deletion at the write must stop the restore and name the slot: %v", err)
+	}
+	if _, err := os.Lstat(env); !errors.Is(err, os.ErrNotExist) || f.current().V2Restore != "open" {
+		t.Fatalf("the restore replaced a deletion that the review did not show: %v %+v", err, f.current())
+	}
+}
+
 func TestRestoreRecoversAnInterruptedSwitchReleaseBeforeItRollsBack(t *testing.T) {
 	f := linuxFixture(t)
 	before := capture(t, f, f.save())

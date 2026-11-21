@@ -91,7 +91,8 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 			candidates = append(candidates, released.Want)
 		}
 	}
-	if restoring || has && record.Next != "" && set.movedAside(key, record, candidates) {
+	interrupted := restoring && set.movedAside(key, state.Record{Resource: slot.Resource, Kind: slot.Kind}, []string{started})
+	if interrupted || has && record.Next != "" && set.movedAside(key, record, candidates) {
 		candidates = append(candidates, targets.Absent)
 	}
 	if restoring && !slices.Contains(candidates, started) {
@@ -125,7 +126,7 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.Action, item.Detail, item.Replacement = "restore", "it gets its value of release v2", ""
 	}
 	item.live = live.Fingerprint
-	if restoring && (live.Fingerprint == targets.Absent || live.Fingerprint == live.Want) {
+	if restoring && (interrupted && live.Fingerprint == targets.Absent || live.Fingerprint == live.Want) {
 		item.live = started
 	}
 	return item
@@ -143,6 +144,22 @@ func (s *restoreSet) movedAside(key string, record state.Record, candidates []st
 	path := filepath.Join(filepath.Dir(key), name)
 	moved, err := s.writer.InspectRecord(path, &memory{state.State{Targets: map[string]state.Record{path: {Resource: record.Resource, Kind: record.Kind, Before: targets.Absent}}}})
 	return err == nil && moved.State != targets.StateUnreadable && moved.Fingerprint != targets.Absent && slices.Contains(candidates, moved.Fingerprint)
+}
+
+func (s *restoreSet) holds(item RestoreItem, slot Slot) error {
+	record := state.Record{Resource: slot.Resource, Kind: slot.Kind, Before: slot.Saved}
+	live, err := s.writer.InspectRecord(item.Key, &memory{state.State{Targets: map[string]state.Record{item.Key: record}}})
+	switch {
+	case err != nil:
+		return err
+	case live.State == targets.StateUnreadable:
+		return errors.New(live.Detail)
+	case live.Fingerprint == item.live, live.Fingerprint == item.saved:
+		return nil
+	case live.Fingerprint == targets.Absent && s.movedAside(item.Key, record, []string{item.live}):
+		return nil
+	}
+	return errors.New("it changed after the review; run restore-v2 again")
 }
 
 func (r *Restoration) plan() (*restoreSet, error) {
@@ -351,6 +368,10 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 			return "", err
 		}
 		if err := set.verifySaved(item.Key); err != nil {
+			failures = append(failures, item.Key+": "+err.Error())
+			continue
+		}
+		if err := set.holds(item, slot); err != nil {
 			failures = append(failures, item.Key+": "+err.Error())
 			continue
 		}

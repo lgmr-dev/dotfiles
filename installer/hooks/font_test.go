@@ -699,3 +699,30 @@ func TestFontRepairKeepsARegistrationWithABaselineOnlyRecord(t *testing.T) {
 		t.Fatal("a registration without an applied record is not kept", finding)
 	}
 }
+
+func TestFontRetryCompletesAnActivationAfterTheConfirmedMarkIsGone(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	key := targets.Key(f.path(face), hooks.FontSlot)
+	if err := f.Update(func(s *state.State) error {
+		record := s.Targets[key]
+		record.Next = "font:not-loaded-yet"
+		s.Targets[key] = record
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	delete(f.engine.loaded, f.path(face))
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status == engine.Blocked {
+		t.Fatal("the retry treated the registration that setup wrote as foreign", finding)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err != nil {
+		t.Fatal("the retry did not complete the activation", err)
+	}
+	if record := f.State().Targets[key]; record.Next != "" || record.Applied == "" {
+		t.Fatal("the activation record is not finished", record)
+	}
+}

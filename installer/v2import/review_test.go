@@ -1116,3 +1116,22 @@ func TestTheSwitchRepairsAFontRegistrationThatFollowsItsFiles(t *testing.T) {
 		t.Fatalf("on Linux and macOS the font files carry the registration, so the switch repairs it: %v %q %+v", changes, read(t, registry), f.current())
 	}
 }
+
+func TestTheSwitchNeverCreatesAWindowsFontRegistration(t *testing.T) {
+	f := linuxFixture(t)
+	t.Cleanup(v2import.SetRegistryFonts(true))
+	f.save()
+	registry, changes := filepath.Join(f.root, "registry"), []string{}
+	f.extraKinds = map[string]targets.Kind{"font": registrationKind{fontKind{targets.FileKind("font")}, registry, &changes}}
+	files := f.units[hooks.FontResource]
+	f.units[hooks.FontResource] = func() []targets.Desired {
+		return append([]targets.Desired{{Kind: "font", Path: f.fontPath(), Slot: hooks.FontSlot, Content: []byte("v3")}}, files()...)
+	}
+	result := f.mustImport()
+	if _, err := os.Stat(registry); len(changes) != 0 || !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("the switch created a registration that restore-v2 cannot take back: %v %v", changes, err)
+	}
+	if result.Status != "needs-action" || f.current().V2Restore != "open" {
+		t.Fatalf("the switch must complete and leave the registration to the next run: %+v %+v", result, f.current())
+	}
+}

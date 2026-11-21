@@ -165,12 +165,12 @@ func (s *restoreSet) capture(ctx context.Context, key string, record state.Recor
 	if !untouched {
 		return fmt.Errorf("%s changed in an earlier run and is not in the restore set %s; examine it, then run restore-v2 or setup again", key, s.dir)
 	}
+	if s.windows && record.Kind == "font" {
+		return fmt.Errorf("%s: %w", key, errNoCopy)
+	}
 	saved, made, err := s.writer.Capture(ctx, key, record, filepath.Join(s.dir, s.manifest.Folder))
 	if err != nil {
 		return fmt.Errorf("cannot save %s for restore-v2; nothing was changed there: %w", key, err)
-	}
-	if strings.HasPrefix(saved, "fp:") && s.windows && record.Kind == "font" {
-		return fmt.Errorf("%s: %w", key, errNoCopy)
 	}
 	slot := Slot{Resource: record.Resource, Kind: record.Kind, Saved: saved, Made: made}
 	if slot.Fingerprint, err = s.savedFingerprint(key, slot); err != nil {

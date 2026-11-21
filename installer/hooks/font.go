@@ -308,7 +308,6 @@ func (p *Fonts) observe(ctx context.Context, r catalog.Resource, rec engine.Reco
 	st := rec.State()
 	o.recorded = desktopRecorded(st, r.ID)
 	faces := fontFaces()
-	activating := slices.Contains(st.Pending, r.ID+":activate")
 	for i, value := range fontRegistrations(o.probe) {
 		if value == "" {
 			continue
@@ -316,7 +315,7 @@ func (p *Fonts) observe(ctx context.Context, r catalog.Resource, rec engine.Reco
 		record := st.Targets[targets.Key(o.paths[i], FontSlot)]
 		live := p.live(faces[i], o.probe[i])
 		applied := record.Applied != "" && live == record.Applied
-		unfinished := record.Next != "" && !record.Release && (live == record.Next || activating)
+		unfinished := record.Next != "" && !record.Release
 		if value != o.paths[i] || !applied && !unfinished {
 			o.foreign = append(o.foreign, "current-user font registration: "+faces[i].File)
 		}

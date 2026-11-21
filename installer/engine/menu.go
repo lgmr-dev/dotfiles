@@ -493,7 +493,7 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 		}
 		accepted, err := ui.Review(ctx, e.Catalog, proposal, revise)
 		if err != nil || !accepted {
-			return result, err
+			return Result{Status: "cancelled"}, err
 		}
 		session.close()
 		applying, err := ui.BeginApply(ctx)

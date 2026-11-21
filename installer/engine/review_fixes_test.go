@@ -124,7 +124,7 @@ func TestARunWithoutAChangeLeavesTheFallbackOpen(t *testing.T) {
 	if plan, err = e.Preview(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
-	w.resource("tool.zsh").applyErr = errors.New("download failed")
+	w.resource("tool.zsh").afterApply = func() { w.resource("tool.zsh").unhealthy = true }
 	if _, err := e.Apply(context.Background(), request, plan); err == nil || !slices.Contains(w.calls("apply:"), "tool.zsh") {
 		t.Fatal("the fixture step did not run and fail", err)
 	}
@@ -221,5 +221,69 @@ func TestCheckKeepsAV2FolderThatARecordedTargetStillNames(t *testing.T) {
 	if strings.Contains(check.Message, "Owner cleanup") || !strings.Contains(check.Message, "Note: setup cannot say if "+restore+" is still in use, because it could not read "+profile+"#block") ||
 		!strings.Contains(check.Message, "Note: "+packages+" is a folder of release v2 still in use by ") {
 		t.Fatal("check gave a cleanup instruction although a recorded target is unreadable", check.Message)
+	}
+}
+
+func TestAKeptResourceThatChangesAfterTheReviewStopsTheRun(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	request := selection("editor", "other")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil || operation(t, plan, "config.editor").Action != "keep" {
+		t.Fatal(actions(plan), err)
+	}
+	w.resource("config.editor").changed = true
+	result, err := e.Apply(context.Background(), request, plan)
+	if !errors.Is(err, engine.ErrPlanChanged) || result.Status != "failed" || strings.Contains(result.Message, "All selected resources passed verification.") {
+		t.Fatal("a kept resource changed after the review and the run continued", result, err)
+	}
+	if slices.Contains(w.calls("apply:"), "tool.other") || !slices.Equal(saved(t, e).Selected, []string{"editor"}) {
+		t.Fatal("the run changed the system or the selection before it stopped")
+	}
+	w.resource("config.editor").changed = false
+	ui := &scriptedUI{t: t, answers: []string{"apply"}, tools: choose("editor")}
+	ui.review = func(context.Context, engine.Proposal, engine.Revise) (bool, error) {
+		if len(ui.reviews) == 1 {
+			w.resource("config.editor").changed = true
+		}
+		return len(ui.reviews) == 1, nil
+	}
+	e.UI = ui
+	if result, err := e.Run(context.Background()); err != nil || result.Status != "cancelled" {
+		t.Fatal(result, err)
+	}
+	if len(ui.reviews) != 2 || !strings.Contains(ui.reviews[1].Notice, "Your system changed after the review. This is the updated plan.") || operation(t, ui.reviews[1].Plan, "config.editor").Action != "pending" || len(ui.reports) != 0 {
+		t.Fatal("the menu did not show the updated plan", len(ui.reviews), ui.reports)
+	}
+}
+
+func TestAFailedFirstStepWithoutAChangeLeavesTheFallbackOpen(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	setFallback(t, e, "open")
+	request := selection("editor", "other")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.resource("tool.other").applyErr = errors.New("permission denied")
+	result, err := e.Apply(context.Background(), request, plan)
+	if err == nil || !strings.Contains(result.Message, "permission denied") {
+		t.Fatal(result, err)
+	}
+	if saved(t, e).V2Restore != "open" || !strings.Contains(result.Message, "Nothing changed, so the v2 fallback stays open.") {
+		t.Fatal("a failed first step that wrote nothing closed the fallback", saved(t, e).V2Restore, result.Message)
+	}
+	w.resource("tool.other").applyErr = nil
+	w.resource("tool.other").afterApply = func() { w.resource("tool.other").unhealthy = true }
+	if plan, err = e.Preview(context.Background(), request); err != nil {
+		t.Fatal(err)
+	}
+	result, err = e.Apply(context.Background(), request, plan)
+	if err == nil || !strings.Contains(result.Message, "did not pass verification") {
+		t.Fatal(result, err)
+	}
+	if saved(t, e).V2Restore != "" || strings.Contains(result.Message, "fallback stays open") {
+		t.Fatal("a failed step that changed the state left the fallback open", saved(t, e).V2Restore, result.Message)
 	}
 }

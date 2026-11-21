@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -27,7 +28,9 @@ import (
 // is permitted while v2_restore is "switching", and it does not close the v2
 // fallback. Each other confirmed apply or update closes an open fallback
 // immediately before its first step that applies or removes; a run without
-// such a step leaves the fallback open. RestoreV2, when set, is the restore
+// such a step leaves the fallback open, and a step that fails without a
+// change of the targets, the system records and the pending marks opens it
+// again. RestoreV2, when set, is the restore
 // of release v2 that asks before it replaces a changed slot: the action menu
 // offers it while v2_restore is "open".
 type Engine struct {
@@ -258,6 +261,27 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 	if !sameSelection(approved, effective) || approved.V2Restore != st.V2Restore {
 		return result, ErrPlanChanged
 	}
+	if e.Selection != nil {
+		wanted, err := e.Catalog.Closure(slices.Concat(effective.Selected, effective.Keep), e.Context)
+		if err != nil {
+			return result, err
+		}
+		e.Selection(wanted)
+	}
+	for _, op := range approved.Operations {
+		if op.Action != "keep" {
+			continue
+		}
+		fresh, err := e.inspectOne(ctx, op.Resource, Want{Present: true, Update: request.Mode == "update"}, viewRecords{st})
+		if err != nil {
+			return result, err
+		}
+		if fresh.Token != op.Finding.Token {
+			r, _ := e.Catalog.Resource(op.Resource)
+			result.Message = r.Name + " changed after approval; review a new plan"
+			return result, ErrPlanChanged
+		}
+	}
 	if len(st.Pending) != 0 {
 		if err := store.Update(func(s *state.State) error {
 			for _, mark := range st.Pending {
@@ -269,13 +293,6 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 		}
 	}
 	closeFallback := st.V2Restore == "open" && !e.Switch
-	if e.Selection != nil {
-		wanted, err := e.Catalog.Closure(slices.Concat(effective.Selected, effective.Keep), e.Context)
-		if err != nil {
-			return result, err
-		}
-		e.Selection(wanted)
-	}
 	logNotes := []string{}
 	log, err := openApplyLog(e.StateDir, time.Now())
 	if err != nil {
@@ -379,9 +396,14 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 			result.Message = strings.Join(append(failures, r.Name+" changed after approval; review a new plan"), "\n")
 			return result, ErrPlanChanged
 		}
+		var closedAt *state.State
 		if err == nil && closeFallback {
 			err = store.Update(func(s *state.State) error { s.V2Restore = ""; return nil })
 			closeFallback = false
+			if err == nil {
+				before := store.View()
+				closedAt = &before
+			}
 		}
 		if err == nil {
 			if removal {
@@ -396,6 +418,12 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 		if err != nil {
 			ReportStep(ctx, "[%d/%d] %s failed after %s", step, total, r.Name, platform.FormatElapsed(time.Since(started)))
 			failure := r.Name + " (" + r.ID + "): " + err.Error()
+			if after := store.View(); closedAt != nil && reflect.DeepEqual(closedAt.Targets, after.Targets) && reflect.DeepEqual(closedAt.System, after.System) && slices.Equal(closedAt.Pending, after.Pending) {
+				if reopenErr := store.Update(func(s *state.State) error { s.V2Restore = "open"; return nil }); reopenErr == nil {
+					closeFallback = true
+					failure += "\nNothing changed, so the v2 fallback stays open."
+				}
+			}
 			failures = append(failures, failure)
 			blocked[r.ID] = "its " + op.Action + " step failed"
 			if removal {

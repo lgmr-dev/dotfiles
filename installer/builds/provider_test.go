@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -576,13 +577,15 @@ func TestSweepKeepsABuildThatARecordedFileNames(t *testing.T) {
 }
 
 func TestSweepRemovesNoBuildWhenItCannotReadARecordedTarget(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("the fixture needs a file mode that stops a read")
+	}
 	for _, kind := range []string{"link", "file"} {
 		t.Run(kind, func(t *testing.T) {
 			f, first, second, _ := threeBuilds(t)
 			target := filepath.Join(filepath.Dir(f.provider.StateDir), "target")
-			if kind == "link" {
-				write(t, target, "a file in the place of the recorded link")
-			} else if err := os.Mkdir(target, 0700); err != nil {
+			write(t, target, "content that setup cannot read")
+			if err := os.Chmod(target, 0); err != nil {
 				t.Fatal(err)
 			}
 			record(t, f, target, kind)
@@ -594,6 +597,35 @@ func TestSweepRemovesNoBuildWhenItCannotReadARecordedTarget(t *testing.T) {
 				if read(t, filepath.Join(build, "tool")) != text {
 					t.Fatal("the sweep removed a build")
 				}
+			}
+		})
+	}
+}
+
+func TestSweepContinuesWhenARecordedTargetHasAnotherKind(t *testing.T) {
+	for _, test := range []struct {
+		name, kind string
+		make       func(t *testing.T, target, first string)
+		keeps      bool
+	}{
+		{"an edited file in the place of a link", "link", func(t *testing.T, target, _ string) { write(t, target, "format = 'edited'\n") }, false},
+		{"a file that names a build in the place of a link", "link", func(t *testing.T, target, first string) { write(t, target, "command = '"+first+"/tool'\n") }, true},
+		{"a folder in the place of a link", "link", func(t *testing.T, target, first string) { write(t, filepath.Join(target, "notes"), first) }, false},
+		{"a folder in the place of a file", "file", func(t *testing.T, target, first string) { write(t, filepath.Join(target, "notes"), first) }, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f, first, second, _ := threeBuilds(t)
+			target := filepath.Join(filepath.Dir(f.provider.StateDir), "starship.toml")
+			test.make(t, target, first)
+			record(t, f, target, test.kind)
+			removed, left := f.sweep()
+			want := []string{first, second}
+			if test.keeps {
+				want = []string{second}
+			}
+			slices.Sort(want)
+			if !slices.Equal(removed, want) || len(left) != 0 {
+				t.Fatal("unexpected sweep", removed, left)
 			}
 		})
 	}

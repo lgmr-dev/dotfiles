@@ -20,11 +20,12 @@ import (
 // current links and of each staged link, the builds that a recorded target
 // names, and the builds that the manifests of those builds use. A recorded
 // target names a build in its record values, in the live target of a recorded
-// link and in the complete live content of a recorded file, block or field.
-// When Sweep cannot read a recorded target that exists, it removes no build
-// and returns the reason. It removes an unused build only while its tree
-// still equals its manifest, then the manifest of that build and an empty
-// resource folder. It leaves a changed build, a folder without a valid
+// link and in the complete live content of a recorded file, block or field,
+// or of a regular file in the place of a recorded link. A folder in the place
+// of a target names no build. When a read of a recorded target fails, Sweep
+// removes no build and returns the reason. It removes an unused build only
+// while its tree still equals its manifest, then the manifest of that build
+// and an empty resource folder. It leaves a changed build, a folder without a valid
 // manifest, a manifest file without its build, a staged link that no
 // unfinished publication records and each entry that it does not know, and
 // returns them in left. An entry that appears during the removal also stays.
@@ -189,7 +190,7 @@ func recordedBuilds(key string, record state.Record, all []string) ([]string, er
 	if err != nil {
 		return nil, err
 	}
-	if record.Kind == "link" || info.Mode()&os.ModeSymlink != 0 {
+	if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
 		target, err := os.Readlink(path)
 		if err != nil {
 			return nil, err
@@ -210,7 +211,7 @@ func recordedBuilds(key string, record state.Record, all []string) ([]string, er
 		}
 	}
 	if !info.Mode().IsRegular() {
-		return nil, errors.New("it is not a regular file")
+		return result(), nil
 	}
 	overlap := 0
 	for _, build := range all {

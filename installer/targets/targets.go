@@ -403,6 +403,14 @@ func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Re
 	return nil
 }
 
+func (w *Writer) unchanged(kind Kind, d Desired, fingerprint string) bool {
+	if bound(d.Path) != nil {
+		return false
+	}
+	again, err := kind.Observe(d)
+	return err == nil && again == fingerprint
+}
+
 // Converge makes one unit equal to d through the write order. A unit that
 // matches the applied value of its record and an absent unit need no
 // decision. Other content stops with ErrChanged, or with Replace it is saved
@@ -418,6 +426,9 @@ func (w *Writer) disown(ctx context.Context, kind Kind, d Desired, rec engine.Re
 // record is changed content. A write that stops because the destination
 // changed after the approval takes its intended value out of the record
 // again, so a later run cannot take that changed content for its own write.
+// A write or a restore that fails and leaves the destination as it was puts
+// the record back as it was before the call; when the destination changed
+// or setup cannot inspect it, the intended value stays for the recovery.
 // A baseline that is a fingerprint only is never
 // a copy: an approved replacement saves the live unit first and records that
 // copy as the baseline, except for a kind that declares Uncopyable. A run after an interruption completes or repeats the
@@ -491,8 +502,8 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 			}
 		}
 	}
+	first := state.Record{Resource: d.Resource, Kind: d.Kind, Before: Absent}
 	if !has {
-		first := state.Record{Resource: d.Resource, Kind: d.Kind, Before: Absent}
 		if live.Fingerprint == Absent {
 			first.Made, err = created(d)
 		} else {
@@ -552,7 +563,21 @@ func (w *Writer) Converge(ctx context.Context, d Desired, rec engine.Records, c 
 			if errors.Is(err, ErrChanged) {
 				return reject(err)
 			}
-			return err
+			if !w.unchanged(kind, d, live.Fingerprint) {
+				return err
+			}
+			if has {
+				return reject(err)
+			}
+			if dropErr := rec.Update(func(s *state.State) error { s.Drop(d.Key); return nil }); dropErr != nil {
+				return errors.Join(err, dropErr)
+			}
+			made := first.Made
+			if len(made) != 0 && made[0] == d.Path {
+				made = made[1:]
+			}
+			platform.RemoveCreatedDirectories(made)
+			return errors.Join(err, kind.Discard(first.Before, w.baselines()))
 		}
 	}
 	if err := hit("write"); err != nil {
@@ -637,7 +662,8 @@ func (w *Writer) Release(ctx context.Context, key string, rec engine.Records, c 
 		}
 		return nil
 	}
-	if !record.Release {
+	began := !record.Release
+	if began {
 		if err := rec.Update(func(s *state.State) error { return s.BeginRelease(key) }); err != nil {
 			return err
 		}
@@ -662,7 +688,11 @@ func (w *Writer) Release(ctx context.Context, key string, rec engine.Records, c 
 			return fmt.Errorf("setup has no copy of the earlier content of %s; restore it yourself, then run setup again", key)
 		}
 		if err := kind.Restore(ctx, d, record, live.Fingerprint); err != nil {
-			return fmt.Errorf("%s: %w", key, err)
+			err = fmt.Errorf("%s: %w", key, err)
+			if began && w.unchanged(kind, d, live.Fingerprint) {
+				err = errors.Join(err, rec.Update(func(s *state.State) error { s.Targets[key] = record; return nil }))
+			}
+			return err
 		}
 		if err := hit("restore"); err != nil {
 			return err

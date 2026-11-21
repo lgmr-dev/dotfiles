@@ -323,7 +323,7 @@ func exerciseT3Server(t *testing.T, command, home string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, command, "serve", "--host", "127.0.0.1", "--port", strconv.Itoa(port), "--base-dir", filepath.Join(home, ".t3"), "--auto-bootstrap-project-from-cwd")
+	cmd := exec.CommandContext(ctx, command, "serve", "--host", "127.0.0.1", "--port", strconv.Itoa(port), "--base-dir", filepath.Join(home, ".t3"))
 	cmd.Dir, cmd.Env, cmd.WaitDelay = filepath.Join(home, "personal-project"), agentCLIEnvironment(home), 2*time.Second
 	// Startup can print a one-time pairing secret. Never export it as diagnostics.
 	process, err := startAgentCLI(ctx, cmd)

@@ -212,7 +212,7 @@ func TestArchiveTransferKeepsSlowProgressWithoutRanges(t *testing.T) {
 }
 
 func TestArchiveTransferKeepsSlowProgressAfterAnIgnoredResume(t *testing.T) {
-	data := transferData(256 << 10)
+	data := transferData(1 << 20)
 	server, log := transferServer(t, false, func(_ int, w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		w.Header().Set("Accept-Ranges", "bytes")
@@ -223,7 +223,7 @@ func TestArchiveTransferKeepsSlowProgressAfterAnIgnoredResume(t *testing.T) {
 				return
 			}
 			w.(http.Flusher).Flush()
-			time.Sleep(40 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 	})
 	policy := testArchiveTransfer

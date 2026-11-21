@@ -119,6 +119,15 @@ func Scope(c Catalog, ctx platform.Context, st state.State, request Request) (wa
 	return wanted, released, nil
 }
 
+func unfinished(st state.State, id string) bool {
+	for _, record := range st.Targets {
+		if record.Resource == id && record.Next != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func withReason(text, reason string) string {
 	if reason == "" {
 		return text
@@ -140,7 +149,7 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 	plan := Plan{Mode: request.Mode, Source: source, Target: st.Target, Context: ctx, Selected: request.Selected, Keep: request.Keep,
 		RemoveShared: request.RemoveShared, Replace: request.Replace, Pending: slices.Clone(st.Pending), V2Restore: st.V2Restore}
 	for _, id := range request.Replace {
-		if f, ok := found.Wanted[id]; !ok || !slices.Contains(wanted, id) || f.Status != Changed {
+		if f, ok := found.Wanted[id]; !ok || !slices.Contains(wanted, id) || f.Status != Changed && !unfinished(st, id) {
 			return plan, fmt.Errorf("%s has no changed content to replace in this selection", id)
 		}
 	}
@@ -187,7 +196,6 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 			op.Action, op.Reason = "pending", withReason("changed content stays as it is", f.Reason)
 			if slices.Contains(request.Replace, id) {
 				op.Action, op.Reason = "repair", withReason("save the current content, then replace it with the selected content", f.Reason)
-				op.Finding.Replace = true
 			}
 		case Unknown:
 			op.Action, op.Reason, blocks = "pending", withReason("setup could not inspect this resource", f.Reason), true
@@ -198,6 +206,9 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 			}
 		default:
 			return plan, fmt.Errorf("%s has an invalid inspection status", id)
+		}
+		if slices.Contains(request.Replace, id) {
+			op.Finding.Replace = true
 		}
 		if (r.ReplanAfter || f.Replan) && (op.Action == "install" || op.Action == "repair" || op.Action == "update") {
 			op.Reason += "; bootstrap then review newly available provider inventory"

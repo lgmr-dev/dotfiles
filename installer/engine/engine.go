@@ -224,12 +224,14 @@ func sameSelection(plan Plan, request Request) bool {
 }
 
 // Apply runs the approved plan of a request. It takes the installer lock,
-// stops at a pending mark, saves the selection and runs each step: inspect
-// again and compare the token, apply or remove, inspect again to verify. A
-// failed step blocks its dependents and the other steps continue. A different
-// token returns ErrPlanChanged. A step that makes a provider available ends
-// the pass with ErrReplan when work remains. After a pass without a failure it
-// runs the sweep.
+// stops at a pending mark and inspects each operation again before its first
+// change: a different token returns ErrPlanChanged and changes nothing. Then
+// it saves the selection and runs each step: inspect again and compare the
+// token, apply or remove, inspect again to verify. A failed step blocks its
+// dependents and the other steps continue. A different token returns
+// ErrPlanChanged. A step that makes a provider available ends the pass with
+// ErrReplan when work remains. After a pass without a failure it runs the
+// sweep.
 func (e *Engine) Apply(ctx context.Context, request Request, approved Plan) (Result, error) {
 	return e.apply(ctx, request, approved, nil)
 }
@@ -283,15 +285,18 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 		e.Selection(wanted)
 	}
 	for _, op := range approved.Operations {
-		if op.Action != "keep" {
-			continue
+		r, known := e.Catalog.Resource(op.Resource)
+		if !known {
+			return result, fmt.Errorf("approved plan names the unknown resource %q", op.Resource)
 		}
-		fresh, err := e.inspectOne(ctx, op.Resource, Want{Present: true, Update: request.Mode == "update"}, viewRecords{st})
+		released := op.Action == "remove" || op.Action == "forget" || op.Action == "retain"
+		want := Want{Present: !released, Update: request.Mode == "update" && !released}
+		fresh, err := e.inspectOne(ctx, op.Resource, want, viewRecords{st})
 		if err != nil {
 			return result, err
 		}
-		if fresh.Token != op.Finding.Token {
-			r, _ := e.Catalog.Resource(op.Resource)
+		completed := !released && fresh.Status == Satisfied && op.Finding.Status != Satisfied
+		if fresh.Token != op.Finding.Token && !completed {
 			result.Message = r.Name + " changed after approval; review a new plan"
 			return result, ErrPlanChanged
 		}
@@ -356,10 +361,7 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 		if err := ctx.Err(); err != nil {
 			return result, err
 		}
-		r, known := e.Catalog.Resource(op.Resource)
-		if !known {
-			return result, fmt.Errorf("approved plan names the unknown resource %q", op.Resource)
-		}
+		r, _ := e.Catalog.Resource(op.Resource)
 		if op.Action == "pending" {
 			if op.Finding.Status != Changed {
 				blocked[r.ID] = op.Reason

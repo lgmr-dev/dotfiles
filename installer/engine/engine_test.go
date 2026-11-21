@@ -303,7 +303,7 @@ func TestChangedTokenStopsTheStep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.resource("tool.editor").generation++
+	w.resource("tool.git").afterApply = func() { w.resource("tool.editor").generation++ }
 	result, err := e.Apply(context.Background(), request, plan)
 	if !errors.Is(err, engine.ErrPlanChanged) || result.Status != "failed" {
 		t.Fatal(result, err)

@@ -389,3 +389,45 @@ func TestCheckReportsAnUnfinishedWriteOfAWantedResource(t *testing.T) {
 		t.Fatal("check hid the unfinished write of a wanted resource", check, err)
 	}
 }
+
+func TestAnOperationThatChangesAfterTheReviewStopsTheRunBeforeAnyChange(t *testing.T) {
+	e, w := fixture(t)
+	setFallback(t, e, "open")
+	request := selection("other", "shell")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil || !slices.Equal(actions(plan), []string{"install:tool.other", "install:tool.zsh"}) {
+		t.Fatal(actions(plan), err)
+	}
+	w.resource("tool.zsh").generation++
+	result, err := e.Apply(context.Background(), request, plan)
+	if !errors.Is(err, engine.ErrPlanChanged) || result.Status != "failed" {
+		t.Fatal(result, err)
+	}
+	st := saved(t, e)
+	if got := w.calls("apply:"); len(got) != 0 || len(st.Selected) != 0 || len(st.Targets) != 0 || st.V2Restore != "open" {
+		t.Fatal("the run changed the system, the selection or the fallback before it showed the new plan", got, st.Selected, st.V2Restore)
+	}
+}
+
+func TestTheRetryOfAnInterruptedReplacementAcceptsItsReplaceFlag(t *testing.T) {
+	e, w := fixture(t)
+	edit(t, e, func(s *state.State) {
+		s.Targets = map[string]state.Record{w.key("config.editor"): {Resource: "config.editor", Kind: "file", Next: "fp:1", Before: "absent"}}
+	})
+	request := selection("editor")
+	request.Replace = []string{"config.editor"}
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil {
+		t.Fatal("the retry of an approved replacement was refused", err)
+	}
+	if op := operation(t, plan, "config.editor"); op.Action != "install" || !op.Finding.Replace {
+		t.Fatal(op)
+	}
+	if result, err := e.Apply(context.Background(), request, plan); err != nil || result.Status != "ready" || !slices.Equal(w.replaced, []string{"config.editor"}) {
+		t.Fatal("the retry did not complete the replacement", result, err, w.replaced)
+	}
+	request.Replace = []string{"tool.editor"}
+	if _, err := e.Preview(context.Background(), request); err == nil {
+		t.Fatal("a replacement without changed content or an unfinished record was accepted")
+	}
+}

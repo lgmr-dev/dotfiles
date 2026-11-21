@@ -177,6 +177,18 @@ func (e *Engine) disclosures(plan Plan) string {
 	return message
 }
 
+// UnfinishedLines returns one line for each target record of st with an
+// unfinished change, in the order of the target keys.
+func UnfinishedLines(st state.State) []string {
+	lines := []string{}
+	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
+		if record := st.Targets[key]; record.Next != "" {
+			lines = append(lines, "unfinished change: "+key+" ("+record.Resource+"). Run setup again to finish it.")
+		}
+	}
+	return lines
+}
+
 func (e *Engine) checkResult(ctx context.Context, st state.State, plan Plan) Result {
 	reasons := []string{}
 	if plan.V2Restore == "switching" {
@@ -185,11 +197,7 @@ func (e *Engine) checkResult(ctx context.Context, st state.State, plan Plan) Res
 	for _, mark := range plan.Pending {
 		reasons = append(reasons, pendingLine(mark))
 	}
-	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
-		if record := st.Targets[key]; record.Next != "" {
-			reasons = append(reasons, "unfinished change: "+key+" ("+record.Resource+"). Run setup again to finish it.")
-		}
-	}
+	reasons = append(reasons, UnfinishedLines(st)...)
 	retainedNotes := []string{}
 	for _, op := range plan.Operations {
 		r, _ := e.Catalog.Resource(op.Resource)

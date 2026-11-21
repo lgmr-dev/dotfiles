@@ -237,10 +237,14 @@ func run(ctx context.Context, args []string) error {
 	if st, err := state.Peek(stateDir, s.target); errors.Is(err, state.ErrSchema1) || err == nil && st.V2Restore == "switching" {
 		return importV2(ctx, s)
 	}
-	e := newEngine(s)
 	if c.name != "" {
-		return execute(ctx, e, c, s.output)
+		return execute(ctx, newEngine(s), c, s.output)
 	}
+	return menu(ctx, menuEngine(s), os.Stdin, s.output)
+}
+
+func menuEngine(s setup) *engine.Engine {
+	e := newEngine(s)
 	e.RestoreV2 = func(ctx context.Context, ui engine.Interaction) (engine.Result, error) {
 		options, _, err := importOptions(s)
 		if surface, ok := ui.(restoreUI); err == nil && ok {
@@ -250,7 +254,7 @@ func run(ctx context.Context, args []string) error {
 		}
 		return engine.Result{Status: "ready"}, err
 	}
-	return menu(ctx, e, os.Stdin, s.output)
+	return e
 }
 
 func menu(ctx context.Context, e *engine.Engine, input, output *os.File) (resultErr error) {

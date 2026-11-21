@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
@@ -141,6 +142,17 @@ func (k *KeyboardAccess) block(title string, commands ...platform.Command) engin
 	for _, c := range commands {
 		block.Lines = append(block.Lines, aptShellLine(c))
 	}
+	return block
+}
+
+func (k *KeyboardAccess) installBlock(o keyboardObservation) engine.CommandBlock {
+	block := k.block("Install the keyboard access rule", k.applyCommands(o)...)
+	format := strings.NewReplacer(`\`, `\\`, "%", "%%", "\n", `\n`).Replace(string(KeyboardRule()))
+	stage := aptShellWord(k.stage())
+	block.Lines = slices.Concat([]string{
+		"# Setup does the preparation itself. These lines give the same file.",
+		"(umask 077 && mkdir -p " + aptShellWord(k.Directory) + " && set -C && printf " + aptShellLiteral(format) + " > " + stage + ")",
+	}, block.Lines, []string{"rm -f -- " + stage})
 	return block
 }
 
@@ -293,9 +305,7 @@ func (k *KeyboardAccess) Inspect(ctx context.Context, r catalog.Resource, want e
 		f.Status = engine.Satisfied
 	case !o.Present:
 		f.Status, f.Reason, f.Privileged, f.Pending = engine.Missing, detail, true, true
-		block := k.block("Install the keyboard access rule", k.applyCommands(o)...)
-		block.Lines = append([]string{"# Setup first writes the rule to " + k.stage() + ". It deletes the file after the step."}, block.Lines...)
-		f.Commands = []engine.CommandBlock{block}
+		f.Commands = []engine.CommandBlock{k.installBlock(o)}
 	case o.settled():
 		f.Status = engine.Satisfied
 	case o.owned():

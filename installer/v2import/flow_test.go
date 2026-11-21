@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/luisgui1757/dotfiles/installer/builds"
 	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/hooks"
@@ -410,6 +411,9 @@ func TestAStagedBuildOfADeselectedToolDoesNotStopTheNextImport(t *testing.T) {
 			if err != nil {
 				t.Fatalf("a staged build of a deselected tool must not stop the import: %v", err)
 			}
+			if current := builds.CurrentDir(f.state, "tool.nvim"); !strings.Contains(proposal.Details, "The import removes the link "+current) {
+				t.Fatalf("the review must name the removal of %s:\n%s", current, proposal.Details)
+			}
 			for _, op := range proposal.Plan.Operations {
 				if op.Action == "remove" || op.Action == "forget" {
 					t.Fatalf("the import must not remove %s", op.Resource)
@@ -422,13 +426,17 @@ func TestAStagedBuildOfADeselectedToolDoesNotStopTheNextImport(t *testing.T) {
 			if st.Schema != 2 || st.V2Restore != "open" || slices.Contains(st.Selected, "neovim") {
 				t.Fatalf("after the import the state must be schema 2 without Neovim: %+v", st)
 			}
-			current := filepath.Join(f.state, "tools", "tool.nvim", "current")
+			current := builds.CurrentDir(f.state, "tool.nvim")
 			if _, has := st.Targets[current]; has {
 				t.Fatalf("the state records the staged build of a deselected tool: %+v", st.Targets[current])
 			}
-			if read(t, filepath.Join(current, "bin", "tool")) != "v3 tool.nvim\n" {
+			if _, err := os.Lstat(current); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("the import must remove the link of a staged build that it leaves out: %v", err)
+			}
+			if read(t, filepath.Join(builds.ResourceDir(f.state, "tool.nvim"), "1-abcdef012345-1", "bin", "tool")) != "v3 tool.nvim\n" {
 				t.Fatal("the import must leave the staged build for the sweep")
 			}
+			selectNeovimInV3(t, f)
 		})
 	}
 }

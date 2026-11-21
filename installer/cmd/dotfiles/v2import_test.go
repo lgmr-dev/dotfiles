@@ -455,3 +455,60 @@ func TestTheImportMenuAsksForEachPendingMarkBeforeTheSwitch(t *testing.T) {
 		t.Fatalf("the approved switch must clear the confirmed mark and complete: %+v %v", st, err)
 	}
 }
+
+func TestTheImportCommandsDuringTheSwitchNameEachUnfinishedTarget(t *testing.T) {
+	s, _ := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	first, second := filepath.Join(s.folders.Home, ".zshrc"), filepath.Join(s.folders.Home, ".zshenv")
+	editV2State(t, s, func(st *state.State) {
+		st.V2Restore = "switching"
+		st.Targets[first] = state.Record{Resource: "config.zsh", Kind: "file", Next: "fp:1", Before: "absent"}
+		st.Targets[second] = state.Record{Resource: "config.zsh", Kind: "file", Next: "fp:2", Before: "absent"}
+	})
+	lines := []string{"unfinished change: " + first + " (config.zsh). Run setup again to finish it.", "unfinished change: " + second + " (config.zsh). Run setup again to finish it."}
+	for _, args := range [][]string{{"plan"}, {"apply"}, {"check"}} {
+		text, err := runV2(t, s, importV2, args...)
+		for _, line := range lines {
+			if !strings.Contains(text, line) {
+				t.Fatalf("%v must name each unfinished target:\n%s\n%v", args, text, err)
+			}
+		}
+		if args[0] == "check" && (err == nil || !strings.Contains(reportPart(t, text), "these items need your action")) {
+			t.Fatalf("check must report the unfinished targets as an action:\n%s\n%v", text, err)
+		}
+	}
+}
+
+type actionScreen struct {
+	restoreScreen
+	offered []string
+}
+
+func (a *actionScreen) Choose(_ context.Context, _ string, choices []engine.Choice, _ []string, _ bool) ([]string, error) {
+	for _, choice := range choices {
+		a.offered = append(a.offered, choice.ID)
+	}
+	return []string{"exit"}, nil
+}
+
+func (a *actionScreen) ChooseTools(context.Context, engine.ToolMenu) ([]string, error) {
+	return nil, engine.ErrCancelled
+}
+
+func TestTheMenuAfterAnImportOffersTheRestoreOfReleaseV2(t *testing.T) {
+	s, _ := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	e := menuEngine(s)
+	screen := &actionScreen{}
+	e.UI = screen
+	if _, err := e.Run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(screen.offered, "restore-v2") {
+		t.Fatalf("the menu after an import must offer the restore of release v2: %q", screen.offered)
+	}
+}

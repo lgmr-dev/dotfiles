@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/luisgui1757/dotfiles/installer/builds"
 	"github.com/luisgui1757/dotfiles/installer/catalog"
 	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/hooks"
@@ -142,23 +143,68 @@ func (o Options) phases(plan engine.Plan) (blockers []string, builds []engine.Op
 
 func stagingDir(stateDir string) string { return filepath.Join(restoreDir(stateDir), "staging") }
 
-func (o Options) staged(mapping Mapping) (map[string]state.Record, error) {
-	records := map[string]state.Record{}
+func (o Options) staged(mapping Mapping) (kept, dropped map[string]state.Record, err error) {
+	kept, dropped = map[string]state.Record{}, map[string]state.Record{}
 	closure, err := deferCatalog{o.Engine.Catalog, mapping.Deferred}.Closure(slices.Concat(mapping.State.Selected, mapping.State.Keep), o.Engine.Context)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	st, err := state.Peek(stagingDir(o.Engine.StateDir), o.Engine.Target)
 	if err != nil {
-		return records, nil
+		return kept, dropped, nil
 	}
-	tools := filepath.Join(o.Engine.StateDir, "tools")
+	tools := builds.ToolsDir(o.Engine.StateDir)
 	for key, record := range st.Targets {
-		if within(tools, key) && slices.Contains(closure, record.Resource) {
-			records[key] = record
+		switch {
+		case !within(tools, key):
+		case slices.Contains(closure, record.Resource):
+			kept[key] = record
+		case key == builds.CurrentDir(o.Engine.StateDir, record.Resource):
+			dropped[key] = record
 		}
 	}
-	return records, nil
+	return kept, dropped, nil
+}
+
+func stagedLink(key string, record state.Record) (link string, published bool) {
+	link, err := builds.LinkTarget(key)
+	return link, err == nil && (link == "" || link == record.Applied || link == record.Next)
+}
+
+func (o Options) droppedNotes(dropped map[string]state.Record) []string {
+	notes := []string{}
+	for _, key := range slices.Sorted(maps.Keys(dropped)) {
+		record := dropped[key]
+		link, published := stagedLink(key, record)
+		switch {
+		case !published:
+			notes = append(notes, fmt.Sprintf("The link %s does not point at the build that an earlier import made for %s, so it stays. Move it away before you select %s in release v3.", key, o.name(record.Resource), o.name(record.Resource)))
+		case link != "":
+			notes = append(notes, fmt.Sprintf("The import removes the link %s to the build that an earlier import made for %s, because the selection does not include it. The build stays for the sweep.", key, o.name(record.Resource)))
+		}
+	}
+	return notes
+}
+
+func (o Options) unstage(dropped map[string]state.Record) error {
+	if len(dropped) == 0 {
+		return nil
+	}
+	store, err := state.Open(stagingDir(o.Engine.StateDir), o.Engine.Target)
+	if err != nil {
+		return err
+	}
+	rec := guarded{store, builds.ToolsDir(o.Engine.StateDir)}
+	for _, key := range slices.Sorted(maps.Keys(dropped)) {
+		record := dropped[key]
+		if _, published := stagedLink(key, record); !published {
+			continue
+		}
+		if err := builds.Unpublish(o.Engine.StateDir, record.Resource, rec); err != nil {
+			return errors.Join(err, store.Close())
+		}
+	}
+	return store.Close()
 }
 
 // Preview maps a schema-1 state and plans the import, or plans the
@@ -198,10 +244,11 @@ func Preview(ctx context.Context, o Options, setLegacy func(directories []string
 	if setLegacy != nil {
 		setLegacy(mapping.Legacy)
 	}
-	staged, err := o.staged(mapping)
+	staged, dropped, err := o.staged(mapping)
 	if err != nil {
 		return nil, err
 	}
+	mapping.Notes = append(mapping.Notes, o.droppedNotes(dropped)...)
 	st := mapping.State.Clone()
 	maps.Copy(st.Targets, staged)
 	preview := *e
@@ -352,8 +399,11 @@ func (p *Proposal) publish(ctx context.Context) (resultErr error) {
 	if len(broken) != 0 {
 		return fmt.Errorf("the import stopped before the switch, and release v2 stays active. These applications of release v2 do not start: %s. Repair them with the setup of %s (%s), or deselect them there, then run this setup again", strings.Join(broken, ", "), SourceCommit, SourceRelease)
 	}
-	staged, err := p.o.staged(p.Mapping)
+	staged, dropped, err := p.o.staged(p.Mapping)
 	if err != nil {
+		return err
+	}
+	if err := p.o.unstage(dropped); err != nil {
 		return err
 	}
 	st := p.Mapping.State.Clone()

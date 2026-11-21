@@ -185,7 +185,7 @@ func (k slotKind) valueOf(data []byte, d Desired) (string, []byte, error) {
 	return value, raw, err
 }
 
-func (k slotKind) revert(ctx context.Context, d Desired, record state.Record, aside string, earlier, current []byte, file string, raw []byte) error {
+func (k slotKind) revert(ctx context.Context, d Desired, record state.Record, aside string, earlier, current []byte, file, live string, raw []byte) error {
 	expected := record.Applied
 	if expected == "" {
 		var err error
@@ -203,6 +203,13 @@ func (k slotKind) revert(ctx context.Context, d Desired, record state.Record, as
 		return err == nil && bytes.Equal(copied, part)
 	})
 	if err != nil || !replaced && (value != expected || file == Absent && value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path) {
+		written := expectedStage(k, record)
+		if record.Release && written == "" {
+			written = Absent
+		}
+		if err == nil && file != Absent && live == written {
+			return fmt.Errorf("%s has a name that setup reserves. It holds the profile from before the write, but it does not match the record, so setup keeps it. The write of the live profile %s is complete. Examine %s, remove it, then run setup again", aside, d.Path, aside)
+		}
 		return errors.Join(leftover(aside), err)
 	}
 	if file == Absent {
@@ -222,7 +229,7 @@ func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) e
 		return errors.Join(leftover(aside), err)
 	}
 	if moved != Absent {
-		current, file, _, raw, err := k.read(d)
+		current, file, live, raw, err := k.read(d)
 		if err != nil {
 			return err
 		}
@@ -230,7 +237,7 @@ func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) e
 			if err := unclaimed(ctx, aside, file != Absent); err != nil {
 				return err
 			}
-		} else if err := k.revert(ctx, d, record, aside, earlier, current, file, raw); err != nil {
+		} else if err := k.revert(ctx, d, record, aside, earlier, current, file, live, raw); err != nil {
 			return err
 		}
 	}

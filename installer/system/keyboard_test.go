@@ -5,7 +5,9 @@ package system
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -153,9 +155,8 @@ func TestKeyboardAccessRuleLifecycle(t *testing.T) {
 	ctx := context.Background()
 	r := keyboardFixtureResource
 	found := f.inspect(true)
-	if found.Status != engine.Missing || !found.Privileged || !found.Pending || len(found.Commands) != 1 || found.Commands[0].By != "setup" || len(found.Commands[0].Lines) != 7 ||
-		!strings.HasPrefix(found.Commands[0].Lines[0], "# Setup first writes the rule to ") ||
-		!strings.HasPrefix(found.Commands[0].Lines[1], "LC_ALL=C /fake/sudo -n -- /usr/bin/install -m 0644 -o root -g root -T ") || found.Commands[0].Lines[4] != "LC_ALL=C /fake/sudo -n -- /usr/bin/udevadm control --reload-rules" {
+	if found.Status != engine.Missing || !found.Privileged || !found.Pending || len(found.Commands) != 1 || found.Commands[0].By != "setup" || len(found.Commands[0].Lines) != 9 ||
+		!strings.HasPrefix(found.Commands[0].Lines[2], "LC_ALL=C /fake/sudo -n -- /usr/bin/install -m 0644 -o root -g root -T ") || found.Commands[0].Lines[5] != "LC_ALL=C /fake/sudo -n -- /usr/bin/udevadm control --reload-rules" {
 		t.Fatal("an absent rule must be installable with administrator rights", found)
 	}
 	fingerprint := KeyboardRuleFingerprint(KeyboardRule())
@@ -454,6 +455,72 @@ func TestKeyboardAccessMarksBeforeTheFirstPrivilegedCommand(t *testing.T) {
 	f.fail["install"] = aptFixtureExit(1)
 	if err := f.k.Apply(ctx, r, f.inspect(true), f.rec); err == nil || len(f.rec.State().Pending) != 1 {
 		t.Fatal("a write that started and failed must keep its mark", err, f.rec.State().Pending)
+	}
+}
+
+func TestKeyboardAccessShownInstallBlockStagesTheRuleThatApplyStages(t *testing.T) {
+	f := newKeyboardFixture(t)
+	lines := f.inspect(true).Commands[0].Lines
+	privileged := func(line string) bool { return strings.Contains(line, "/fake/sudo") }
+	first, after := slices.IndexFunc(lines, privileged), len(lines)
+	for after > 0 && !privileged(lines[after-1]) {
+		after--
+	}
+	shell := func(lines []string) error {
+		for _, line := range lines {
+			if strings.HasPrefix(line, "#") {
+				continue
+			}
+			cmd := exec.Command("/bin/sh", "-c", line)
+			cmd.Dir = t.TempDir()
+			if out, err := cmd.CombinedOutput(); err != nil {
+				return fmt.Errorf("%s: %w: %s", line, err, out)
+			}
+		}
+		return nil
+	}
+	stage := filepath.Join(f.k.Directory, "keyboard-access.rules")
+	if err := shell(lines[:first]); err != nil {
+		t.Fatal(err)
+	}
+	shown, err := os.ReadFile(stage)
+	if err != nil {
+		t.Fatal("the shown block must create the staged rule before the first privileged command", lines, err)
+	}
+	shownFile, _ := os.Stat(stage)
+	shownDirectory, _ := os.Stat(f.k.Directory)
+	if err := os.WriteFile(stage, []byte("# personal\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := shell(lines[:first]); err == nil {
+		t.Fatal("the shown block must never overwrite an existing staged file")
+	}
+	if data, err := os.ReadFile(stage); err != nil || string(data) != "# personal\n" {
+		t.Fatal("the shown block overwrote an existing staged file", string(data), err)
+	}
+	if err := shell(lines[after:]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(stage); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("the shown block must delete the staged rule after the privileged commands", err)
+	}
+	if err := os.Remove(f.k.Directory); err != nil {
+		t.Fatal(err)
+	}
+	var staged []byte
+	var stagedFile, stagedDirectory os.FileInfo
+	f.during = func(name string) {
+		if name == "install" {
+			staged, _ = os.ReadFile(stage)
+			stagedFile, _ = os.Stat(stage)
+			stagedDirectory, _ = os.Stat(f.k.Directory)
+		}
+	}
+	if err := f.k.Apply(context.Background(), keyboardFixtureResource, f.inspect(true), f.rec); err != nil {
+		t.Fatal(err)
+	}
+	if string(shown) != string(staged) || shownFile.Mode() != stagedFile.Mode() || shownDirectory.Mode() != stagedDirectory.Mode() {
+		t.Fatal("the shown block must stage the bytes and modes that setup stages", string(shown), string(staged), shownFile.Mode(), stagedFile.Mode(), shownDirectory.Mode(), stagedDirectory.Mode())
 	}
 }
 

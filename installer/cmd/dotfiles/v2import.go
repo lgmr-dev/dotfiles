@@ -102,14 +102,30 @@ func runImportV2(ctx context.Context, s setup) error {
 		return err
 	}
 	preview := importPreview(options, proposal)
-	if c.name == "check" {
-		if _, err := fmt.Fprint(s.output, preview); err != nil {
+	unfinished := []string{}
+	if proposal.Switching {
+		st, err := state.Peek(s.stateDir, s.target)
+		if err != nil {
 			return err
 		}
-		if proposal.Switching {
-			return errors.New("the import from release v2 is not complete; run apply --yes to complete it, or restore-v2 --yes to go back to release v2")
+		unfinished = engine.UnfinishedLines(st)
+	}
+	if c.name == "check" {
+		if !proposal.Switching {
+			if _, err := fmt.Fprint(s.output, preview); err != nil {
+				return err
+			}
+			return errors.New("this installation runs release v2; run setup, or apply --yes, to import it. Nothing was changed")
 		}
-		return errors.New("this installation runs release v2; run setup, or apply --yes, to import it. Nothing was changed")
+		result := engine.Result{Status: "needs-action", Plan: proposal.Plan,
+			Message: strings.Join(append([]string{"The import from release v2 is not complete. Run apply --yes to complete it, or restore-v2 --yes to go back to release v2."}, unfinished...), "\n")}
+		if _, err := fmt.Fprint(s.output, preview+terminal.ReportText(result)); err != nil {
+			return err
+		}
+		return finish(result, nil)
+	}
+	if len(unfinished) != 0 {
+		preview += strings.Join(unfinished, "\n") + "\n"
 	}
 	if !c.yes || c.name == "plan" {
 		if c.name != "plan" {
@@ -140,7 +156,7 @@ func importMenu(ctx context.Context, s setup, options v2import.Options, setLegac
 	if err := ui.Close(); err != nil {
 		return err
 	}
-	return menu(ctx, newEngine(s), os.Stdin, s.output)
+	return menu(ctx, menuEngine(s), os.Stdin, s.output)
 }
 
 type importUI interface {

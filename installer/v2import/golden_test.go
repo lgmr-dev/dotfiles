@@ -17,7 +17,7 @@ func TestMappingAcceptsTheFingerprintsThatReleaseV2Computed(t *testing.T) {
 	f := newFixture(t, "linux")
 	profile := filepath.Join(f.home, ".tmux.plugins.conf")
 	write(t, profile, "# personal\n\n# >>> dotfiles:tmux.plugins >>>\nrun-shell \"/x/plugins.sh\"\n# <<< dotfiles:tmux.plugins <<<\nalias after=1\n", 0644)
-	before := v2import.Observation{Provider: "profile-block", Scope: "user", Identity: "identity", Fingerprint: "before"}
+	before := v2import.Observation{Provider: "profile-block", Scope: "user", Identity: digest(t, []string{profile}), Fingerprint: digest(t, [][]byte{nil})}
 	after := before
 	after.Present, after.Healthy, after.Fingerprint = true, true, goldenBlockFingerprint
 	f.document(filepath.Join(f.state, f.recovery(plugins), "profile.json"), map[string]any{"schema": 1, "resource": plugins, "before": before, "entries": []profileEntry{{Path: profile}}})
@@ -25,9 +25,12 @@ func TestMappingAcceptsTheFingerprintsThatReleaseV2Computed(t *testing.T) {
 
 	settings := filepath.Join(f.home, ".config", "Code", "User", "settings.json")
 	write(t, settings, "{\n  // personal comment\n  \"editor.fontSize\": 13,\n  \"workbench.colorTheme\": \"Rosé <Pine>\",\n  \"update.mode\": \"none\", // trailing\n}\n", 0644)
-	after.Fingerprint = goldenFieldsFingerprint
+	fields := []string{"workbench.colorTheme", "update.mode"}
+	before.Identity = digest(t, struct{ Paths, Fields []string }{[]string{settings}, fields})
+	after = before
+	after.Present, after.Healthy, after.Fingerprint = true, true, goldenFieldsFingerprint
 	f.document(filepath.Join(f.state, f.recovery(vscode), "profile.json"), map[string]any{"schema": 1, "resource": vscode, "before": before,
-		"fields": []string{"workbench.colorTheme", "update.mode"}, "entries": []profileEntry{{Path: settings}}})
+		"fields": fields, "entries": []profileEntry{{Path: settings}}})
 	f.v1.Receipts[vscode] = v2import.Receipt{Ownership: "created", Before: before, After: after, Status: "ready", Recovery: f.recovery(vscode), OperationID: operation(vscode)}
 	f.v1.Selected = []string{"tmux"}
 	f.save()

@@ -156,7 +156,8 @@ func TestASlotWithOnlyAFingerprintIsDisclosedAndDoesNotStopTheRestore(t *testing
 	before := capture(t, f, f.save())
 	f.mustImport()
 	editManifest(t, f, func(slots map[string]any) {
-		slots[f.fontPath()].(map[string]any)["saved"] = "fp:link:no-copy-by-design"
+		slot := slots[f.fontPath()].(map[string]any)
+		slot["saved"], slot["fingerprint"] = "fp:link:no-copy-by-design", "link:no-copy-by-design"
 	})
 	_, message := mustRestore(t, f)
 	if !strings.Contains(message, "Not restored: "+f.fontPath()) || !strings.Contains(message, "Release v2 is active again") {
@@ -593,5 +594,222 @@ func TestRestoreRechecksThePendingMarksUnderTheLock(t *testing.T) {
 	if _, err := restoration.Run(context.Background(), nil); err != nil {
 		t.Fatal(err)
 	}
+	before.restored(t, f)
+}
+
+type held struct{ st state.State }
+
+func (h *held) State() state.State { return h.st.Clone() }
+
+func (h *held) Update(edit func(*state.State) error) error {
+	next := h.st.Clone()
+	if err := edit(&next); err != nil {
+		return err
+	}
+	h.st = next
+	return nil
+}
+
+func TestAnEditDuringTheMappingIsNeverOwned(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	type edit struct{ path, key string }
+	cases := map[string]func(f *fx) edit{
+		"generated file": func(f *fx) edit {
+			env := filepath.Join(f.state, "shells", "env.sh")
+			return edit{env, env}
+		},
+		"block": func(f *fx) edit {
+			zshrc := filepath.Join(f.home, ".zshrc")
+			return edit{zshrc, targets.Key(zshrc, shells)}
+		},
+		"field": func(f *fx) edit {
+			settings := filepath.Join(f.home, ".config", "Code", "User", "settings.json")
+			return edit{settings, targets.Key(settings, "update.mode")}
+		},
+		"runtime link": func(f *fx) edit { return edit{f.publicRuntime(), f.publicRuntime()} },
+	}
+	for name, unit := range cases {
+		t.Run(name, func(t *testing.T) {
+			f := linuxFixture(t)
+			f.save()
+			target := unit(f)
+			change := func() {
+				switch name {
+				case "runtime link":
+					if err := os.Remove(target.path); err != nil {
+						t.Fatal(err)
+					}
+					link(t, filepath.Join(f.home, "my-runtime"), target.path)
+				case "field":
+					write(t, target.path, strings.Replace(read(t, target.path), `"none"`, `"default"`, 1), 0644)
+				case "block":
+					write(t, target.path, strings.Replace(read(t, target.path), ". v2-init", ". my edit", 1), 0644)
+				default:
+					write(t, target.path, read(t, target.path)+"# my edit\n", 0644)
+				}
+			}
+			edited := false
+			v2import.SetFault(func(at string) error {
+				if at == "read:"+target.path && !edited {
+					edited = true
+					change()
+				}
+				return nil
+			})
+			mapping := mustMap(t, f)
+			v2import.SetFault(nil)
+			if !edited {
+				t.Fatal("the fixture must edit the target after its first read")
+			}
+			live, err := f.writer().InspectRecord(target.key, &held{mapping.State})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if live.State == targets.StateApplied {
+				t.Fatalf("the import recorded an edit made during its inspection as owned: %+v %+v", mapping.State.Targets[target.key], live)
+			}
+		})
+	}
+}
+
+func TestAnEditedV2ProfileBaselineGivesNoOwnership(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	path := filepath.Join(f.state, f.recovery(vscode), "profile.json")
+	var baseline map[string]any
+	if err := json.Unmarshal([]byte(read(t, path)), &baseline); err != nil {
+		t.Fatal(err)
+	}
+	entry := baseline["entries"].([]any)[0].(map[string]any)
+	entry["block"] = []byte(`{"update.mode":"manual","workbench.colorTheme":"Personal <Dark>"}`)
+	f.document(path, baseline)
+	mapping := mustMap(t, f)
+	settings := filepath.Join(f.home, ".config", "Code", "User", "settings.json")
+	for _, field := range []string{"workbench.colorTheme", "update.mode"} {
+		record := mapping.State.Targets[targets.Key(settings, field)]
+		if record.Applied != "" || !strings.HasPrefix(record.Before, "fp:") {
+			t.Fatalf("%s: an edited v2 baseline must give a baseline-only record without its values: %+v", field, record)
+		}
+	}
+	if notes := strings.Join(mapping.Notes, "\n"); !strings.Contains(notes, vscode) || !strings.Contains(notes, path) {
+		t.Fatalf("the note must name the resource and its baseline: %v", mapping.Notes)
+	}
+}
+
+func savedCopy(t *testing.T, f *fx, key string) string {
+	t.Helper()
+	saved := ""
+	editManifest(t, f, func(slots map[string]any) {
+		saved = strings.TrimPrefix(slots[key].(map[string]any)["saved"].(string), "backup:")
+	})
+	return saved
+}
+
+func TestRestoreStopsWhenASavedCopyChangedBeforeTheReview(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	write(t, savedCopy(t, f, env), "tampered copy\n", 0644)
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil || !strings.Contains(restoration.Text(), "blocked  "+env) {
+		t.Fatalf("the review must block a slot whose saved copy changed: %v\n%s", err, restoration.Text())
+	}
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), env) {
+		t.Fatalf("a changed saved copy must stop the restore and name the slot: %v", err)
+	}
+	if st := f.current(); st.V2Restore != "open" || read(t, env) != "# v3 env\n" {
+		t.Fatalf("the stop must keep release v3 and the target: %+v %q", st, read(t, env))
+	}
+}
+
+func TestRestoreStopsWhenASavedCopyChangesAtTheWrite(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	saved := savedCopy(t, f, env)
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	v2import.SetFault(func(at string) error {
+		if at == "restore-slot:"+env {
+			write(t, saved, "tampered copy\n", 0644)
+		}
+		return nil
+	})
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), env) {
+		t.Fatalf("a saved copy that changes at the write must stop the restore and name the slot: %v", err)
+	}
+	if st := f.current(); st.V2Restore != "open" || read(t, env) == "tampered copy\n" {
+		t.Fatalf("the restore must not publish release v2 or write the changed copy: %+v %q", st, read(t, env))
+	}
+}
+
+func TestRestoreKeepsATargetThatYouDeletedAfterTheSwitch(t *testing.T) {
+	for _, replace := range []bool{false, true} {
+		f := linuxFixture(t)
+		f.save()
+		v2env := read(t, filepath.Join(f.state, "shells", "env.sh"))
+		f.mustImport()
+		env := filepath.Join(f.state, "shells", "env.sh")
+		if err := os.Remove(env); err != nil {
+			t.Fatal(err)
+		}
+		restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed := restoration.Changed()
+		if len(changed) != 1 || changed[0].Key != env || changed[0].Replacement != "restore" {
+			t.Fatalf("a target that you deleted after the switch is changed content: %+v", restoration.Items)
+		}
+		chosen := []string{}
+		if replace {
+			chosen = []string{env}
+		}
+		message, err := restoration.Run(context.Background(), chosen)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if replace {
+			if read(t, env) != v2env {
+				t.Fatalf("an approved replacement must give back the value of release v2: %q", read(t, env))
+			}
+			continue
+		}
+		if _, err := os.Lstat(env); !errors.Is(err, os.ErrNotExist) || !strings.Contains(message, "Kept your changed content: "+env) {
+			t.Fatalf("without a decision the deletion must stay and be reported: %v %q", err, message)
+		}
+	}
+}
+
+func TestRestoreRecoversAnInterruptedSwitchReleaseBeforeItRollsBack(t *testing.T) {
+	f := linuxFixture(t)
+	before := capture(t, f, f.save())
+	zshrc := filepath.Join(f.home, ".zshrc")
+	key := targets.Key(zshrc, shells)
+	v2zshrc := read(t, zshrc)
+	f.mustImport()
+	write(t, zshrc, v2zshrc, 0644)
+	live, err := f.writer().InspectRecord(key, &held{f.current()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	without, err := targets.Block{}.Replace([]byte(v2zshrc), targets.Desired{Path: zshrc, Slot: shells}, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	editState(t, f, func(document map[string]any) {
+		record := document["targets"].(map[string]any)[key].(map[string]any)
+		record["applied"], record["next"], record["release"] = live.Fingerprint, targets.Absent, true
+	})
+	write(t, strings.TrimSuffix(aside(key), ".previous")+".next", string(without), 0644)
+	if err := os.Rename(zshrc, aside(key)); err != nil {
+		t.Fatal(err)
+	}
+	mustRestore(t, f)
 	before.restored(t, f)
 }

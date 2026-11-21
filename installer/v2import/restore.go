@@ -69,15 +69,24 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.Detail = "setup cannot compare it with its saved value: " + err.Error()
 		return item
 	}
-	candidates := []string{targets.Absent, live.Want}
-	if record, has := st.Targets[key]; has {
+	if live.Want != slot.Fingerprint {
+		item.Detail = "its saved copy in " + set.dir + " changed after the switch, and setup does not give back a changed copy"
+		return item
+	}
+	started, restoring := set.manifest.Restoring[key]
+	record, has := st.Targets[key]
+	deleted := has && record.Applied != "" && record.Next == "" && !record.Release && !restoring
+	candidates := []string{live.Want}
+	if !deleted {
+		candidates = append(candidates, targets.Absent)
+	}
+	if has {
 		candidates = append(candidates, record.Applied, record.Next)
 	} else if imported, had := set.manifest.Imported.Targets[key]; had && imported.Before != "" {
 		if released, err := inspect(imported.Before); err == nil {
 			candidates = append(candidates, released.Want)
 		}
 	}
-	started, restoring := set.manifest.Restoring[key]
 	if restoring && !slices.Contains(candidates, started) {
 		copied, err := inspect(set.manifest.Edited[key])
 		restoring = set.manifest.Edited[key] != "" && err == nil && copied.Want == started
@@ -99,6 +108,8 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.Replacement = "remove"
 	}
 	switch {
+	case deleted && live.Fingerprint == targets.Absent:
+		item.Action, item.Detail = "changed", "you deleted it after the switch; restore-v2 keeps the deletion unless you choose its replacement"
 	case !slices.Contains(candidates, live.Fingerprint):
 		item.Action, item.Detail = "changed", "it changed after the switch; restore-v2 keeps it unless you choose its replacement"
 	case slot.Saved == targets.Absent:
@@ -288,18 +299,24 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 				kept[item.Key] = item.live
 				continue
 			}
-			copied, err := set.saveEdited(ctx, item, slot)
-			if err != nil {
-				failures = append(failures, item.Key+": setup cannot save your changed content, so it stays: "+err.Error())
-				continue
+			if item.live != targets.Absent {
+				copied, err := set.saveEdited(ctx, item, slot)
+				if err != nil {
+					failures = append(failures, item.Key+": setup cannot save your changed content, so it stays: "+err.Error())
+					continue
+				}
+				notes = append(notes, "Saved your changed content of "+item.Key+" at "+copied)
 			}
-			notes = append(notes, "Saved your changed content of "+item.Key+" at "+copied)
 		}
 		if err := set.intend(item.Key, item.live); err != nil {
 			return "", err
 		}
 		if err := hit("restore-slot:" + item.Key); err != nil {
 			return "", err
+		}
+		if err := set.verifySaved(item.Key); err != nil {
+			failures = append(failures, item.Key+": "+err.Error())
+			continue
 		}
 		record := state.Record{Resource: slot.Resource, Kind: slot.Kind, Applied: item.live, Next: slot.Saved, Release: true, Before: slot.Saved, Made: slices.Clone(slot.Made)}
 		err := set.writer.Release(ctx, item.Key, &memory{state.State{Targets: map[string]state.Record{item.Key: record}}}, targets.Preserve)
@@ -397,7 +414,17 @@ func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) ([]str
 	}
 	for _, key := range slotOrder(set.manifest.Slots) {
 		record, has := st.Targets[key]
-		if _, restoring := set.manifest.Restoring[key]; !has || record.Next == "" || record.Release || restoring {
+		if _, restoring := set.manifest.Restoring[key]; !has || record.Next == "" || restoring {
+			continue
+		}
+		if record.Release {
+			if err := set.writer.Recover(ctx, key, &memory{state.State{Targets: map[string]state.Record{key: record}}}); err != nil {
+				failures = append(failures, key+": "+err.Error())
+			}
+			continue
+		}
+		if err := set.verifySaved(key); err != nil {
+			failures = append(failures, key+": "+err.Error())
 			continue
 		}
 		forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: set.manifest.Slots[key].Saved}

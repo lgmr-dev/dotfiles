@@ -265,6 +265,12 @@ func (m *mapper) profile(id string, receipt Receipt) error {
 		m.note("%s: release v2 did not own it and its baseline is not readable; setup treats its content as yours.", id)
 		return nil
 	}
+	if err := verifyProfileBaseline(id, receipt, baseline); err != nil {
+		m.note("%s: the saved baseline %s is not the one that release v2 recorded: %v. Setup cannot give the earlier values back, so it takes no ownership of this resource and asks before it replaces its content.",
+			id, filepath.Join(m.dir, receipt.Recovery, "profile.json"), err)
+		m.unverified(id, receipt, baseline)
+		return nil
+	}
 	switch {
 	case len(baseline.Fields) == 0:
 		return m.blocks(id, receipt, baseline)
@@ -274,10 +280,30 @@ func (m *mapper) profile(id string, receipt Receipt) error {
 	return m.fields(id, receipt, baseline)
 }
 
-func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) error {
-	blocks, exact, readable := [][]byte{}, []bool{}, true
+func (m *mapper) unverified(id string, receipt Receipt, baseline profileBaseline) {
+	unowned := func(key string) {
+		m.record(key, state.Record{Resource: id, Kind: "field", Before: "fp:" + receipt.Before.Fingerprint}, false)
+	}
 	for _, entry := range baseline.Entries {
-		data, _, err := readProfileFile(entry.Path)
+		switch {
+		case id == terminalResource:
+			unowned(targets.Key(entry.Path, hooks.TerminalSlot))
+		case len(baseline.Fields) != 0:
+			for _, field := range baseline.Fields {
+				unowned(targets.Key(entry.Path, field))
+			}
+		case within(filepath.Join(m.dir, "shells"), entry.Path):
+			m.row(id, entry.Path, "generated file without proof of ownership: no record")
+		default:
+			m.record(targets.Key(entry.Path, id), state.Record{Resource: id, Kind: "block", Before: "fp:" + receipt.Before.Fingerprint}, false)
+		}
+	}
+}
+
+func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) error {
+	blocks, contents, files, exact, readable := [][]byte{}, [][]byte{}, []platform.Snapshot{}, []bool{}, true
+	for _, entry := range baseline.Entries {
+		data, file, err := readProfileFile(entry.Path)
 		var block []byte
 		if err == nil {
 			block, err = liveBlock(data, id)
@@ -287,7 +313,7 @@ func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) er
 			readable = false
 			m.note("%s: cannot read the managed block in %s: %v. Setup takes no ownership of this resource.", id, entry.Path, err)
 		}
-		blocks = append(blocks, block)
+		blocks, contents, files = append(blocks, block), append(contents, data), append(files, file)
 	}
 	fingerprint, err := digest(blocks)
 	if err != nil {
@@ -296,13 +322,13 @@ func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) er
 	owned := m.created(receipt) && readable && fingerprint == receipt.After.Fingerprint
 	for i, entry := range baseline.Entries {
 		if within(filepath.Join(m.dir, "shells"), entry.Path) {
-			snapshot, err := platform.SnapshotTree(entry.Path)
-			if owned && entry.Absent && err == nil && snapshot.Kind == "file" && !exact[i] {
+			snapshot := files[i]
+			if owned && entry.Absent && snapshot.Kind == "file" && !exact[i] {
 				m.row(id, entry.Path, "generated file with content outside the block of release v2: no record, and setup asks before it replaces the file")
 				m.note("%s: %s holds lines outside the block that release v2 wrote. Setup keeps the file. It saves the file before a replacement that you approve.", id, entry.Path)
 				continue
 			}
-			if !owned || !entry.Absent || err != nil || snapshot.Kind != "file" {
+			if !owned || !entry.Absent || snapshot.Kind != "file" {
 				m.row(id, entry.Path, "generated file without proof of ownership: no record")
 				continue
 			}
@@ -324,7 +350,7 @@ func (m *mapper) blocks(id string, receipt Receipt, baseline profileBaseline) er
 		}
 		slotOwned := false
 		if owned && blocks[i] != nil {
-			live, err := m.fingerprint(key, "block", id)
+			live, err := m.writer.ObserveContent(key, record, contents[i])
 			if err == nil && live != targets.Absent {
 				record.Applied, slotOwned = live, true
 			}
@@ -340,9 +366,9 @@ func (m *mapper) fields(id string, receipt Receipt, baseline profileBaseline) er
 	}
 	entry := baseline.Entries[0]
 	slot := targets.Field{JSONC: func(string) bool { return id == vscodeResource }}
-	data, exists, err := readProfileFile(entry.Path)
+	data, file, err := readProfileFile(entry.Path)
 	values, readable := map[string]json.RawMessage{}, err == nil
-	if exists && readable && len(data) != 0 {
+	if file.Kind != "absent" && readable && len(data) != 0 {
 		for _, field := range baseline.Fields {
 			value, present, err := slot.Extract(data, targets.Desired{Path: entry.Path, Slot: field})
 			if err != nil {
@@ -391,7 +417,7 @@ func (m *mapper) fields(id string, receipt Receipt, baseline profileBaseline) er
 			continue
 		}
 		if slotOwned {
-			if record.Applied, err = m.fingerprint(key, "field", id); err != nil {
+			if record.Applied, err = m.writer.ObserveContent(key, record, data); err != nil {
 				return refused("cannot read %s: %v", key, err)
 			}
 		}
@@ -418,9 +444,9 @@ func (m *mapper) terminal(id string, receipt Receipt, baseline profileBaseline) 
 		record.Made = append([]string{entry.Path}, entry.Created...)
 	}
 	owned := false
-	if data, exists, err := readProfileFile(entry.Path); err == nil && exists && m.created(receipt) {
+	if data, file, err := readProfileFile(entry.Path); err == nil && file.Kind != "absent" && m.created(receipt) {
 		if fingerprint, err := hooks.TerminalImportFingerprint(data); err == nil && fingerprint != "" && fingerprint == receipt.After.Fingerprint {
-			if live, err := m.fingerprint(key, "field", id); err == nil && live != targets.Absent {
+			if live, err := m.writer.ObserveContent(key, record, data); err == nil && live != targets.Absent {
 				record.Applied, owned = live, true
 			}
 		}
@@ -463,10 +489,9 @@ func (m *mapper) neovim(id string, receipt Receipt) {
 		m.row(id, link, "no record: setup builds a new runtime")
 		return
 	}
-	target, err := os.Readlink(link)
+	target, snapshot, err := readLink(link)
 	fingerprint, _ := digest(target)
-	snapshot, snapshotErr := platform.SnapshotTree(link)
-	if err != nil || snapshotErr != nil || !m.created(receipt) || fingerprint != receipt.After.Fingerprint || recordKind(snapshot.Kind) != "link" {
+	if err != nil || !m.created(receipt) || fingerprint != receipt.After.Fingerprint {
 		m.row(id, link, "not the runtime link that release v2 published: no record, and setup asks before it replaces the link")
 		return
 	}

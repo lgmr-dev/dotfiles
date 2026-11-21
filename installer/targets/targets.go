@@ -128,6 +128,14 @@ type Uncopyable interface {
 	CannotCopy() bool
 }
 
+// ContentObserver is an optional interface of a Kind for a part of a file.
+// ObserveContent returns the fingerprint of the part d.Slot in data, the
+// content of the file d.Path, as Observe returns it for a file with that
+// content. It reads no file.
+type ContentObserver interface {
+	ObserveContent(d Desired, data []byte) (string, error)
+}
+
 // Writer applies the write order to units. StateDir is the installer state
 // folder: baselines and backups go to its baselines folder. Kinds adds or
 // replaces kinds. A key of Kinds is a record kind, such as "font", or a
@@ -324,6 +332,44 @@ func (w *Writer) InspectRecord(key string, rec engine.Records) (Live, error) {
 		live.Want = baseline
 	}
 	return live, nil
+}
+
+// ObserveContent returns the fingerprint of the part of a record key in
+// data, the content of its file, as InspectRecord returns it for a file with
+// that content. It reads no file, so a caller can check the same bytes in
+// another way and record this fingerprint for them. It fails for a kind that
+// is not a ContentObserver and for a path that moved or was redirected.
+func (w *Writer) ObserveContent(key string, record state.Record, data []byte) (string, error) {
+	d, kind, err := w.recorded(key, record)
+	if err != nil {
+		return "", err
+	}
+	observer, ok := kind.(ContentObserver)
+	if !ok {
+		return "", fmt.Errorf("the target kind %s does not read a part of a file", record.Kind)
+	}
+	if err := bound(d.Path); err != nil {
+		return "", err
+	}
+	return observer.ObserveContent(d, data)
+}
+
+// Recover completes or reverts a move of the unit of a record key that an
+// earlier run left unfinished, with the record of that run. It changes no
+// record. A key without a record does nothing.
+func (w *Writer) Recover(ctx context.Context, key string, rec engine.Records) error {
+	record, has := rec.State().Targets[key]
+	if !has {
+		return nil
+	}
+	d, kind, err := w.recorded(key, record)
+	if err != nil {
+		return err
+	}
+	if err := bound(d.Path); err != nil {
+		return err
+	}
+	return kind.Recover(withBaselines(ctx, w.baselines()), d, record)
 }
 
 func baselineOf(record state.Record) string {

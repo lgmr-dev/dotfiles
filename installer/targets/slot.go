@@ -79,28 +79,40 @@ func readSlotFile(path string) ([]byte, string, error) {
 	return data, fingerprintOf(before), nil
 }
 
+func (k slotKind) part(data []byte, d Desired) (string, []byte, error) {
+	raw, present, err := k.slot.Extract(data, d)
+	if err != nil {
+		return "", nil, err
+	}
+	if !present {
+		return Absent, nil, nil
+	}
+	if len(raw) == 0 {
+		return "", nil, errors.New("a managed part has an empty value")
+	}
+	return k.fingerprint(raw), raw, nil
+}
+
 func (k slotKind) read(d Desired) (data []byte, file, value string, raw []byte, err error) {
 	data, file, err = readSlotFile(d.Path)
 	if err != nil || file == Absent {
 		return nil, Absent, Absent, nil, err
 	}
-	raw, present, err := k.slot.Extract(data, d)
-	if err != nil {
+	if value, raw, err = k.part(data, d); err != nil {
 		return nil, "", "", nil, err
 	}
-	if !present {
-		return data, file, Absent, nil, nil
-	}
-	if len(raw) == 0 {
-		return nil, "", "", nil, errors.New("a managed part has an empty value")
-	}
-	return data, file, k.fingerprint(raw), raw, nil
+	return data, file, value, raw, nil
 }
 
 func (k slotKind) Slotted() bool { return true }
 
 func (k slotKind) Observe(d Desired) (string, error) {
 	_, _, value, _, err := k.read(d)
+	return value, err
+}
+
+func (k slotKind) ObserveContent(d Desired, data []byte) (string, error) {
+	value, _, err := k.part(data, d)
 	return value, err
 }
 

@@ -215,7 +215,7 @@ func TestTheRestoreMenuUsesTheReviewScreenWithTheFullListAndTheReplacementChoice
 		if err := os.WriteFile(path, []byte("my content of "+filepath.Base(path)+"\n"), 0600); err != nil {
 			t.Fatal(err)
 		}
-		slots[path] = map[string]any{"resource": "config.fixture", "kind": "file", "saved": "absent"}
+		slots[path] = map[string]any{"resource": "config.fixture", "kind": "file", "saved": "absent", "fingerprint": "absent"}
 	}
 	manifest["slots"] = slots
 	if data, err = json.Marshal(manifest); err != nil {

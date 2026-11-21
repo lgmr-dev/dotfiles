@@ -2,9 +2,12 @@ package v2import
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"unicode/utf16"
@@ -92,6 +95,35 @@ func readProfileBaseline(stateDir, id string, receipt Receipt) (profileBaseline,
 	return baseline, nil
 }
 
+func verifyProfileBaseline(id string, receipt Receipt, baseline profileBaseline) error {
+	paths, blocks, present := []string{}, [][]byte{}, false
+	for _, entry := range baseline.Entries {
+		paths, blocks, present = append(paths, entry.Path), append(blocks, entry.Block), present || len(entry.Block) != 0
+	}
+	var identity any = paths
+	if len(baseline.Fields) != 0 {
+		identity = struct{ Paths, Fields []string }{paths, baseline.Fields}
+	}
+	identityDigest, identityErr := digest(identity)
+	blocksDigest, blocksErr := digest(blocks)
+	if err := errors.Join(identityErr, blocksErr); err != nil {
+		return err
+	}
+	if identityDigest != baseline.Before.Identity {
+		return errors.New("the paths and fields of the profile baseline differ from its receipt")
+	}
+	if id == terminalResource {
+		if blocksDigest != baseline.Before.Inventory || blocksDigest != receipt.Before.Inventory {
+			return errors.New("the saved Windows Terminal values differ from their receipt")
+		}
+		return nil
+	}
+	if blocksDigest != baseline.Before.Fingerprint || present != baseline.Before.Present {
+		return errors.New("the saved profile values differ from their receipt")
+	}
+	return nil
+}
+
 func baselineExists(stateDir string, receipt Receipt, name string) bool {
 	if !validRecovery(receipt.Recovery) {
 		return false
@@ -100,19 +132,53 @@ func baselineExists(stateDir string, receipt Receipt, name string) bool {
 	return err == nil
 }
 
-func readProfileFile(path string) ([]byte, bool, error) {
+func readProfileFile(path string) ([]byte, platform.Snapshot, error) {
+	absent := platform.Snapshot{Kind: "absent"}
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
+		return nil, absent, nil
 	}
 	if err != nil {
-		return nil, false, err
+		return nil, absent, err
 	}
 	if !info.Mode().IsRegular() || info.Size() > platform.MaxProfileBytes {
-		return nil, false, errors.New("profile is not a regular file within its read bound")
+		return nil, absent, errors.New("profile is not a regular file within its read bound")
 	}
-	data, err := os.ReadFile(path)
-	return data, true, err
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, absent, err
+	}
+	opened, err := file.Stat()
+	if err != nil || !os.SameFile(info, opened) {
+		return nil, absent, errors.Join(errors.New("profile changed while opening"), err, file.Close())
+	}
+	data, err := io.ReadAll(io.LimitReader(file, platform.MaxProfileBytes+1))
+	if err = errors.Join(err, file.Close()); err != nil || len(data) > platform.MaxProfileBytes {
+		return nil, absent, errors.Join(errors.New("profile exceeds its read bound"), err)
+	}
+	sum := sha256.Sum256(data)
+	snapshot, err := platform.SnapshotEntries([]platform.Entry{{Path: ".", Kind: "file", Content: hex.EncodeToString(sum[:]), Mode: uint32(info.Mode().Perm())}})
+	return data, snapshot, errors.Join(err, hit("read:"+path))
+}
+
+func readLink(path string) (string, platform.Snapshot, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", platform.Snapshot{}, err
+	}
+	kind := "link"
+	switch {
+	case info.Mode()&os.ModeIrregular != 0:
+		kind = "junction"
+	case info.Mode()&os.ModeSymlink == 0:
+		return "", platform.Snapshot{}, errors.New("the runtime path is not a link")
+	}
+	target, err := os.Readlink(path)
+	if err != nil {
+		return "", platform.Snapshot{}, err
+	}
+	snapshot, err := platform.SnapshotEntries([]platform.Entry{{Path: ".", Kind: kind, Content: target}})
+	return target, snapshot, errors.Join(err, hit("read:"+path))
 }
 
 func profileEncoding(data []byte) (func(string) []byte, error) {

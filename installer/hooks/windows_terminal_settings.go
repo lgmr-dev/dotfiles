@@ -149,6 +149,10 @@ func (k terminalKind) Observe(d targets.Desired) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	return k.ObserveContent(d, data)
+}
+
+func (k terminalKind) ObserveContent(d targets.Desired, data []byte) (string, error) {
 	value, present, err := terminalSlot{}.Extract(data, d)
 	if err != nil {
 		return "", err

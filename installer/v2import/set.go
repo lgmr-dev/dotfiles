@@ -27,13 +27,16 @@ const RestoreFolder = "v2-restore"
 
 // Slot is the saved live value of one target before its first change in the
 // switch. Saved is "absent", an inline value, a copy in the restore set, or
-// "fp:" and a fingerprint for a unit that setup cannot copy. Made lists what
+// "fp:" and a fingerprint for a unit that setup cannot copy. Fingerprint is
+// the fingerprint of Saved when the switch captured it: restore-v2 gives the
+// target back only while Saved still has this fingerprint. Made lists what
 // the switch created for an absent unit.
 type Slot struct {
-	Resource string   `json:"resource"`
-	Kind     string   `json:"kind"`
-	Saved    string   `json:"saved"`
-	Made     []string `json:"made,omitempty"`
+	Resource    string   `json:"resource"`
+	Kind        string   `json:"kind"`
+	Saved       string   `json:"saved"`
+	Fingerprint string   `json:"fingerprint"`
+	Made        []string `json:"made,omitempty"`
 }
 
 // Manifest describes the restore set. Folder names the subfolder with the
@@ -154,8 +157,28 @@ func (s *restoreSet) capture(ctx context.Context, key string, record state.Recor
 	if err != nil {
 		return fmt.Errorf("cannot save %s for restore-v2; nothing was changed there: %w", key, err)
 	}
-	s.manifest.Slots[key] = Slot{Resource: record.Resource, Kind: record.Kind, Saved: saved, Made: made}
+	slot := Slot{Resource: record.Resource, Kind: record.Kind, Saved: saved, Made: made}
+	if slot.Fingerprint, err = s.savedFingerprint(key, slot); err != nil {
+		return fmt.Errorf("cannot save %s for restore-v2; nothing was changed there: %w", key, err)
+	}
+	s.manifest.Slots[key] = slot
 	return s.save()
+}
+
+func (s *restoreSet) savedFingerprint(key string, slot Slot) (string, error) {
+	live, err := s.writer.InspectRecord(key, &memory{state.State{Targets: map[string]state.Record{key: {Resource: slot.Resource, Kind: slot.Kind, Before: slot.Saved}}}})
+	if err == nil && live.Want == "" {
+		err = errors.New("setup cannot read the saved copy")
+	}
+	return live.Want, err
+}
+
+func (s *restoreSet) verifySaved(key string) error {
+	slot := s.manifest.Slots[key]
+	if fingerprint, err := s.savedFingerprint(key, slot); err != nil || fingerprint != slot.Fingerprint {
+		return errors.Join(fmt.Errorf("the saved copy of %s in %s changed after the switch; setup does not give back a changed copy", key, s.dir), err)
+	}
+	return nil
 }
 
 type captureRecords struct {

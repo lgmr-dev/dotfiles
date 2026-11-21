@@ -95,10 +95,10 @@ const (
 	keyboardResource = "system.keyboard-access"
 )
 
-var deferredApplications = []struct{ tool, bin string }{
-	{"tool.vscode", "Visual Studio Code.app/Contents/Resources/app/bin"},
-	{"tool.ghostty", "Ghostty.app/Contents/MacOS"},
-	{"tool.openwhispr", ""},
+var deferredApplications = []struct{ tool, bin, executable string }{
+	{"tool.vscode", "Visual Studio Code.app/Contents/Resources/app/bin", "Visual Studio Code.app/Contents/MacOS/Code"},
+	{"tool.ghostty", "Ghostty.app/Contents/MacOS", "Ghostty.app/Contents/MacOS/ghostty"},
+	{"tool.openwhispr", "", "OpenWhispr.app/Contents/MacOS/OpenWhispr"},
 }
 
 func within(folder, path string) bool {
@@ -611,12 +611,29 @@ func LegacyCommandDirectories(stateDir string, st state.State, ctx platform.Cont
 // LegacyApplications returns the macOS applications that still run from
 // their payloads of release v2: tool.vscode, tool.ghostty or tool.openwhispr.
 // An application counts while a recorded link of its desktop integration
-// points into the packages folder of release v2 and that payload exists.
+// points into the packages folder of release v2, each such link resolves, and
+// the bundle executable of the current payload is a regular executable file.
 func LegacyApplications(stateDir string, st state.State, ctx platform.Context) []string {
 	return slices.DeleteFunc(legacyTools(stateDir, st, ctx), func(tool string) bool {
-		_, err := os.Stat(filepath.Join(stateDir, "packages", tool, "current"))
-		return err != nil
+		return !runnable(stateDir, st, tool)
 	})
+}
+
+func runnable(stateDir string, st state.State, tool string) bool {
+	for key, record := range st.Targets {
+		if target, err := os.Readlink(key); record.Kind == "link" && err == nil && within(filepath.Join(stateDir, "packages", tool), target) {
+			if _, err := os.Stat(key); err != nil {
+				return false
+			}
+		}
+	}
+	for _, application := range deferredApplications {
+		if application.tool == tool {
+			info, err := os.Stat(filepath.Join(stateDir, "packages", tool, "current", filepath.FromSlash(application.executable)))
+			return err == nil && info.Mode().IsRegular() && info.Mode().Perm()&0111 != 0
+		}
+	}
+	return false
 }
 
 func legacyDirectories(stateDir string, tools []string) []string {

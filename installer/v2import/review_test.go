@@ -813,3 +813,78 @@ func TestRestoreRecoversAnInterruptedSwitchReleaseBeforeItRollsBack(t *testing.T
 	mustRestore(t, f)
 	before.restored(t, f)
 }
+
+func TestRestoreGivesBackASlotThatTheSwitchReleasedTowardItsBaseline(t *testing.T) {
+	f := linuxFixture(t)
+	settings := filepath.Join(f.home, ".config", "Code", "User", "settings.json")
+	f.units[vscode] = func() []targets.Desired {
+		return []targets.Desired{
+			{Kind: "field", Path: settings, Slot: "workbench.colorTheme", Content: []byte(`"Rosé Pine Moon"`)},
+			{Kind: "field", Path: settings, Slot: "update.mode", Content: []byte(`"none"`)},
+		}
+	}
+	before := capture(t, f, f.save())
+	f.mustImport()
+	key := targets.Key(settings, "workbench.colorTheme")
+	if !strings.Contains(read(t, settings), "Rosé Pine Moon") {
+		t.Fatalf("the switch must change the field: %s", read(t, settings))
+	}
+	released := &held{f.current()}
+	if err := f.writer().Release(context.Background(), key, released, targets.Preserve); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(read(t, settings), "Personal") {
+		t.Fatalf("the release must restore the baseline of the field: %s", read(t, settings))
+	}
+	editState(t, f, func(document map[string]any) {
+		record := document["targets"].(map[string]any)[key].(map[string]any)
+		record["release"], record["next"] = true, record["before"]
+	})
+	mustRestore(t, f)
+	before.restored(t, f)
+}
+
+func TestRestoreNeverReplacesAnEditMadeAfterTheReview(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	write(t, env, "# v3 env\n# reviewed edit\n", 0644)
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const later = "# v3 env\n# edit after the review\n"
+	v2import.SetFault(func(at string) error {
+		if at == "restore-plan" {
+			write(t, env, later, 0644)
+		}
+		return nil
+	})
+	if _, err := restoration.Run(context.Background(), []string{env}); err == nil || !strings.Contains(err.Error(), "the files changed after the review; run restore-v2 again") {
+		t.Fatalf("an edit that the review did not show must stop the restore: %v", err)
+	}
+	if st := f.current(); st.V2Restore != "open" || read(t, env) != later {
+		t.Fatalf("the restore replaced an edit that the review did not show: %+v %q", st, read(t, env))
+	}
+}
+
+func TestRestoreRefusesAnotherV2StateInTheRestoreSet(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	f.v1.Generation++
+	data, err := json.MarshalIndent(f.v1, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(f.state, "v2-restore", "state.json"), string(data)+"\n", 0600)
+	published := read(t, filepath.Join(f.state, "state.json"))
+	if _, err := v2import.PreviewRestore(context.Background(), f.options()); err == nil || !strings.Contains(err.Error(), "differs from the state that the switch saved") {
+		t.Fatalf("the review must refuse a saved state that the switch did not save: %v", err)
+	}
+	if read(t, filepath.Join(f.state, "state.json")) != published {
+		t.Fatal("the refusal must change nothing")
+	}
+}

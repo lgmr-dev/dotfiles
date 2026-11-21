@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -80,10 +81,17 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 	if !deleted {
 		candidates = append(candidates, targets.Absent)
 	}
-	if has {
+	baseline := ""
+	switch imported, had := set.manifest.Imported.Targets[key]; {
+	case has && record.Release:
+		candidates, baseline = append(candidates, record.Applied), record.Before
+	case has:
 		candidates = append(candidates, record.Applied, record.Next)
-	} else if imported, had := set.manifest.Imported.Targets[key]; had && imported.Before != "" {
-		if released, err := inspect(imported.Before); err == nil {
+	case had:
+		baseline = imported.Before
+	}
+	if baseline != "" {
+		if released, err := inspect(baseline); err == nil {
 			candidates = append(candidates, released.Want)
 		}
 	}
@@ -144,7 +152,7 @@ func (r *Restoration) plan() (*restoreSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	original, err := r.original()
+	original, err := r.original(set.manifest.State)
 	if err != nil {
 		return nil, err
 	}
@@ -156,10 +164,13 @@ func (r *Restoration) plan() (*restoreSet, error) {
 	return set, nil
 }
 
-func (r *Restoration) original() ([]byte, error) {
+func (r *Restoration) original(saved string) ([]byte, error) {
 	_, data, err := LoadState(restoreDir(r.o.Engine.StateDir), r.o.Folders.Home, r.o.Engine.Context)
 	if err != nil {
 		return nil, errors.Join(errors.New("the restore set has no valid state of release v2; nothing was changed"), err)
+	}
+	if sum := sha256.Sum256(data); hex.EncodeToString(sum[:]) != saved {
+		return nil, errors.New("the state of release v2 in the restore set differs from the state that the switch saved; nothing was changed")
 	}
 	return data, nil
 }
@@ -236,7 +247,9 @@ func (r *Restoration) Changed() []RestoreItem {
 // created and its empty created folders, and keeps a target that already
 // holds its saved value. A target that changed after the switch stays,
 // unless replace names its key: then setup saves the changed content first
-// and reports where. At the end it publishes the saved schema-1 state,
+// and reports where. A replacement applies only to the content that the
+// review showed: when that target changed again, Run stops before its first
+// write of a saved value. At the end it publishes the saved schema-1 state,
 // exactly as the review read it. A pending mark that is not in Confirmed
 // stops it before the first write with engine.ErrPending and the report
 // text; it clears the confirmed marks before the first write. When a step
@@ -282,8 +295,18 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	if len(failures) != 0 {
 		return "", fmt.Errorf("restore-v2 stopped. An earlier switch run left an unfinished write. Resolve these items and run restore-v2 again:\n  %s", strings.Join(failures, "\n  "))
 	}
+	if err := hit("restore-plan"); err != nil {
+		return "", err
+	}
 	if set, err = r.plan(); err != nil {
 		return "", err
+	}
+	for _, item := range r.Items {
+		if item.Action == "changed" && slices.Contains(replace, item.Key) && !slices.ContainsFunc(approved, func(shown RestoreItem) bool {
+			return shown.Key == item.Key && shown.Action == "changed" && shown.live == item.live
+		}) {
+			return "", fmt.Errorf("the files changed after the review; run restore-v2 again. Setup did not replace %s", item.Key)
+		}
 	}
 	notes, failures, kept := []string{}, []string{}, map[string]string{}
 	for _, item := range r.Items {

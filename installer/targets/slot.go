@@ -35,22 +35,35 @@ type Slot interface {
 	Empty(data []byte, d Desired) (bool, error)
 }
 
+// Canonical is an optional interface of a Slot whose value has more than one
+// spelling for the same settings. Fingerprint returns the fingerprint of a
+// value, or Absent when the value holds no managed setting. The kind of the
+// slot then uses it for each fingerprint: the live part, the desired content,
+// the baseline and each check of an unfinished move.
+type Canonical interface {
+	Fingerprint(value []byte) (string, error)
+}
+
 type slotKind struct {
 	name string
 	slot Slot
 }
 
 // SlotKind returns a kind for a part of a file under the record kind name.
-// Its fingerprint is the name and the SHA-256 of the value. Its baseline is
+// Its fingerprint is the name and the SHA-256 of the value, or the
+// fingerprint of a Canonical slot. Its baseline is
 // inline: "value:<base64 of the value>". The write keeps the owner, the mode
 // and the other metadata of the file. When setup created the file, the
 // record lists the file as the first entry of its created folders, and the
 // release deletes the file when it is empty again.
 func SlotKind(name string, slot Slot) Kind { return slotKind{name, slot} }
 
-func (k slotKind) fingerprint(value []byte) string {
+func (k slotKind) fingerprint(value []byte) (string, error) {
+	if canonical, ok := k.slot.(Canonical); ok {
+		return canonical.Fingerprint(value)
+	}
 	sum := sha256.Sum256(value)
-	return k.name + ":" + hex.EncodeToString(sum[:])
+	return k.name + ":" + hex.EncodeToString(sum[:]), nil
 }
 
 func readSlotFile(path string) ([]byte, string, error) {
@@ -90,7 +103,11 @@ func (k slotKind) part(data []byte, d Desired) (string, []byte, error) {
 	if len(raw) == 0 {
 		return "", nil, errors.New("a managed part has an empty value")
 	}
-	return k.fingerprint(raw), raw, nil
+	value, err := k.fingerprint(raw)
+	if err != nil {
+		return "", nil, err
+	}
+	return value, raw, nil
 }
 
 func (k slotKind) read(d Desired) (data []byte, file, value string, raw []byte, err error) {
@@ -121,7 +138,7 @@ func (k slotKind) Fingerprint(d Desired) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return k.fingerprint(value), nil
+	return k.fingerprint(value)
 }
 
 func inlineValue(before string) ([]byte, error) {
@@ -143,7 +160,7 @@ func (k slotKind) Baseline(before string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return k.fingerprint(value), nil
+	return k.fingerprint(value)
 }
 
 func (k slotKind) Save(_ context.Context, d Desired, _ string) (string, error) {
@@ -164,7 +181,8 @@ func (k slotKind) valueOf(data []byte, d Desired) (string, []byte, error) {
 	if err != nil || !present {
 		return Absent, nil, err
 	}
-	return k.fingerprint(raw), raw, nil
+	value, err := k.fingerprint(raw)
+	return value, raw, err
 }
 
 func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) error {
@@ -231,7 +249,11 @@ func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) e
 	if file == Absent && d.BOM {
 		current = []byte{0xef, 0xbb, 0xbf}
 	}
-	rendered, err := k.slot.Replace(current, d, raw, raw != nil)
+	present := raw != nil
+	if baseline, err := inlineValue(baselineOf(record)); record.Release && err == nil {
+		raw, present = baseline, true
+	}
+	rendered, err := k.slot.Replace(current, d, raw, present)
 	if err != nil || !bytes.Equal(rendered, left) {
 		return errors.Join(leftover(staged), err)
 	}

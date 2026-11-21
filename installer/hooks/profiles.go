@@ -84,7 +84,7 @@ func ProfileKinds() map[string]targets.Kind {
 	return map[string]targets.Kind{
 		"field":                 targets.SlotKind("field", targets.Field{JSONC: vscodeSettingsFile}),
 		"block#" + profileGit:   targets.SlotKind("block", gitSlot{targets.Block{Top: true}}),
-		"field#" + TerminalSlot: terminalKind{targets.SlotKind("field", terminalSlot{})},
+		"field#" + TerminalSlot: targets.SlotKind("field", terminalSlot{}),
 	}
 }
 

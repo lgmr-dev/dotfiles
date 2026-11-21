@@ -83,10 +83,10 @@ func TestDeferredMacApplicationsPassCheckAndMoveToTheirCasksWithUpdate(t *testin
 	if w.err != nil {
 		t.Fatal(w.err)
 	}
-	applications := map[string][3]string{
-		"tool.vscode":     {"desktop.vscode", "Visual Studio Code.app", "VS Code"},
-		"tool.ghostty":    {"integration.ghostty", "Ghostty.app", "Ghostty"},
-		"tool.openwhispr": {"desktop.openwhispr", "OpenWhispr.app", "OpenWhispr"},
+	applications := map[string][4]string{
+		"tool.vscode":     {"desktop.vscode", "Visual Studio Code.app", "VS Code", "Code"},
+		"tool.ghostty":    {"integration.ghostty", "Ghostty.app", "Ghostty", "ghostty"},
+		"tool.openwhispr": {"desktop.openwhispr", "OpenWhispr.app", "OpenWhispr", "OpenWhispr"},
 	}
 	casks := &deferredCasks{specs: system.MacCasks(s.folders.Home, "/opt/homebrew"), installed: map[string]string{}, root: filepath.Join(root, "Applications")}
 	resources := []catalog.Resource{{ID: "apps", Name: "Applications", Capability: true, Requires: []string{"desktop.vscode", "integration.ghostty", "desktop.openwhispr"}}}
@@ -123,9 +123,7 @@ func TestDeferredMacApplicationsPassCheckAndMoveToTheirCasksWithUpdate(t *testin
 	rec := storeRecordsFixture{store}
 	for tool, application := range applications {
 		payload := filepath.Join(s.stateDir, "packages", tool, "versions", "aaaa", "payload")
-		if err := os.MkdirAll(filepath.Join(payload, application[1]), 0700); err != nil {
-			t.Fatal(err)
-		}
+		writeExecutable(t, filepath.Join(payload, application[1], "Contents", "MacOS", application[3]))
 		if err := os.Symlink(payload, filepath.Join(s.stateDir, "packages", tool, "current")); err != nil {
 			t.Fatal(err)
 		}
@@ -232,12 +230,47 @@ func TestABrokenLegacyPayloadIsNotDeferred(t *testing.T) {
 	if err != nil || finding.Status != engine.Missing {
 		t.Fatalf("without its payload the application is missing: %+v %v", finding, err)
 	}
-	if err := os.MkdirAll(filepath.Join(s.stateDir, "packages", "tool.ghostty", "current"), 0700); err != nil {
+	executable := filepath.Join(s.stateDir, "packages", "tool.ghostty", "current", "Ghostty.app", "Contents", "MacOS", "ghostty")
+	if err := os.MkdirAll(filepath.Dir(executable), 0700); err != nil {
+		t.Fatal(err)
+	}
+	finding, err = d.Inspect(context.Background(), catalog.Resource{ID: "tool.ghostty", Name: "Ghostty"}, engine.Want{Present: true}, readRecords{st})
+	if err != nil || finding.Status != engine.Missing {
+		t.Fatalf("without its bundle executable the application is missing: %+v %v", finding, err)
+	}
+	if err := os.WriteFile(executable, []byte("#!/bin/sh\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	finding, err = d.Inspect(context.Background(), catalog.Resource{ID: "tool.ghostty", Name: "Ghostty"}, engine.Want{Present: true}, readRecords{st})
+	if err != nil || finding.Status != engine.Missing {
+		t.Fatalf("with a bundle executable that cannot run the application is missing: %+v %v", finding, err)
+	}
+	if err := os.Chmod(executable, 0700); err != nil {
 		t.Fatal(err)
 	}
 	finding, err = d.Inspect(context.Background(), catalog.Resource{ID: "tool.ghostty", Name: "Ghostty"}, engine.Want{Present: true}, readRecords{st})
 	if err != nil || finding.Status != engine.Outdated || finding.Reason != deferredReason || len(finding.Commands) != 0 {
 		t.Fatalf("with its payload the application is deferred: %+v %v", finding, err)
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(s.stateDir, "packages", "tool.ghostty", "versions", "gone", "payload", "Ghostty.app"), link); err != nil {
+		t.Fatal(err)
+	}
+	finding, err = d.Inspect(context.Background(), catalog.Resource{ID: "tool.ghostty", Name: "Ghostty"}, engine.Want{Present: true}, readRecords{st})
+	if err != nil || finding.Status != engine.Missing {
+		t.Fatalf("with a launcher that points at nothing the application is missing: %+v %v", finding, err)
+	}
+}
+
+func writeExecutable(t *testing.T, path string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("#!/bin/sh\n"), 0700); err != nil {
+		t.Fatal(err)
 	}
 }
 

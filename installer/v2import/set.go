@@ -3,6 +3,8 @@ package v2import
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -39,8 +41,10 @@ type Slot struct {
 	Made        []string `json:"made,omitempty"`
 }
 
-// Manifest describes the restore set. Folder names the subfolder with the
-// copies. Imported is the schema-2 state that the import published: a target
+// Manifest describes the restore set. State is the SHA-256 in hex of the
+// original schema-1 state that the switch saved: restore-v2 publishes only a
+// saved state with this digest. Folder names the subfolder with the copies.
+// Imported is the schema-2 state that the import published: a target
 // whose record still equals its imported record has no change yet. Deferred
 // and Legacy keep the macOS applications that stay on release v2. Restoring
 // holds, for each slot that restore-v2 started to give back, the fingerprint
@@ -52,6 +56,7 @@ type Slot struct {
 type Manifest struct {
 	Schema    int               `json:"schema"`
 	Source    string            `json:"source"`
+	State     string            `json:"state"`
 	Folder    string            `json:"folder"`
 	Deferred  []string          `json:"deferred,omitempty"`
 	Legacy    []string          `json:"legacy,omitempty"`
@@ -113,7 +118,8 @@ func createRestoreSet(o Options, mapping Mapping, imported state.State) error {
 	if err := platform.SaveDocument(filepath.Join(dir, "state.json"), mapping.Original); err != nil {
 		return err
 	}
-	set := &restoreSet{dir: dir, manifest: Manifest{Schema: 1, Source: SourceCommit, Folder: "saved-" + strings.ToLower(rand.Text()),
+	sum := sha256.Sum256(mapping.Original)
+	set := &restoreSet{dir: dir, manifest: Manifest{Schema: 1, Source: SourceCommit, State: hex.EncodeToString(sum[:]), Folder: "saved-" + strings.ToLower(rand.Text()),
 		Deferred: mapping.Deferred, Legacy: mapping.Legacy, Imported: imported, Slots: map[string]Slot{}}}
 	return set.save()
 }

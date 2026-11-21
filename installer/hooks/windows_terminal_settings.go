@@ -2,11 +2,9 @@ package hooks
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -137,49 +135,7 @@ func (terminalSlot) Empty(data []byte, d targets.Desired) (bool, error) {
 	return targets.Field{JSONC: func(string) bool { return true }}.Empty(data, d)
 }
 
-type terminalKind struct{ raw targets.Kind }
-
-func (k terminalKind) Slotted() bool { return true }
-
-func (k terminalKind) Observe(d targets.Desired) (string, error) {
-	if raw, err := k.raw.Observe(d); err != nil || raw == targets.Absent {
-		return raw, err
-	}
-	data, err := profileRead(d.Path)
-	if err != nil {
-		return "", err
-	}
-	return k.ObserveContent(d, data)
-}
-
-func (k terminalKind) ObserveContent(d targets.Desired, data []byte) (string, error) {
-	value, present, err := terminalSlot{}.Extract(data, d)
-	if err != nil {
-		return "", err
-	}
-	if !present {
-		return targets.Absent, nil
-	}
-	return terminalCanonical(value)
-}
-
-func (k terminalKind) Fingerprint(d targets.Desired) (string, error) {
-	value, err := terminalSlot{}.Render(d)
-	if err != nil {
-		return "", err
-	}
-	return terminalCanonical(value)
-}
-
-func (k terminalKind) Baseline(before string) (string, error) {
-	encoded, inline := strings.CutPrefix(before, "value:")
-	if !inline {
-		return k.raw.Baseline(before)
-	}
-	value, err := base64.StdEncoding.DecodeString(encoded)
-	if err != nil {
-		return "", err
-	}
+func (terminalSlot) Fingerprint(value []byte) (string, error) {
 	projection, err := terminalDecodeProjection(value)
 	if err != nil {
 		return "", err
@@ -189,43 +145,6 @@ func (k terminalKind) Baseline(before string) (string, error) {
 	}
 	return terminalCanonical(value)
 }
-
-func (k terminalKind) Recover(ctx context.Context, d targets.Desired, record state.Record) error {
-	return k.raw.Recover(ctx, d, record)
-}
-
-func (k terminalKind) Save(ctx context.Context, d targets.Desired, dir string) (string, error) {
-	return k.raw.Save(ctx, d, dir)
-}
-
-func (k terminalKind) from(d targets.Desired, from string) (string, error) {
-	current, err := k.Observe(d)
-	if err != nil {
-		return "", err
-	}
-	if current != from {
-		return "", fmt.Errorf("%s changed during the write: %w", d.Path, targets.ErrChanged)
-	}
-	return k.raw.Observe(d)
-}
-
-func (k terminalKind) Write(ctx context.Context, d targets.Desired, from string) error {
-	raw, err := k.from(d, from)
-	if err != nil {
-		return err
-	}
-	return k.raw.Write(ctx, d, raw)
-}
-
-func (k terminalKind) Restore(ctx context.Context, d targets.Desired, record state.Record, from string) error {
-	raw, err := k.from(d, from)
-	if err != nil {
-		return err
-	}
-	return k.raw.Restore(ctx, d, record, raw)
-}
-
-func (k terminalKind) Discard(before, dir string) error { return k.raw.Discard(before, dir) }
 
 func terminalReplace(data, replacement []byte) ([]byte, error) {
 	if _, err := terminalExtract(data); err != nil {

@@ -2,7 +2,9 @@ package v2import_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"maps"
@@ -13,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/luisgui1757/dotfiles/installer/hooks"
+	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/system"
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -265,6 +268,71 @@ func TestImportRefusesAStateItCannotUseAndWritesNothing(t *testing.T) {
 			}
 			if after := describe(t, f.root); after != before {
 				t.Fatal("a refused import wrote to the machine")
+			}
+		})
+	}
+}
+
+func TestMappingOwnsOnlyTheFontRegistrationsThatReleaseV2Made(t *testing.T) {
+	type face struct{ file, postScript string }
+	faces := []face{}
+	for _, family := range [][2]string{{"HackNerdFont", "HackNF"}, {"HackNerdFontMono", "HackNFM"}, {"HackNerdFontPropo", "HackNFP"}} {
+		for _, style := range []string{"Regular", "Bold", "Italic", "BoldItalic"} {
+			faces = append(faces, face{family[0] + "-" + style + ".ttf", family[1] + "-" + style})
+		}
+	}
+	for _, test := range []struct {
+		name       string
+		redirected int
+		inventory  bool
+	}{
+		{"one registration points elsewhere", 5, true},
+		{"no registration inventory", -1, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			f := windowsFixture(t)
+			local := filepath.Join(f.home, "AppData", "Local")
+			paths := []string{}
+			for _, face := range faces {
+				paths = append(paths, filepath.Join(local, "Microsoft", "Windows", "Fonts", "Dotfiles-"+face.file))
+			}
+			f.configurationOf(hooks.FontResource, "native-font", paths, func(path string) { write(t, path, "v2 font "+filepath.Base(path)+"\n", 0644) })
+			receipt := f.v1.Receipts[hooks.FontResource]
+			if test.inventory {
+				receipt.Before.Inventory, receipt.After.Inventory = digest(t, make([]string, len(paths))), digest(t, paths)
+			}
+			f.v1.Receipts[hooks.FontResource] = receipt
+			f.v1.Selected = append(f.v1.Selected, "fonts")
+			registrations := slices.Clone(paths)
+			if test.redirected >= 0 {
+				registrations[test.redirected] = filepath.Join(f.home, "Fonts", "Mine.ttf")
+			}
+			query := func(context.Context, platform.Command) ([]byte, error) {
+				result := []map[string]any{}
+				for i, face := range faces {
+					sum := sha256.Sum256([]byte(read(t, paths[i])))
+					result = append(result, map[string]any{"name": face.postScript, "path": "", "hash": hex.EncodeToString(sum[:]), "glyph": true, "registration": registrations[i]})
+				}
+				return json.Marshal(result)
+			}
+			fonts := &hooks.Fonts{Context: f.ctx, Folders: platform.Folders{Home: f.home, LocalAppData: local}, StateDir: f.state, Query: query}
+			f.extraKinds = fonts.Kinds()
+			f.save()
+			mapping := mustMap(t, f)
+			notes := strings.Join(mapping.Notes, "\n")
+			for i, path := range paths {
+				key := targets.Key(path, hooks.FontSlot)
+				if test.inventory && i != test.redirected {
+					owned(t, mapping.State, key, hooks.FontResource, "font", "absent")
+					continue
+				}
+				record := mapping.State.Targets[key]
+				if record.Resource != hooks.FontResource || record.Kind != "font" || record.Applied != "" || !strings.HasPrefix(record.Before, "fp:font:") {
+					t.Fatalf("%s: a registration that release v2 did not provably make must be baseline-only: %+v", key, record)
+				}
+				if !strings.Contains(notes, key) {
+					t.Fatalf("the notes must name %s: %v", key, mapping.Notes)
+				}
 			}
 		})
 	}

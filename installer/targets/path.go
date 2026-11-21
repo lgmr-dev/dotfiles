@@ -43,9 +43,12 @@ func snapshot(path string) (string, error) {
 }
 
 func siblings(d Desired) (staged, aside string) {
-	sum := sha256.Sum256([]byte(d.Key))
-	name := filepath.Join(filepath.Dir(d.Path), ".dotfiles-"+hex.EncodeToString(sum[:8]))
+	name := filepath.Join(filepath.Dir(d.Path), ".dotfiles-"+tag(d.Key))
 	return name + ".next", name + ".previous"
+}
+
+func savedName(d Desired) string {
+	return strings.TrimLeft(filepath.Base(d.Path), ".") + "-" + tag(d.Key) + "-"
 }
 
 func removeEntry(path string) error {
@@ -193,7 +196,7 @@ func copyUnit(ctx context.Context, from, to string) error {
 }
 
 func (k pathKind) Save(ctx context.Context, d Desired, dir string) (string, error) {
-	backup := filepath.Join(dir, strings.TrimLeft(filepath.Base(d.Path), ".")+"-"+rand.Text())
+	backup := filepath.Join(dir, savedName(d)+rand.Text())
 	if err := copyUnit(ctx, d.Path, backup); err != nil {
 		return "", err
 	}
@@ -222,6 +225,25 @@ func expectedStage(kind Kind, record state.Record) string {
 	return baseline
 }
 
+func unclaimed(ctx context.Context, aside string, destination bool) error {
+	if !destination {
+		return leftover(aside)
+	}
+	platform.Detail(ctx, "Kept %s: the record has no unfinished write, so setup cannot prove that it made it; examine it", aside)
+	return nil
+}
+
+func (k pathKind) movedAside(ctx context.Context, d Desired, record state.Record, moved string) bool {
+	baseline := ""
+	if record.Before != "" {
+		baseline, _ = k.Baseline(record.Before)
+	}
+	return moved == record.Applied || moved == baseline || savedIn(ctx, savedName(d), func(saved string) bool {
+		copied, err := snapshot(saved)
+		return err == nil && copied == moved
+	})
+}
+
 func (k pathKind) Recover(ctx context.Context, d Desired, record state.Record) error {
 	staged, aside := siblings(d)
 	moved, err := snapshot(aside)
@@ -229,23 +251,18 @@ func (k pathKind) Recover(ctx context.Context, d Desired, record state.Record) e
 		return errors.Join(leftover(aside), err)
 	}
 	if moved != Absent {
-		baseline := ""
-		if record.Before != "" {
-			baseline, _ = k.Baseline(record.Before)
-		}
-		if moved != record.Applied && moved != baseline && !savedIn(ctx, func(saved string) bool {
-			copied, err := snapshot(saved)
-			return err == nil && copied == moved
-		}) {
-			return leftover(aside)
-		}
 		current, err := snapshot(d.Path)
 		if err != nil {
 			return err
 		}
-		if current == Absent {
+		switch {
+		case record.Next == "":
+			err = unclaimed(ctx, aside, current != Absent)
+		case !k.movedAside(ctx, d, record, moved):
+			err = leftover(aside)
+		case current == Absent:
 			err = platform.MoveNoReplace(aside, d.Path)
-		} else {
+		default:
 			err = removeEntry(aside)
 		}
 		if err != nil {

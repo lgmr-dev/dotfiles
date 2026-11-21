@@ -185,6 +185,36 @@ func (k slotKind) valueOf(data []byte, d Desired) (string, []byte, error) {
 	return value, raw, err
 }
 
+func (k slotKind) revert(ctx context.Context, d Desired, record state.Record, aside string, earlier, current []byte, file string, raw []byte) error {
+	expected := record.Applied
+	if expected == "" {
+		var err error
+		if expected, err = k.Baseline(baselineOf(record)); err != nil {
+			return err
+		}
+	}
+	value, part, err := k.valueOf(earlier, d)
+	replaced := err == nil && part != nil && savedIn(ctx, keptName(d), func(saved string) bool {
+		info, err := os.Lstat(saved)
+		if err != nil || !info.Mode().IsRegular() || info.Size() != int64(len(part)) {
+			return false
+		}
+		copied, err := os.ReadFile(saved)
+		return err == nil && bytes.Equal(copied, part)
+	})
+	if err != nil || !replaced && (value != expected || file == Absent && value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path) {
+		return errors.Join(leftover(aside), err)
+	}
+	if file == Absent {
+		return platform.MoveNoReplace(aside, d.Path)
+	}
+	rendered, err := k.slot.Replace(earlier, d, raw, raw != nil)
+	if err != nil || !bytes.Equal(rendered, current) {
+		return errors.Join(leftover(aside), err)
+	}
+	return os.Remove(aside)
+}
+
 func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) error {
 	staged, aside := siblings(d)
 	earlier, moved, err := readSlotFile(aside)
@@ -196,34 +226,11 @@ func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) e
 		if err != nil {
 			return err
 		}
-		expected := record.Applied
-		if expected == "" {
-			if expected, err = k.Baseline(baselineOf(record)); err != nil {
+		if record.Next == "" {
+			if err := unclaimed(ctx, aside, file != Absent); err != nil {
 				return err
 			}
-		}
-		value, part, err := k.valueOf(earlier, d)
-		replaced := err == nil && part != nil && savedIn(ctx, func(saved string) bool {
-			info, err := os.Lstat(saved)
-			if err != nil || !info.Mode().IsRegular() || info.Size() != int64(len(part)) {
-				return false
-			}
-			copied, err := os.ReadFile(saved)
-			return err == nil && bytes.Equal(copied, part)
-		})
-		if err != nil || !replaced && (value != expected || file == Absent && value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path) {
-			return errors.Join(leftover(aside), err)
-		}
-		if file == Absent {
-			err = platform.MoveNoReplace(aside, d.Path)
-		} else {
-			expected, replaceErr := k.slot.Replace(earlier, d, raw, raw != nil)
-			if replaceErr != nil || !bytes.Equal(expected, current) {
-				return errors.Join(leftover(aside), replaceErr)
-			}
-			err = os.Remove(aside)
-		}
-		if err != nil {
+		} else if err := k.revert(ctx, d, record, aside, earlier, current, file, raw); err != nil {
 			return err
 		}
 	}

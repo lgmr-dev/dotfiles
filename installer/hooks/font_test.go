@@ -641,3 +641,26 @@ func TestFontRecordsAnnounceTheNativeChangeBeforeTheNativeCommand(t *testing.T) 
 		t.Fatal("the removal left a mark, a record or a registration", f.State().Pending)
 	}
 }
+
+func TestFontRemovalKeepsARegistrationThatSetupDoesNotOwn(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	key := targets.Key(f.path(face), hooks.FontSlot)
+	if err := f.sentinelEnv.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.FontResource, Kind: "font", Before: "fp:font:foreign"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.provider.Remove(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false), f.sentinelEnv); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.engine.registry) != 1 {
+		t.Fatal("the removal unregistered a registration without an applied record", len(f.engine.registry))
+	}
+	if _, ok := f.State().Targets[key]; ok {
+		t.Fatal("the record of the unowned registration stays")
+	}
+}

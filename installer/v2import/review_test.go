@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -995,4 +996,45 @@ func TestAnAlteredV2ConfigurationBaselineGivesNoOwnership(t *testing.T) {
 		t.Fatal("the mapping must leave the earlier content in place")
 	}
 	owned(t, mapping.State, filepath.Join(f.home, ".config", "nvim"), "config.nvim", "link", "absent", filepath.Join(f.home, ".config"))
+}
+
+type stopAfterWrite struct {
+	targets.Kind
+	path string
+}
+
+func (k stopAfterWrite) ObserveContent(d targets.Desired, data []byte) (string, error) {
+	return k.Kind.(targets.ContentObserver).ObserveContent(d, data)
+}
+
+func (k stopAfterWrite) Write(ctx context.Context, d targets.Desired, from string) error {
+	if err := k.Kind.Write(ctx, d, from); err != nil || d.Path != k.path {
+		return err
+	}
+	return errors.New("stopped after the write of " + d.Path)
+}
+
+func TestRestoreRemovesTheFileAndFolderOfAFieldThatTheSwitchStoppedAfterWriting(t *testing.T) {
+	f := linuxFixture(t)
+	settings := filepath.Join(f.home, ".config", "v3-fields", "settings.json")
+	field := targets.Desired{Kind: "field", Path: settings, Slot: "theme", Content: []byte(`"rose-pine"`)}
+	f.units[shells] = func() []targets.Desired { return append(f.shellUnits(), field) }
+	before := capture(t, f, f.save())
+	proposal, err := f.preview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.extraKinds = map[string]targets.Kind{"field": stopAfterWrite{hooks.ProfileKinds()["field"], settings}}
+	if result, err := proposal.Run(context.Background()); err == nil {
+		t.Fatalf("the fixture must stop the switch after the write: %s", result.Message)
+	}
+	f.extraKinds = nil
+	if record := f.current().Targets[targets.Key(settings, "theme")]; record.Next == "" || record.Applied != "" {
+		t.Fatalf("the switch must stop after it published the field and before it promoted it: %+v", record)
+	}
+	if !strings.Contains(read(t, settings), "rose-pine") {
+		t.Fatal("the fixture must stop after the field is in the new file")
+	}
+	mustRestore(t, f)
+	before.restored(t, f)
 }

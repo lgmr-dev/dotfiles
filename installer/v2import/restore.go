@@ -463,7 +463,8 @@ func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) ([]str
 			failures = append(failures, key+": "+err.Error())
 			continue
 		}
-		forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: set.manifest.Slots[key].Saved}
+		slot := set.manifest.Slots[key]
+		forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: slot.Saved, Made: slices.Clone(slot.Made)}
 		if err := set.writer.Release(ctx, key, &rollback{memory{state.State{Targets: map[string]state.Record{key: forward}}}, set, key}, targets.Preserve); err != nil {
 			failures = append(failures, key+": "+err.Error())
 			continue

@@ -8,7 +8,9 @@ package targets
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -160,7 +162,12 @@ func withBaselines(ctx context.Context, dir string) context.Context {
 	return context.WithValue(ctx, baselinesKey{}, dir)
 }
 
-func savedIn(ctx context.Context, match func(path string) bool) bool {
+func tag(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:8])
+}
+
+func savedIn(ctx context.Context, prefix string, match func(path string) bool) bool {
 	dir, _ := ctx.Value(baselinesKey{}).(string)
 	if dir == "" {
 		return false
@@ -170,12 +177,14 @@ func savedIn(ctx context.Context, match func(path string) bool) bool {
 		return false
 	}
 	for _, entry := range entries {
-		if match(filepath.Join(dir, entry.Name())) {
+		if strings.HasPrefix(entry.Name(), prefix) && match(filepath.Join(dir, entry.Name())) {
 			return true
 		}
 	}
 	return false
 }
+
+func keptName(d Desired) string { return "replaced-" + tag(d.Key) + "-" }
 
 var fault func(point string) error
 
@@ -405,7 +414,7 @@ func (w *Writer) keep(ctx context.Context, d Desired, saved string) error {
 		if err != nil {
 			return err
 		}
-		path = filepath.Join(w.baselines(), "replaced-"+rand.Text())
+		path = filepath.Join(w.baselines(), keptName(d)+rand.Text())
 		if err := platform.SaveDocument(path, value); err != nil {
 			return err
 		}

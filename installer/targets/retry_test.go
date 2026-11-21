@@ -3,6 +3,7 @@ package targets_test
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -129,6 +130,84 @@ func TestInterruptedPublicationKeepsAnEditedPreviousFile(t *testing.T) {
 			}
 			if _, err := os.Lstat(aside); err != nil || read(t, aside) != edited || read(t, d.Path) != published {
 				t.Fatal("the edit in the previous file was lost", err)
+			}
+		})
+	}
+}
+
+func TestRecoveryKeepsAPreviousEntryThatOnlyAnotherBackupMatches(t *testing.T) {
+	others := map[string]struct{ path, content, part string }{
+		"file":  {filepath.Join("app", "other.conf"), "kept elsewhere\n", ""},
+		"field": {filepath.Join("app", "other.json"), `{"theme":"kept"}`, `"kept"`},
+	}
+	for name, other := range others {
+		for _, pending := range []bool{false, true} {
+			t.Run(name, func(t *testing.T) {
+				e := newEnv(t)
+				f := fixtureNamed(name)
+				if f.outside != nil {
+					f.outside(e)
+				}
+				d := f.first(e)
+				e.mustConverge(d, targets.Preserve)
+				elsewhere := d
+				elsewhere.Path = filepath.Join(e.root, other.path)
+				e.mustConverge(elsewhere, targets.Preserve)
+				write(t, elsewhere.Path, other.content, 0644)
+				e.mustConverge(elsewhere, targets.Replace)
+				if !holds(e, "kept") {
+					t.Fatal("the fixture needs a backup of the other target", e.baselines())
+				}
+				if pending {
+					interruptAt("next")
+					if err := e.converge(f.second(e), targets.Preserve); !errors.Is(err, errFault) {
+						t.Fatal(err)
+					}
+					targets.SetFault(nil)
+				}
+				_, aside := targets.Siblings(d)
+				content := other.content
+				if other.part != "" {
+					content = strings.Replace(read(t, d.Path), `"rose-pine"`, other.part, 1)
+				}
+				write(t, aside, content, 0644)
+				before := describe(t, e.root)
+				err := e.converge(d, targets.Preserve)
+				if pending != (err != nil) || pending && !strings.Contains(err.Error(), aside) {
+					t.Fatal("recovery must keep the entry, and name it for an unfinished write", err)
+				}
+				if describe(t, e.root) != before {
+					t.Fatal("recovery deleted an entry that the backup of another target matches")
+				}
+			})
+		}
+	}
+}
+
+func TestRecoveryCompletesAnApprovedReplacementWithItsOwnBackup(t *testing.T) {
+	for _, name := range []string{"block", "field"} {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			f := fixtureNamed(name)
+			f.outside(e)
+			e.mustConverge(f.first(e), targets.Preserve)
+			f.intruder(e)
+			interruptAt("publish")
+			if err := e.converge(f.second(e), targets.Replace); !errors.Is(err, errFault) {
+				t.Fatal(err)
+			}
+			targets.SetFault(nil)
+			d := f.second(e)
+			_, aside := targets.Siblings(d)
+			if _, err := os.Lstat(aside); err != nil {
+				t.Fatal("the fixture needs a previous entry", err)
+			}
+			e.mustConverge(d, targets.Preserve)
+			if _, err := os.Lstat(aside); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("recovery kept the previous entry of its own approved write", err)
+			}
+			if !holdsIntruder(e) {
+				t.Fatal("the replaced content has no copy", e.baselines())
 			}
 		})
 	}

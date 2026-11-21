@@ -132,18 +132,6 @@ func (m *mapper) note(format string, arguments ...any) {
 	m.out.Notes = append(m.out.Notes, fmt.Sprintf(format, arguments...))
 }
 
-func (m *mapper) fingerprint(key, kind, resource string) (string, error) {
-	rec := &memory{state.State{Targets: map[string]state.Record{key: {Resource: resource, Kind: kind, Before: targets.Absent}}}}
-	live, err := m.writer.InspectRecord(key, rec)
-	if err != nil {
-		return "", err
-	}
-	if live.State == targets.StateUnreadable {
-		return "", errors.New(live.Detail)
-	}
-	return live.Fingerprint, nil
-}
-
 func (m *mapper) record(key string, record state.Record, owned bool) {
 	result := "baseline only, no ownership: setup asks before it replaces the content"
 	if owned {
@@ -244,28 +232,58 @@ func (m *mapper) configuration(id string, receipt Receipt) error {
 		m.record(target.Destination, record, unitOwned)
 	}
 	if id == hooks.FontResource && owned {
-		m.fontRegistrations(id, baseline)
+		m.fontRegistrations(id, receipt, baseline)
 	}
 	return nil
 }
 
-func (m *mapper) fontRegistrations(id string, baseline configBaseline) {
+func registeredByV2(receipt Receipt, paths []string) bool {
+	empty, emptyErr := digest(make([]string, len(paths)))
+	registered, registeredErr := digest(paths)
+	return errors.Join(emptyErr, registeredErr) == nil && receipt.Before.Inventory == empty && receipt.After.Inventory == registered
+}
+
+func (m *mapper) fontRegistration(id, path string) (targets.Live, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return targets.Live{}, err
+	}
+	sum := sha256.Sum256(data)
+	live, err := m.writer.Inspect(targets.Desired{Resource: id, Kind: "font", Path: path, Slot: hooks.FontSlot, Content: []byte(hex.EncodeToString(sum[:]))}, &memory{})
+	if err == nil && live.State == targets.StateUnreadable {
+		err = errors.New(live.Detail)
+	}
+	return live, err
+}
+
+func (m *mapper) fontRegistrations(id string, receipt Receipt, baseline configBaseline) {
 	if _, ok := m.o.Kinds["font"]; !ok {
 		m.note("%s: this build has no font registration reader; setup inspects the registrations again.", id)
 		return
 	}
+	paths := []string{}
 	for _, target := range baseline.Targets {
-		key := targets.Key(target.Destination, hooks.FontSlot)
-		fingerprint, err := m.fingerprint(key, "font", id)
+		paths = append(paths, target.Destination)
+	}
+	windows := m.ctx.OS == "windows"
+	made := !windows || registeredByV2(receipt, paths)
+	for _, path := range paths {
+		key := targets.Key(path, hooks.FontSlot)
+		live, err := m.fontRegistration(id, path)
 		if err != nil {
-			m.note("%s: cannot read the font registration of %s: %v", id, target.Destination, err)
+			m.note("%s: cannot read the font registration of %s: %v", id, path, err)
 			continue
 		}
-		if fingerprint == targets.Absent {
+		if live.Fingerprint == targets.Absent {
 			m.row(id, key, "no active registration: no record")
 			continue
 		}
-		m.record(key, state.Record{Resource: id, Kind: "font", Applied: fingerprint, Before: targets.Absent}, true)
+		if made && (!windows || live.Fingerprint == live.Want) {
+			m.record(key, state.Record{Resource: id, Kind: "font", Applied: live.Fingerprint, Before: targets.Absent}, true)
+			continue
+		}
+		m.note("%s: the font registration %s is not the registration of %s that release v2 made. Setup takes no ownership of it and does not change it.", id, key, path)
+		m.record(key, state.Record{Resource: id, Kind: "font", Before: "fp:" + live.Fingerprint}, false)
 	}
 }
 

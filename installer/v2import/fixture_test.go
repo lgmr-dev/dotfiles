@@ -166,7 +166,11 @@ type configTarget struct {
 
 func (f *fx) configuration(id, provider string, publish map[string]func(path string)) {
 	f.t.Helper()
-	paths := slices.Sorted(maps.Keys(publish))
+	f.configurationOf(id, provider, slices.Sorted(maps.Keys(publish)), func(path string) { publish[path](path) })
+}
+
+func (f *fx) configurationOf(id, provider string, paths []string, publish func(path string)) {
+	f.t.Helper()
 	op := operation(id)
 	before := v2import.Observation{Provider: provider, Scope: "user", Identity: digest(f.t, paths)}
 	earlier := f.snapshots(paths)
@@ -191,7 +195,7 @@ func (f *fx) configuration(id, provider string, publish map[string]func(path str
 			}
 		}
 		baseline = append(baseline, target)
-		publish[path](path)
+		publish(path)
 	}
 	after := before
 	after.Present, after.Healthy, after.Fingerprint, after.CompletedOperation = true, true, digest(f.t, f.snapshots(paths)), op

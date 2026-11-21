@@ -585,10 +585,16 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 		return err
 	}
 	keys := p.keys(paths)
-	owned := []int{}
+	owned, unowned := []int{}, []int{}
+	st := rec.State()
 	for i, key := range keys {
-		if slices.Contains(recorded, key) {
+		if !slices.Contains(recorded, key) {
+			continue
+		}
+		if record := st.Targets[key]; record.Applied != "" || record.Release {
 			owned = append(owned, i)
+		} else {
+			unowned = append(unowned, i)
 		}
 	}
 	mark := r.ID + ":release"
@@ -636,7 +642,7 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 		}
 	}
 	return rec.Update(func(s *state.State) error {
-		for _, i := range owned {
+		for _, i := range append(owned, unowned...) {
 			s.Drop(keys[i])
 		}
 		return nil

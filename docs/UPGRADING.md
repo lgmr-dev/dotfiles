@@ -239,7 +239,7 @@ apply the settings. Your other settings stay.
 T3 Code server is the earlier optional selection, never an automatic migration or provider
 replacement. It uses the official standalone package with a browser UI on Apple
 Silicon macOS, Ubuntu/Debian amd64/arm64 and Windows amd64. The fixed stable
-`v0.1.9` pin supplies Orchestrator V2. Finish any pending nightly installation
+`v0.1.10` pin supplies Orchestrator V2. Finish any pending nightly installation
 with its original checkout first; then stop T3, update the checkout and choose
 **Update tools** to replace the managed nightly with stable. Personal
 T3 state stays outside the package; back it up before running a newer server.

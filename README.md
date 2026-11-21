@@ -331,9 +331,9 @@ fresh terminal. It starts the local server and opens the browser UI. Keep that
 terminal open, and press Ctrl-C to stop the server. Setup adds no Node
 installation and no background service.
 
-The pinned stable **v0.1.9** of the server includes Orchestrator V2. Updates
+The pinned stable **v0.1.10** of the server includes Orchestrator V2. Updates
 follow the stable release pinned by the reviewed checkout.
-[Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.9).
+[Upstream release](https://github.com/pingdotgg/t3code/releases/tag/v0.1.10).
 
 Both T3 selections set these fields in `~/.t3/userdata/settings.json`. Setup
 uses `~/.t3` also when `T3CODE_HOME` names another folder.

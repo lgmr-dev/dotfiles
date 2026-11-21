@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.fzf": {
+      "darwin/arm64": {
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-darwin_arm64.tar.gz",
+        "sha256": "1e76698eb481436e42119bea6aa6e2bd9552ff090789d769c286e3c3a4e0ded6",
+        "format": "tar.gz",
+        "commands": {
+          "fzf": "fzf"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-windows_amd64.zip",
+        "sha256": "e3fb809d48094bea7f9f4df03b2fea33ae6e28a6cd32fdad9970cd79e1103901",
+        "format": "zip",
+        "commands": {
+          "fzf": "fzf.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-linux_arm64.tar.gz",
+        "sha256": "bd0717badb6a5620387e014bb94209aac4d9eab6ab77b5348eabb0833aeb4d59",
+        "format": "tar.gz",
+        "commands": {
+          "fzf": "fzf"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-linux_amd64.tar.gz",
+        "sha256": "0d6640f83582d991cf429754baad64b07e3a4e439a6019670f4b91da1314141c",
+        "format": "tar.gz",
+        "commands": {
+          "fzf": "fzf"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "powershell.psfzf": {
+      "windows/amd64": {
+        "version": "2.7.12",
+        "url": "https://www.powershellgallery.com/api/v2/package/PSFzf/2.7.12",
+        "sha256": "5d5c55df79d24b5efbb6c6715c12ec12cb34f32dca57f5c90868de7f47a9b1ad",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "PSFzf.psd1"
+        ]
+      }
+    }
+  }
+}

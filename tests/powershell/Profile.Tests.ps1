@@ -5,7 +5,7 @@ BeforeAll {
     $previousExport = $env:DOTFILES_WRITE_SHELL_FIXTURES
     try {
         $env:DOTFILES_WRITE_SHELL_FIXTURES = $script:Fixture
-        & go -C (Join-Path $script:RepoRoot 'installer') test -count=1 -run '^TestWriteActiveShellFixtures$' .
+        & go -C (Join-Path $script:RepoRoot 'installer') test -count=1 -run '^TestWriteActiveShellFixtures$' ./hooks
         if ($LASTEXITCODE -ne 0) { throw 'Active shell generation failed' }
     } finally {
         $env:DOTFILES_WRITE_SHELL_FIXTURES = $previousExport

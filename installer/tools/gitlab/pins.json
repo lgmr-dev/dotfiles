@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.glab": {
+      "darwin/arm64": {
+        "version": "1.131.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_darwin_arm64.tar.gz",
+        "sha256": "905271694af2dd68cc254d9a2f3dae80036e5c752a82ea16dec5220f4bff1de7",
+        "format": "tar.gz",
+        "commands": {
+          "glab": "bin/glab"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.131.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_linux_amd64.tar.gz",
+        "sha256": "580dbca43835b47267e512476a442f6b2e8785a82b26ccacee22bd7010662b2d",
+        "format": "tar.gz",
+        "commands": {
+          "glab": "bin/glab"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "linux/arm64": {
+        "version": "1.131.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_linux_arm64.tar.gz",
+        "sha256": "7c4befd271203745b674caae2a69590ea5f9c6e5dee78bd3b40ba0e2a7c74749",
+        "format": "tar.gz",
+        "commands": {
+          "glab": "bin/glab"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      },
+      "windows/amd64": {
+        "version": "1.131.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_windows_amd64.zip",
+        "sha256": "225bfd870f7e8bcb3cc7ebaedc18d161d3470ddd4565cebe41d08604fe197d15",
+        "format": "zip",
+        "commands": {
+          "glab": "bin/glab.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ]
+      }
+    }
+  }
+}

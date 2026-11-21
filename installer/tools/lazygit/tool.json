@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "lazygit",
+      "name": "lazygit",
+      "description": "Terminal Git interface",
+      "capability": true,
+      "category": "Version control",
+      "order": 15,
+      "requires": [
+        "config.lazygit"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.lazygit",
+      "name": "lazygit",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "lazygit",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.lazygit"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.lazygit"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.lazygit"
+        }
+      }
+    },
+    {
+      "id": "config.lazygit",
+      "name": "lazygit configuration",
+      "requires": [
+        "tool.lazygit"
+      ],
+      "action": "config",
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.lazygit",
+      "source": "lazygit/config.yml",
+      "folder": "home",
+      "path": "Library/Application Support/lazygit/config.yml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.lazygit",
+      "source": "lazygit/config.yml",
+      "folder": "config",
+      "path": "lazygit/config.yml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.lazygit",
+      "source": "lazygit/config.yml",
+      "folder": "local_app_data",
+      "path": "lazygit/config.yml",
+      "platforms": [
+        "windows"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "t3-code",
+      "name": "T3 Code server",
+      "description": "Stable standalone server + browser UI; configure/authenticate a provider separately",
+      "capability": true,
+      "category": "AI coding",
+      "order": 25,
+      "requires": [
+        "tool.t3",
+        "integration.t3-code"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.t3",
+      "name": "T3 Code",
+      "description": "Official standalone package; no provider authentication or background service setup",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "platform_requires": {
+        "linux": [
+          "library.libstdcxx6"
+        ]
+      },
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.t3"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.t3"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.t3"
+        }
+      }
+    },
+    {
+      "id": "integration.t3-code",
+      "name": "T3 Code settings and the Rosé Pine Moon theme",
+      "requires": [
+        "integration.t3-code-theme"
+      ],
+      "action": "profile",
+      "scope": "user"
+    },
+    {
+      "id": "integration.t3-code-theme",
+      "name": "T3 Code Rosé Pine Moon theme file",
+      "action": "profile",
+      "scope": "user"
+    }
+  ]
+}

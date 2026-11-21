@@ -1,0 +1,10 @@
+AppData/Local/Microsoft/**
+AppData/Local/Temp/**
+AppData/Local/gersemi/**
+AppData/Local/go-build/**
+AppData/Local/nvim-data/**
+AppData/LocalLow/Microsoft/**
+AppData/Roaming/Microsoft/**
+AppData/Roaming/Visual Studio Setup/**
+NTUSER.DAT*
+ntuser.*

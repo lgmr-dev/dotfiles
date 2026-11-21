@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.opencode": {
+      "darwin/arm64": {
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-darwin-arm64.zip",
+        "sha256": "7907df2b12720a840fbb49c5b978b9b82925b6bf75479a5fd216afa8932b6702",
+        "format": "zip",
+        "commands": {
+          "opencode": "opencode"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "fc0f81522aceeabac47693d88389efa2bc517ce74c2c38fd6967819fcc6e4d3b",
+        "format": "tar.gz",
+        "commands": {
+          "opencode": "opencode"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-linux-arm64.tar.gz",
+        "sha256": "3207fb5cdec448d479242c0f1a14f4f7bdfcad3a79209b5eb8f9003725e93711",
+        "format": "tar.gz",
+        "commands": {
+          "opencode": "opencode"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "2.3.0",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-windows-x64-baseline.zip",
+        "sha256": "a3abde3f736a1b51acb28466001333189184507096cb2fe0d684fe822cbd37ec",
+        "format": "zip",
+        "commands": {
+          "opencode": "opencode.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    }
+  }
+}

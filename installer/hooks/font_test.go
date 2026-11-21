@@ -1,0 +1,943 @@
+package hooks_test
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+	"unicode/utf16"
+
+	"github.com/luisgui1757/dotfiles/installer/catalog"
+	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/luisgui1757/dotfiles/installer/hooks"
+	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/luisgui1757/dotfiles/installer/targets"
+)
+
+type fontFixtureFace struct{ file, family, style, postScript string }
+
+func fontFixtureFaces() []fontFixtureFace {
+	faces := []fontFixtureFace{}
+	for _, family := range [][3]string{{"HackNerdFont", "Hack Nerd Font", "HackNF"}, {"HackNerdFontMono", "Hack Nerd Font Mono", "HackNFM"}, {"HackNerdFontPropo", "Hack Nerd Font Propo", "HackNFP"}} {
+		for _, style := range []string{"Regular", "Bold", "Italic", "BoldItalic"} {
+			faces = append(faces, fontFixtureFace{family[0] + "-" + style + ".ttf", family[1], style, family[2] + "-" + style})
+		}
+	}
+	return faces
+}
+
+func fontHash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+type fontEngine struct {
+	t        *testing.T
+	os       string
+	charset  string
+	selected map[string]string
+	registry map[string]string
+	loaded   map[string]bool
+	changes  []platform.Command
+	fail     error
+	queryErr error
+	loadFail string
+}
+
+func (f *fontEngine) valueName(name string) (string, bool) {
+	for key := range f.registry {
+		if strings.EqualFold(key, name) {
+			return key, true
+		}
+	}
+	return name, false
+}
+
+func (f *fontEngine) registration(name string) string {
+	key, present := f.valueName(name)
+	if value := f.registry[key]; present && value == "" {
+		return "(empty registry value)"
+	}
+	return f.registry[key]
+}
+
+func (f *fontEngine) query(_ context.Context, c platform.Command) ([]byte, error) {
+	f.t.Helper()
+	if f.queryErr != nil {
+		return nil, f.queryErr
+	}
+	switch f.os {
+	case "linux":
+		if filepath.Base(c.Path) != "fc-match" || len(c.Args) != 3 || c.Args[0] != "-f" || c.Args[1] != "%{postscriptname}\n%{file}\n%{charset}\n" {
+			f.t.Fatal("unexpected fc-match command", c)
+		}
+		for _, face := range fontFixtureFaces() {
+			if c.Args[2] == face.family+":style="+strings.ReplaceAll(face.style, "BoldItalic", "Bold Italic") {
+				if path := f.selected[face.file]; path != "" {
+					return []byte(face.postScript + "\n" + path + "\n" + f.charset + "\n"), nil
+				}
+				return []byte("DejaVuSans\n/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf\n20-7e a0-17f\n"), nil
+			}
+		}
+		f.t.Fatal("unexpected font pattern", c.Args[2])
+	case "windows":
+		var input struct {
+			Faces []struct{ File, Family, PostScript, Style string }
+			Paths []string
+		}
+		if err := json.NewDecoder(c.Stdin).Decode(&input); err != nil || len(input.Faces) != 12 || len(input.Paths) != 12 {
+			f.t.Fatal("unexpected font query input", err)
+		}
+		result := []map[string]any{}
+		for _, face := range input.Faces {
+			name := "Dotfiles " + face.File + " (TrueType)"
+			item := map[string]any{"name": "", "path": "", "hash": "", "glyph": false, "registration": f.registration(name)}
+			if path := f.registration(name); path != "" && f.loaded[path] {
+				if data, err := os.ReadFile(path); err == nil {
+					item["name"], item["hash"], item["glyph"] = face.PostScript, fontHash(data), true
+				}
+			}
+			result = append(result, item)
+		}
+		return json.Marshal(result)
+	}
+	return nil, errors.New("unexpected font query")
+}
+
+func (f *fontEngine) Run(_ context.Context, c platform.Command) ([]byte, error) {
+	f.t.Helper()
+	f.changes = append(f.changes, c)
+	if f.fail != nil {
+		return nil, f.fail
+	}
+	switch f.os {
+	case "linux":
+		if c.Path != "/usr/bin/fc-cache" || len(c.Args) != 2 || c.Args[0] != "-f" {
+			f.t.Fatal("unexpected fc-cache command", c)
+		}
+		f.selected = map[string]string{}
+		for _, face := range fontFixtureFaces() {
+			path := filepath.Join(c.Args[1], "Dotfiles-HackNerdFont", face.file)
+			if sentinelExists(path) {
+				f.selected[face.file] = path
+			}
+		}
+	case "windows":
+		var input struct {
+			Faces                 []struct{ File string }
+			Paths, Before, Hashes []string
+			Install               bool
+		}
+		if err := json.NewDecoder(c.Stdin).Decode(&input); err != nil {
+			f.t.Fatal(err)
+		}
+		for i, face := range input.Faces {
+			name := "Dotfiles " + face.File + " (TrueType)"
+			if f.registration(name) != input.Before[i] {
+				return nil, errors.New("Font registration changed after approval")
+			}
+		}
+		for i, face := range input.Faces {
+			path := input.Paths[i]
+			name, _ := f.valueName("Dotfiles " + face.File + " (TrueType)")
+			switch {
+			case input.Install:
+				data, err := os.ReadFile(path)
+				if err != nil || fontHash(data) != input.Hashes[i] {
+					return nil, errors.New("Owned font file changed before registration")
+				}
+				f.registry[name] = path
+				if face.File == f.loadFail {
+					return nil, errors.New("Native font activation failed; registration is saved for recovery")
+				}
+				f.loaded[path] = true
+			case input.Before[i] != "":
+				if input.Hashes[i] != "absent" && !f.loaded[path] {
+					return nil, errors.New("Native font is still loaded or could not be released")
+				}
+				delete(f.registry, name)
+				delete(f.loaded, path)
+			}
+		}
+	}
+	return nil, nil
+}
+
+type fontFixture struct {
+	*sentinelEnv
+	engine   *fontEngine
+	provider *hooks.Fonts
+	folder   string
+}
+
+var fontResource = catalog.Resource{ID: hooks.FontResource, Name: "Hack Nerd Font"}
+
+func newFontFixture(t *testing.T, system string) *fontFixture {
+	t.Helper()
+	if system == "linux" {
+		desktopSkipWithoutPOSIXPaths(t, "fontconfig on Linux")
+	}
+	e := newSentinelEnv(t)
+	native := &fontEngine{t: t, os: system, charset: "20-7e e000-f8ff", selected: map[string]string{}, registry: map[string]string{}, loaded: map[string]bool{}}
+	files := []string{}
+	for _, face := range fontFixtureFaces() {
+		files = append(files, face.file)
+	}
+	p := &hooks.Fonts{Context: platform.Context{OS: system, Arch: "amd64"}, Folders: platform.Folders{Home: e.home, LocalAppData: filepath.Join(e.home, "AppData", "Local")}, StateDir: e.state,
+		Pins: map[string]catalog.ArchivePin{hooks.FontArchive: {Version: "3.5.1", RequiredFiles: files}}, PowerShell: "/fake/powershell.exe", FontCache: "/usr/bin/fc-cache", FontMatch: "/usr/bin/fc-match",
+		Runner: native, Query: native.query}
+	p.FontMatch = filepath.Join(filepath.Dir(e.home), "bin", "fc-match")
+	sentinelWrite(t, p.FontMatch, "#!/bin/sh\n", 0755)
+	folder := filepath.Join(e.home, ".local", "share", "fonts", "Dotfiles-HackNerdFont")
+	if system == "windows" {
+		folder = filepath.Join(p.Folders.LocalAppData, "Microsoft", "Windows", "Fonts")
+	}
+	return &fontFixture{sentinelEnv: e, engine: native, provider: p, folder: folder}
+}
+
+func (f *fontFixture) archive() {
+	f.t.Helper()
+	build := filepath.Join(f.state, "tools", hooks.FontArchive, "3.5.1-aaaaaaaaaaaa-1")
+	for _, face := range fontFixtureFaces() {
+		sentinelWrite(f.t, filepath.Join(build, face.file), "font bytes of "+face.file, 0644)
+	}
+	if err := os.Symlink(build, filepath.Join(f.state, "tools", hooks.FontArchive, "current")); err != nil {
+		f.t.Fatal(err)
+	}
+}
+
+func (f *fontFixture) path(face fontFixtureFace) string {
+	if f.engine.os == "windows" {
+		return filepath.Join(f.folder, "Dotfiles-"+face.file)
+	}
+	return filepath.Join(f.folder, face.file)
+}
+
+func (f *fontFixture) records(kind string) []state.Record {
+	records := []state.Record{}
+	for _, record := range f.State().Targets {
+		if record.Kind == kind {
+			records = append(records, record)
+		}
+	}
+	return records
+}
+
+func TestFontPublicationAndRemovalOwnOnlyTheExactFaces(t *testing.T) {
+	for _, system := range []string{"linux", "windows"} {
+		t.Run(system, func(t *testing.T) {
+			f := newFontFixture(t, system)
+			p := f.provider
+			if finding := desktopInspect(t, p, f.sentinelEnv, hooks.FontResource, true); finding.Status != engine.Missing {
+				t.Fatal("missing fonts are not reported", finding)
+			}
+			err := p.Apply(context.Background(), fontResource, desktopInspect(t, p, f.sentinelEnv, hooks.FontResource, true), f)
+			if err == nil || !strings.Contains(err.Error(), "requires its verified archive") || len(f.engine.changes) != 0 {
+				t.Fatal("fonts were activated without the archive", err)
+			}
+			f.archive()
+			desktopApply(t, p, f.sentinelEnv, hooks.FontResource)
+			files, fonts := f.records("file"), f.records("font")
+			if len(files) != 12 || len(fonts) != 12 {
+				t.Fatal("setup did not record twelve font files and twelve registrations", len(files), len(fonts))
+			}
+			for _, face := range fontFixtureFaces() {
+				if sentinelRead(t, f.path(face)) != "font bytes of "+face.file {
+					t.Fatal("unexpected font file", face.file)
+				}
+				record := f.State().Targets[targets.Key(f.path(face), hooks.FontSlot)]
+				if record.Resource != hooks.FontResource || !strings.HasPrefix(record.Applied, "font:") || record.Next != "" || record.Before != "absent" {
+					t.Fatal("the registration is not a separate finished font record", face.file, record)
+				}
+				if system == "windows" && f.engine.registry["Dotfiles "+face.file+" (TrueType)"] != f.path(face) {
+					t.Fatal("unexpected registration value", face.file, f.engine.registry)
+				}
+			}
+			if system == "linux" && (len(f.engine.changes) != 1 || !slices.Equal(f.engine.changes[0].Args, []string{"-f", filepath.Dir(f.folder)})) {
+				t.Fatal("unexpected font cache refresh", f.engine.changes)
+			}
+			changes := len(f.engine.changes)
+			desktopRemove(t, p, f.sentinelEnv, hooks.FontResource)
+			if sentinelExists(f.folder) || len(f.engine.registry) != 0 || len(f.engine.changes) != changes+1 {
+				t.Fatal("the removal left a font file or a registration", f.engine.registry, len(f.engine.changes))
+			}
+		})
+	}
+}
+
+func TestFontReusesPreexistingFacesWithARealNerdGlyph(t *testing.T) {
+	for charset, reused := range map[string]bool{"20-7e f120": true, "20-7e e000-f8ff": true, "f120-f121": true, "20-7e f121-f200": false, "20-7e": false, "x-y f11f": false, "1-2-3 20": false} {
+		f := newFontFixture(t, "linux")
+		f.engine.charset = charset
+		for _, face := range fontFixtureFaces() {
+			path := filepath.Join(f.home, "personal fonts", face.file)
+			sentinelWrite(t, path, "personal "+face.file, 0644)
+			f.engine.selected[face.file] = path
+		}
+		finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+		if reused != (finding.Status == engine.Satisfied && strings.Contains(strings.Join(finding.Notes, " "), "already installed")) {
+			t.Fatal("unexpected reuse for the charset", charset, finding)
+		}
+		if !reused {
+			continue
+		}
+		if err := f.provider.Apply(context.Background(), fontResource, finding, f); err != nil || len(f.State().Targets) != 0 || len(f.engine.changes) != 0 || sentinelExists(f.folder) {
+			t.Fatal("setup took ownership of fonts that it reuses", err)
+		}
+	}
+}
+
+func TestFontKeepsAForeignOrChangedRegistration(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	name := "Dotfiles HackNerdFont-Bold.ttf (TrueType)"
+	f.engine.registry[name] = `C:\personal\Hack.ttf`
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status != engine.Blocked || !strings.Contains(finding.Reason, "a preexisting or changed font registration is retained") || !slices.Equal(finding.Preserved, []string{"current-user font registration: HackNerdFont-Bold.ttf"}) {
+		t.Fatal("a foreign registration does not block the install", finding)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err == nil || len(f.engine.changes) != 0 || sentinelExists(f.folder) {
+		t.Fatal("setup installed beside a foreign registration", err)
+	}
+	delete(f.engine.registry, name)
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	f.engine.registry[name] = `C:\personal\Hack.ttf`
+	if changed := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true); changed.Status != engine.Blocked {
+		t.Fatal("a changed registration does not block a repair", changed)
+	}
+	released := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false)
+	if released.Status != engine.Changed || !strings.Contains(released.Reason, "HackNerdFont-Bold.ttf") {
+		t.Fatal("a changed registration is not retained at removal", released)
+	}
+	if err := f.provider.Remove(context.Background(), fontResource, released, f); err == nil || !strings.Contains(err.Error(), "changed native font registration is retained") {
+		t.Fatal("the removal changed a foreign registration", err)
+	}
+	if f.engine.registry[name] != `C:\personal\Hack.ttf` || len(f.engine.registry) != 12 || len(f.records("font")) != 12 {
+		t.Fatal("the refused removal changed a registration or a record", f.engine.registry)
+	}
+}
+
+func TestFontKeepsAPreexistingDestinationAndAnEditedFile(t *testing.T) {
+	f := newFontFixture(t, "linux")
+	f.archive()
+	personal := filepath.Join(f.folder, "HackNerdFont-Regular.ttf")
+	sentinelWrite(t, personal, "personal", 0644)
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status != engine.Blocked || !strings.Contains(finding.Reason, "preexisting font destination is retained") {
+		t.Fatal("a preexisting destination does not block the install", finding)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err == nil || sentinelRead(t, personal) != "personal" || len(f.State().Targets) != 0 {
+		t.Fatal("setup replaced a preexisting font file", err)
+	}
+	if err := os.Remove(personal); err != nil {
+		t.Fatal(err)
+	}
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	sentinelWrite(t, personal, "edited", 0644)
+	if changed := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true); changed.Status != engine.Changed || !slices.Contains(changed.Preserved, personal) {
+		t.Fatal("an edited font file is not preserved", changed)
+	}
+	if changed := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false); changed.Status != engine.Changed {
+		t.Fatal("an edited font file is not retained at removal", changed)
+	}
+}
+
+func TestFontFailedActivationLeavesTheFontRecordsUnfinished(t *testing.T) {
+	for _, system := range []string{"linux", "windows"} {
+		t.Run(system, func(t *testing.T) {
+			f := newFontFixture(t, system)
+			f.archive()
+			f.engine.fail = errors.New("fixture: activation failed")
+			err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f)
+			if err == nil || !strings.Contains(err.Error(), "fixture: activation failed") {
+				t.Fatal(err)
+			}
+			if files := f.records("file"); len(files) != 12 || slices.ContainsFunc(files, func(r state.Record) bool { return r.Applied == "" || r.Next != "" }) {
+				t.Fatal("the font files are not finished file targets", files)
+			}
+			if fonts := f.records("font"); len(fonts) != 12 || slices.ContainsFunc(fonts, func(r state.Record) bool { return r.Applied != "" || r.Next == "" }) {
+				t.Fatal("a failed activation finished a font record", fonts)
+			}
+			finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+			if finding.Status != engine.Unhealthy || !strings.Contains(finding.Reason, "native activation is unfinished") {
+				t.Fatal("the unfinished activation is not reported", finding)
+			}
+			f.engine.fail = nil
+			desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+			if fonts := f.records("font"); slices.ContainsFunc(fonts, func(r state.Record) bool { return r.Applied == "" || r.Next != "" }) {
+				t.Fatal("the second apply did not finish the font records", fonts)
+			}
+			desktopRemove(t, f.provider, f.sentinelEnv, hooks.FontResource)
+		})
+	}
+}
+
+func TestFontWithoutTheNerdGlyphIsNotReady(t *testing.T) {
+	f := newFontFixture(t, "linux")
+	f.archive()
+	f.engine.charset = "20-7e"
+	err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f)
+	if err == nil || !strings.Contains(err.Error(), "native consumption is not ready") || len(f.records("font")) != 12 {
+		t.Fatal("fonts without the Nerd Font glyph passed", err)
+	}
+	if finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true); finding.Status != engine.Unhealthy {
+		t.Fatal(finding)
+	}
+}
+
+func TestFontMissingInspectionDoesNotInferAbsence(t *testing.T) {
+	f := newFontFixture(t, "linux")
+	f.engine.queryErr = errors.New("fixture: fc-match is not there")
+	if _, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f); err == nil {
+		t.Fatal("a failed inspection gave a result")
+	}
+	f.provider.FontMatch = ""
+	f.engine.queryErr = nil
+	if _, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f); err == nil || !strings.Contains(err.Error(), "fc-match is unavailable") {
+		t.Fatal(err)
+	}
+}
+
+func TestFontDarwinQuerySeparatesScriptAndNames(t *testing.T) {
+	f := newFontFixture(t, "darwin")
+	var command platform.Command
+	f.provider.Query = func(_ context.Context, c platform.Command) ([]byte, error) {
+		command = c
+		return json.Marshal(make([]struct {
+			Name string `json:"name"`
+		}, 12))
+	}
+	if finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true); finding.Status != engine.Missing {
+		t.Fatal(finding)
+	}
+	if command.Path != "/usr/bin/osascript" || len(command.Args) != 5 || !slices.Equal(command.Args[:3], []string{"-l", "JavaScript", "-e"}) || command.Stdin != nil {
+		t.Fatal("the font query must pass its JSON names separately from the static script", command)
+	}
+	var names []string
+	if err := json.Unmarshal([]byte(command.Args[4]), &names); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{}
+	for _, face := range fontFixtureFaces() {
+		want = append(want, face.postScript)
+		if strings.Contains(command.Args[3], face.postScript) {
+			t.Fatal("a font name is in the executable source")
+		}
+	}
+	if !slices.Equal(names, want) {
+		t.Fatal("the native font inspection changed its exact ordered face names", names)
+	}
+}
+
+func TestFontQueryProcessFixture(t *testing.T) {
+	if len(os.Args) < 3 || os.Args[len(os.Args)-2] != "font-query-fixture" {
+		return
+	}
+	role := os.Args[len(os.Args)-1]
+	var input struct{ Faces []json.RawMessage }
+	if err := json.NewDecoder(os.Stdin).Decode(&input); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	var err error
+	switch role {
+	case "progress", "failure", "malformed":
+		_, err = fmt.Fprint(os.Stderr, "#< CLIXML\n<Objs Version=\"1.1.0.1\" xmlns=\"http://schemas.microsoft.com/powershell/2004/04\"><Obj S=\"progress\"><MS><PR N=\"Record\"><AV>Preparing modules for first use.</AV></PR></MS></Obj></Objs>")
+	case "stdout-bound":
+		_, err = fmt.Fprint(os.Stdout, strings.Repeat("x", (1<<20)+1))
+	case "stderr-bound":
+		_, err = fmt.Fprint(os.Stderr, strings.Repeat("x", (1<<20)+1))
+	case "combined-bound":
+		_, err = fmt.Fprint(os.Stdout, strings.Repeat("x", 600<<10))
+		if err == nil {
+			_, err = fmt.Fprint(os.Stderr, strings.Repeat("x", 600<<10))
+		}
+	default:
+		os.Exit(2)
+	}
+	if err != nil {
+		os.Exit(2)
+	}
+	if role == "malformed" {
+		_, err = fmt.Fprint(os.Stdout, "# malformed protocol output\n")
+	}
+	if err == nil {
+		err = json.NewEncoder(os.Stdout).Encode(make([]struct {
+			Name string `json:"name"`
+		}, len(input.Faces)))
+	}
+	if err != nil {
+		os.Exit(2)
+	}
+	if role == "failure" {
+		fmt.Fprint(os.Stderr, "\nfont inspection fixture failure\x1b\n")
+		os.Exit(23)
+	}
+	os.Exit(0)
+}
+
+func fontQueryBoundary(t *testing.T, role string) (engine.Finding, error) {
+	t.Helper()
+	program, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newFontFixture(t, "windows")
+	f.provider.PowerShell = program
+	f.provider.Query = func(ctx context.Context, c platform.Command) ([]byte, error) {
+		if c.Path != program || len(c.Args) != 5 || c.Args[3] != "-EncodedCommand" {
+			t.Fatal("unexpected font query command", c.Args)
+		}
+		c.Args = []string{"-test.run=^TestFontQueryProcessFixture$", "--", "font-query-fixture", role}
+		return hooks.FontQuery(ctx, c)
+	}
+	return f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f)
+}
+
+func TestFontQuerySeparatesJSONFromPowerShellProgress(t *testing.T) {
+	finding, err := fontQueryBoundary(t, "progress")
+	if err != nil || finding.Status != engine.Missing {
+		t.Fatal("the font JSON was contaminated by PowerShell progress", finding, err)
+	}
+}
+
+func TestFontQueryKeepsTheDiagnosticOfAFailedProcess(t *testing.T) {
+	_, err := fontQueryBoundary(t, "failure")
+	if code, ok := platform.ExitCode(err); !ok || code != 23 || !strings.Contains(err.Error(), "font inspection fixture failure") || strings.ContainsRune(err.Error(), '\x1b') {
+		t.Fatal("the native font failure or its diagnostic was lost", err)
+	}
+}
+
+func TestFontQueryRejectsMalformedStdoutAndBoundsBothStreams(t *testing.T) {
+	if _, err := fontQueryBoundary(t, "malformed"); err == nil {
+		t.Fatal("the query removed invalid protocol output")
+	}
+	for _, role := range []string{"stdout-bound", "stderr-bound", "combined-bound"} {
+		if _, err := fontQueryBoundary(t, role); err == nil || !strings.Contains(err.Error(), "inspection exceeds 1 MiB") {
+			t.Fatal("the query exceeded its total output bound", role, err)
+		}
+	}
+}
+
+func TestFontKindReadsARegistrationThroughTheWriter(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	writer := &targets.Writer{StateDir: f.state, Kinds: f.provider.Kinds()}
+	face := fontFixtureFaces()[0]
+	key := targets.Key(f.path(face), hooks.FontSlot)
+	if live, err := writer.InspectRecord(key, f); err != nil || live.State != targets.StateApplied {
+		t.Fatal("the registered kind does not read the registration", live, err)
+	}
+	if err := writer.Release(context.Background(), key, f, targets.Preserve); err != nil {
+		t.Fatal(err)
+	}
+	if _, has := f.engine.registry["Dotfiles "+face.file+" (TrueType)"]; has || len(f.engine.registry) != 11 || len(f.records("font")) != 11 {
+		t.Fatal("the release of one registration record changed another registration", f.engine.registry)
+	}
+}
+
+func TestFontWithoutFcMatchIsMissingOnlyWhenNothingOfSetupIsInstalled(t *testing.T) {
+	f := newFontFixture(t, "linux")
+	f.archive()
+	match := f.provider.FontMatch
+	if err := os.Remove(match); err != nil {
+		t.Fatal(err)
+	}
+	f.engine.queryErr = errors.New("fork/exec fc-match: no such file or directory")
+	before := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if before.Status != engine.Missing {
+		t.Fatal("fonts without fc-match, without a file and without a record are not missing", before)
+	}
+	personal := filepath.Join(f.folder, "HackNerdFont-Regular.ttf")
+	sentinelWrite(t, personal, "personal", 0644)
+	if _, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f); err == nil {
+		t.Fatal("a present font file without fc-match gave a result")
+	}
+	if err := os.RemoveAll(filepath.Join(f.home, ".local")); err != nil {
+		t.Fatal(err)
+	}
+	key := targets.Key(personal, hooks.FontSlot)
+	if err := f.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.FontResource, Kind: "font", Next: "font:fixture", Before: "absent"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f); err == nil {
+		t.Fatal("a font record without fc-match gave a result")
+	}
+	if err := f.Update(func(s *state.State) error { s.Drop(key); return nil }); err != nil {
+		t.Fatal(err)
+	}
+	sentinelWrite(t, match, "#!/bin/sh\n", 0755)
+	f.engine.queryErr = nil
+	after := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if after.Status != engine.Missing || after.Token != before.Token {
+		t.Fatal("the install of fc-match changed the token of the fonts", before, after)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, before, f); err != nil {
+		t.Fatal(err)
+	}
+	if finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true); finding.Status != engine.Satisfied || len(f.records("font")) != 12 {
+		t.Fatal("the apply after the install of fc-match did not verify the fonts", finding)
+	}
+}
+
+type fontCountedRecords struct {
+	engine.Records
+	updates int
+}
+
+func (c *fontCountedRecords) Update(edit func(*state.State) error) error {
+	c.updates++
+	return c.Records.Update(edit)
+}
+
+type fontOrderedRunner struct {
+	platform.Runner
+	before func()
+}
+
+func (r fontOrderedRunner) Run(ctx context.Context, c platform.Command) ([]byte, error) {
+	r.before()
+	return r.Runner.Run(ctx, c)
+}
+
+func TestFontRecordsAnnounceTheNativeChangeBeforeTheNativeCommand(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	update := filepath.Join(f.state, "tools", hooks.FontArchive, "3.5.1-bbbbbbbbbbbb-2")
+	for _, item := range fontFixtureFaces() {
+		sentinelWrite(t, filepath.Join(update, item.file), "updated font bytes of "+item.file, 0644)
+	}
+	current := filepath.Join(f.state, "tools", hooks.FontArchive, "current")
+	if err := os.Remove(current); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(update, current); err != nil {
+		t.Fatal(err)
+	}
+	records := &fontCountedRecords{Records: f.sentinelEnv}
+	natives := 0
+	f.provider.Runner = fontOrderedRunner{Runner: f.engine, before: func() {
+		natives++
+		if natives != 1 {
+			return
+		}
+		if records.updates == 0 {
+			t.Fatal("a native font command ran before a record update")
+		}
+		st := f.State()
+		if !slices.Equal(st.Pending, []string{"tool.font:activate"}) {
+			t.Fatal("the native font command ran without its pending mark", st.Pending)
+		}
+		if len(f.engine.registry) != 12 {
+			t.Fatal("a registration changed before the first native command", len(f.engine.registry))
+		}
+		for _, item := range fontFixtureFaces() {
+			if record := st.Targets[targets.Key(f.path(item), hooks.FontSlot)]; record.Applied == "" || record.Next == "" {
+				t.Fatal("a registration record does not announce its replacement", item.file, record)
+			}
+		}
+	}}
+	finding, err := f.provider.Inspect(context.Background(), fontResource, engine.Want{Present: true}, f)
+	if err != nil || finding.Status != engine.Unhealthy {
+		t.Fatal(finding, err)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, records); err != nil {
+		t.Fatal(err)
+	}
+	if natives != 2 || len(f.State().Pending) != 0 || len(f.engine.registry) != 12 {
+		t.Fatal("the repair did not release and activate under its mark", natives, f.State().Pending)
+	}
+	natives = 0
+	records.updates = 0
+	f.provider.Runner = fontOrderedRunner{Runner: f.engine, before: func() {
+		natives++
+		if st := f.State(); records.updates == 0 || !slices.Equal(st.Pending, []string{"tool.font:release"}) || !st.Targets[targets.Key(f.path(face), hooks.FontSlot)].Release {
+			t.Fatal("the native release ran before its record update", records.updates, st.Pending)
+		}
+	}}
+	if err := f.provider.Remove(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false), records); err != nil {
+		t.Fatal(err)
+	}
+	if natives != 1 || len(f.State().Pending) != 0 || len(f.State().Targets) != 0 || len(f.engine.registry) != 0 {
+		t.Fatal("the removal left a mark, a record or a registration", f.State().Pending)
+	}
+}
+
+func TestFontRemovalKeepsARegistrationThatSetupDoesNotOwn(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	key := targets.Key(f.path(face), hooks.FontSlot)
+	if err := f.sentinelEnv.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.FontResource, Kind: "font", Before: "fp:font:foreign"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.provider.Remove(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false), f.sentinelEnv); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.engine.registry) != 1 {
+		t.Fatal("the removal unregistered a registration without an applied record", len(f.engine.registry))
+	}
+	if _, ok := f.State().Targets[key]; ok {
+		t.Fatal("the record of the unowned registration stays")
+	}
+}
+
+func TestFontRepairKeepsARegistrationWithABaselineOnlyRecord(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	name, key := "Dotfiles "+face.file+" (TrueType)", targets.Key(f.path(face), hooks.FontSlot)
+	writer := &targets.Writer{StateDir: f.state, Kinds: f.provider.Kinds()}
+	live, err := writer.InspectRecord(key, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.FontResource, Kind: "font", Before: "fp:" + live.Fingerprint}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	changes := len(f.engine.changes)
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err == nil || len(f.engine.changes) != changes || f.engine.registry[name] != f.path(face) {
+		t.Fatal("the repair changed a registration that setup does not own", err, len(f.engine.changes)-changes)
+	}
+	if finding.Status != engine.Blocked || !slices.Equal(finding.Preserved, []string{"current-user font registration: " + face.file}) {
+		t.Fatal("a registration without an applied record is not kept", finding)
+	}
+}
+
+func TestFontRetryCompletesAnActivationAfterTheConfirmedMarkIsGone(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	key := targets.Key(f.path(face), hooks.FontSlot)
+	if err := f.Update(func(s *state.State) error {
+		record := s.Targets[key]
+		record.Next = "font:not-loaded-yet"
+		s.Targets[key] = record
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	delete(f.engine.loaded, f.path(face))
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status == engine.Blocked {
+		t.Fatal("the retry treated the registration that setup wrote as foreign", finding)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err != nil {
+		t.Fatal("the retry did not complete the activation", err)
+	}
+	if record := f.State().Targets[key]; record.Next != "" || record.Applied == "" {
+		t.Fatal("the activation record is not finished", record)
+	}
+}
+
+func TestFontKeepsARegistrationWithAnotherCaseOrAnEmptyValue(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	f.engine.registry["DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)"] = `C:\personal\Hack.ttf`
+	f.engine.registry["Dotfiles HackNerdFont-Bold.ttf (TrueType)"] = ""
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status != engine.Blocked || !slices.Equal(finding.Preserved, []string{"current-user font registration: HackNerdFont-Regular.ttf", "current-user font registration: HackNerdFont-Bold.ttf"}) {
+		t.Fatal("a registration with another case or an empty value does not block the install", finding)
+	}
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err == nil || len(f.engine.changes) != 0 {
+		t.Fatal("setup installed over a registration with another case or an empty value", err)
+	}
+	if len(f.engine.registry) != 2 || f.engine.registry["DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)"] != `C:\personal\Hack.ttf` || f.engine.registry["Dotfiles HackNerdFont-Bold.ttf (TrueType)"] != "" {
+		t.Fatal("the refused install changed a registration", f.engine.registry)
+	}
+}
+
+func TestFontRetryLoadsAFaceThatAFailedActivationRegistered(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	f.engine.loadFail = "HackNerdFont-Italic.ttf"
+	err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f)
+	if err == nil || !strings.Contains(err.Error(), "registration is saved for recovery") || len(f.engine.registry) != 3 || len(f.engine.loaded) != 2 {
+		t.Fatal("the activation did not stop after the registration of the face that failed to load", err, f.engine.registry)
+	}
+	f.engine.loadFail = ""
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	if len(f.engine.registry) != 12 || len(f.engine.loaded) != 12 {
+		t.Fatal("the retry did not register and load every face", f.engine.registry, f.engine.loaded)
+	}
+}
+
+func TestFontRemovalAfterAFailedActivationLeavesNoRegistrationWithoutARecord(t *testing.T) {
+	failed := func(t *testing.T) *fontFixture {
+		f := newFontFixture(t, "windows")
+		f.archive()
+		f.engine.loadFail = "HackNerdFont-Italic.ttf"
+		if err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f); err == nil || len(f.engine.registry) != 3 {
+			t.Fatal("the fixture activation did not fail at one face", err, f.engine.registry)
+		}
+		f.engine.loadFail = ""
+		return f
+	}
+	t.Run("own registration", func(t *testing.T) {
+		f := failed(t)
+		desktopRemove(t, f.provider, f.sentinelEnv, hooks.FontResource)
+		if len(f.engine.registry) != 0 || len(f.engine.loaded) != 0 || sentinelExists(f.folder) {
+			t.Fatal("the removal left a registration without a record", f.engine.registry, f.engine.loaded)
+		}
+	})
+	t.Run("changed registration", func(t *testing.T) {
+		f := failed(t)
+		face := fontFixtureFaces()[0]
+		name := "Dotfiles " + face.file + " (TrueType)"
+		f.engine.registry[name] = `C:\personal\Hack.ttf`
+		err := f.provider.Remove(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false), f)
+		if err == nil || !strings.Contains(err.Error(), face.file) {
+			t.Fatal("the removal did not report the registration that setup cannot prove", err)
+		}
+		if f.engine.registry[name] != `C:\personal\Hack.ttf` || len(f.engine.registry) != 3 || len(f.records("font")) != 12 {
+			t.Fatal("the removal changed a registration or dropped its record", f.engine.registry)
+		}
+		for _, item := range fontFixtureFaces() {
+			if !sentinelExists(f.path(item)) {
+				t.Fatal("the removal deleted a font file while a registration names it", item.file)
+			}
+		}
+	})
+}
+
+func TestFontRemovalAfterAFailedUpdateLeavesNoRegistration(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	build := filepath.Join(f.state, "tools", hooks.FontArchive, "3.5.1-aaaaaaaaaaaa-1")
+	for _, face := range fontFixtureFaces() {
+		sentinelWrite(t, filepath.Join(build, face.file), "updated font bytes of "+face.file, 0644)
+	}
+	f.engine.loadFail = "HackNerdFont-Italic.ttf"
+	err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f)
+	if err == nil || !strings.Contains(err.Error(), "registration is saved for recovery") || len(f.engine.registry) != 3 || len(f.engine.loaded) != 2 {
+		t.Fatal("the update did not stop after the registration of the face that failed to load", err, f.engine.registry)
+	}
+	if fonts := f.records("font"); len(fonts) != 12 || slices.ContainsFunc(fonts, func(r state.Record) bool { return r.Applied == "" || r.Next == "" }) {
+		t.Fatal("the failed update did not keep the applied and the intended values", fonts)
+	}
+	f.engine.loadFail = ""
+	desktopRemove(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	if len(f.engine.registry) != 0 || len(f.engine.loaded) != 0 || sentinelExists(f.folder) {
+		t.Fatal("the removal left a registration or a font file", f.engine.registry, f.engine.loaded)
+	}
+}
+
+func fontScript(t *testing.T, c platform.Command) string {
+	t.Helper()
+	data, err := base64.StdEncoding.DecodeString(c.Args[len(c.Args)-1])
+	if err != nil || len(c.Args) != 5 || c.Args[3] != "-EncodedCommand" || len(data)%2 != 0 {
+		t.Fatal("unexpected encoded font command", c.Args, err)
+	}
+	units := make([]uint16, len(data)/2)
+	for i := range units {
+		units[i] = binary.LittleEndian.Uint16(data[i*2:])
+	}
+	return string(utf16.Decode(units))
+}
+
+func fontEncodedArguments(script string) []string {
+	units := utf16.Encode([]rune(script))
+	data := make([]byte, len(units)*2)
+	for i, unit := range units {
+		binary.LittleEndian.PutUint16(data[i*2:], unit)
+	}
+	return []string{"-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(data)}
+}
+
+func TestFontWindowsScriptsKeepARegistrationWithAnotherCaseOrAnEmptyValue(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("the current-user registry exists only on Windows")
+	}
+	program := filepath.Join(os.Getenv("SystemRoot"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	key := fmt.Sprintf(`Software\DotfilesFontTest-%d-%d`, os.Getpid(), time.Now().UnixNano())
+	registry := func(script string) string {
+		t.Helper()
+		command := exec.CommandContext(t.Context(), program, fontEncodedArguments("$ErrorActionPreference='Stop'\n$ProgressPreference='SilentlyContinue'\n$key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('"+key+"')\ntry {\n"+script+"\n} finally { $key.Dispose() }")...)
+		var stderr strings.Builder
+		command.Stderr = &stderr
+		output, err := command.Output()
+		if err != nil {
+			t.Fatal("the registry fixture failed", err, stderr.String())
+		}
+		return string(output)
+	}
+	t.Cleanup(func() {
+		if output, err := exec.Command(program, fontEncodedArguments("[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('"+key+"',$false)")...).CombinedOutput(); err != nil {
+			t.Error("the registry fixture stays", string(output), err)
+		}
+	})
+	registry(`$key.SetValue('DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)','C:\personal\Hack.ttf',[Microsoft.Win32.RegistryValueKind]::String)
+$key.SetValue('Dotfiles HackNerdFont-Bold.ttf (TrueType)','',[Microsoft.Win32.RegistryValueKind]::String)`)
+	const values = `[Console]::Out.Write((@($key.GetValueNames() | Sort-Object | ForEach-Object { $_ + '=' + [string]$key.GetValue($_) }) -join '|'))`
+	before := registry(values)
+	if !strings.Contains(before, `DOTFILES HACKNERDFONT-REGULAR.TTF (TRUETYPE)=C:\personal\Hack.ttf`) {
+		t.Fatal("the registry fixture is not there", before)
+	}
+	redirect := func(c platform.Command) platform.Command {
+		const fonts = `$fontKey='Software\Microsoft\Windows NT\CurrentVersion\Fonts'`
+		script := fontScript(t, c)
+		if strings.Count(script, fonts) != 1 {
+			t.Fatal("the font script does not name the current-user Fonts key exactly once")
+		}
+		c.Args = append(slices.Clone(c.Args[:4]), fontEncodedArguments(strings.Replace(script, fonts, "$fontKey='"+key+"'", 1))[4])
+		return c
+	}
+
+	f := newFontFixture(t, "windows")
+	f.provider.PowerShell = program
+	f.provider.Query = func(ctx context.Context, c platform.Command) ([]byte, error) {
+		return hooks.FontQuery(ctx, redirect(c))
+	}
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if finding.Status != engine.Blocked || !slices.Equal(finding.Preserved, []string{"current-user font registration: HackNerdFont-Regular.ttf", "current-user font registration: HackNerdFont-Bold.ttf"}) {
+		t.Fatal("the font query does not report a registration with another case or an empty value", finding)
+	}
+
+	g := newFontFixture(t, "windows")
+	g.archive()
+	g.provider.PowerShell = program
+	g.provider.Runner = fontRedirectRunner(redirect)
+	err := g.provider.Apply(context.Background(), fontResource, desktopInspect(t, g.provider, g.sentinelEnv, hooks.FontResource, true), g)
+	if err == nil || !strings.Contains(err.Error(), "Font registration changed after approval") {
+		t.Fatal("the font change script did not refuse a registration with another case", err)
+	}
+	if after := registry(values); after != before {
+		t.Fatal("the font change script changed a registration that setup does not own", before, after)
+	}
+}
+
+type fontRedirectRunner func(platform.Command) platform.Command
+
+func (r fontRedirectRunner) Run(ctx context.Context, c platform.Command) ([]byte, error) {
+	return platform.Exec{}.Run(ctx, r(c))
+}

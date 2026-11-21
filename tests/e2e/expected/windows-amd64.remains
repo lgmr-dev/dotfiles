@@ -1,0 +1,32 @@
+.agents/**
+.cache/**
+.claude/**
+.codex/**
+.config
+.config/opencode/**
+.copilot/**
+.local
+.local/share
+.local/share/opencode/**
+.local/state
+.local/state/opencode/**
+AppData/Local/GitHub CLI/**
+AppData/Local/Microsoft/**
+AppData/Local/Mozilla/**
+AppData/Local/Packages/**
+AppData/Local/Programs/**
+AppData/Local/Temp/**
+AppData/Local/copilot/**
+AppData/Local/gersemi/**
+AppData/Local/glab-cli/**
+AppData/Local/go-build/**
+AppData/Local/nvim-data/**
+AppData/Local/superfile/**
+AppData/Local/t3code-updater/**
+AppData/LocalLow/Microsoft/**
+AppData/Roaming/Microsoft/**
+AppData/Roaming/Mozilla/**
+AppData/Roaming/Visual Studio Setup/**
+Desktop/T3 Code (Beta).lnk
+NTUSER.DAT*
+ntuser.*

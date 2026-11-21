@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "azure",
+      "name": "Azure CLI",
+      "description": "Azure resource commands; sign in with az login",
+      "capability": true,
+      "category": "Cloud",
+      "order": 19,
+      "requires": [
+        "tool.az"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.az",
+      "name": "Azure CLI",
+      "requires": [
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.az"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.az"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.az"
+        }
+      }
+    }
+  ]
+}

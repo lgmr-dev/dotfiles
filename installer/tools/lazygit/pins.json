@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.lazygit": {
+      "darwin/arm64": {
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_darwin_arm64.tar.gz",
+        "sha256": "6873e6b7a538b521c4d7ff3f76ec49e6dcafa41e6053a6aae33c12f62663e163",
+        "format": "tar.gz",
+        "commands": {
+          "lazygit": "lazygit"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_linux_arm64.tar.gz",
+        "sha256": "ac0b48237f3d0283813e7154ec063237e519532feb0470c0881a1793ee78fd42",
+        "format": "tar.gz",
+        "commands": {
+          "lazygit": "lazygit"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_linux_x86_64.tar.gz",
+        "sha256": "0a23f429a95f0d09db298b3c291536d818de066aa5a85c255806f0490ff6656b",
+        "format": "tar.gz",
+        "commands": {
+          "lazygit": "lazygit"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_windows_x86_64.zip",
+        "sha256": "a76fe17339fd387c20addc09060f07c240e4b20a9f55fee4ad7c86a251c0741e",
+        "format": "zip",
+        "commands": {
+          "lazygit": "lazygit.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    }
+  }
+}

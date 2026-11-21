@@ -53,7 +53,7 @@
       "customType": "regex",
       "description": "Neovim Linux x86_64 tarball version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": [
-        "/^\\.github/workflows/test\\.yml$/"
+        "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
         "NVIM_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+NVIM_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
@@ -66,7 +66,7 @@
       "customType": "regex",
       "description": "Starship Linux x86_64 release version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": [
-        "/^\\.github/workflows/test\\.yml$/"
+        "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
         "STARSHIP_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+STARSHIP_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
@@ -79,7 +79,7 @@
       "customType": "regex",
       "description": "tree-sitter CLI Linux x86_64 release version in CI. The adjacent SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": [
-        "/^\\.github/workflows/test\\.yml$/"
+        "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
         "TREE_SITTER_CLI_LINUX_VERSION:\\s*(?<currentValue>v[^\\s]+)\\s+TREE_SITTER_CLI_LINUX_X86_64_SHA256:\\s*[a-f0-9]{64}"
@@ -92,7 +92,7 @@
       "customType": "regex",
       "description": "cargo-binstall installer script commit pinned to the current main branch digest. The adjacent installer script SHA-256 must be recomputed manually after Renovate bumps this.",
       "managerFilePatterns": [
-        "/^\\.github/workflows/test\\.yml$/"
+        "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
         "CARGO_BINSTALL_COMMIT:\\s*(?<currentDigest>[a-f0-9]{40})\\s+CARGO_BINSTALL_INSTALLER_SHA256:\\s*[a-f0-9]{64}"
@@ -132,7 +132,7 @@
       "customType": "regex",
       "description": "GitHub runner labels stored in matrix include entries, which the built-in manager cannot extract through matrix variables.",
       "managerFilePatterns": [
-        "/^\\.github/workflows/installer-engine\\.yml$/"
+        "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
         "runner:\\s*(?<depName>ubuntu|macos|windows)-(?<currentValue>[^\\s#]+)"
@@ -142,9 +142,9 @@
     },
     {
       "customType": "regex",
-      "description": "Pinned Windows container image used for fresh native installer acceptance.",
+      "description": "Pinned Windows container image of the clean Windows end-to-end rows.",
       "managerFilePatterns": [
-        "/^\\.github/workflows/installer-engine\\.yml$/"
+        "/^\\.github/workflows/ci\\.yml$/"
       ],
       "matchStrings": [
         "WINDOWS_TEST_IMAGE:\\s*(?<depName>mcr\\.microsoft\\.com/dotnet/framework/runtime):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
@@ -154,22 +154,9 @@
     },
     {
       "customType": "regex",
-      "description": "Pinned oldest supported Ubuntu and Debian images for the Ghostty library-compatibility check. Only digest updates apply: each tag must stay the oldest supported release.",
-      "managerFilePatterns": [
-        "/^\\.github/workflows/installer-engine\\.yml$/"
-      ],
-      "matchStrings": [
-        "GHOSTTY_OLDEST_UBUNTU_IMAGE:\\s*(?<depName>ubuntu):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})",
-        "GHOSTTY_OLDEST_DEBIAN_IMAGE:\\s*(?<depName>debian):(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
-      ],
-      "datasourceTemplate": "docker",
-      "versioningTemplate": "docker"
-    },
-    {
-      "customType": "regex",
       "description": "Release tag of each GitHub release download in the archive pins. Renovate only reports it; the daily pin workflow or a manual PR changes the pin and its checksum.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "\"url\":\\s*\"https://github\\.com/(?<depName>[^/\"]+/[^/\"]+)/releases/download/(?<currentValue>[^/\"]+)/"
@@ -181,7 +168,7 @@
       "customType": "regex",
       "description": "GitLab CLI release in the archive pins. Renovate only reports it.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "\"url\":\\s*\"https://gitlab\\.com/(?<depName>gitlab-org/cli)/-/releases/(?<currentValue>v[^/\"]+)/downloads/"
@@ -191,22 +178,9 @@
     },
     {
       "customType": "regex",
-      "description": "Ghostty macOS release in the archive pins. Renovate only reports it.",
-      "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
-      ],
-      "matchStrings": [
-        "release\\.files\\.ghostty\\.org/(?<currentValue>[^/\"]+)/"
-      ],
-      "datasourceTemplate": "github-tags",
-      "depNameTemplate": "ghostty-org/ghostty",
-      "extractVersionTemplate": "^v(?<version>.+)$"
-    },
-    {
-      "customType": "regex",
       "description": "Python wheel and source package versions in the archive pins. Renovate only reports them.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "files\\.pythonhosted\\.org/packages/[0-9a-f/]+/(?<depName>[A-Za-z0-9_.]+)-(?<currentValue>[0-9][^-\"]*)-[^\"]+\\.whl\"",
@@ -218,7 +192,7 @@
       "customType": "regex",
       "description": "Node.js release in the archive pins. Renovate only reports it.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "nodejs\\.org/dist/v(?<currentValue>[0-9.]+)/"
@@ -231,7 +205,7 @@
       "customType": "regex",
       "description": "Rust compiler release in the archive pins. Renovate only reports it; the components change with it.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "static\\.rust-lang\\.org/dist/[0-9-]+/rustc-(?<currentValue>[0-9.]+)-"
@@ -243,8 +217,8 @@
       "customType": "regex",
       "description": "VS Code release in the archive pins and the Linux Code pins. Renovate only reports it.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/",
-        "/^installer/linux-code-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/",
+        "/^installer/tools/vscode/linux-code-pins\\.json$/"
       ],
       "matchStrings": [
         "\"version\":\\s*\"(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)(?:-[0-9]+)?\",\\s*\"url\":\\s*\"https://vscode\\.download\\.prss\\.microsoft\\.com/"
@@ -256,7 +230,7 @@
       "customType": "regex",
       "description": "Rose Pine VS Code extension in the archive pins. Renovate only reports it.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "publishers/mvllow/vsextensions/rose-pine/(?<currentValue>[0-9.]+)/vspackage"
@@ -269,7 +243,7 @@
       "customType": "regex",
       "description": "PowerShell Gallery modules in the archive pins. Renovate only reports them.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "www\\.powershellgallery\\.com/api/v2/package/(?<depName>[^/\"]+)/(?<currentValue>[^/\"]+)\""
@@ -281,7 +255,7 @@
       "customType": "regex",
       "description": "GNU Make release that the Windows make build packages. Renovate only reports it.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "ezwinports/make-(?<currentValue>[0-9.]+)-without-guile"
@@ -294,7 +268,7 @@
       "customType": "regex",
       "description": "Source commits of the shell and tmux plugin archives. Renovate only reports a newer commit.",
       "managerFilePatterns": [
-        "/^installer/archive-pins\\.json$/"
+        "/^installer/tools/[^/]+/pins\\.json$/"
       ],
       "matchStrings": [
         "codeload\\.github\\.com/(?<depName>[^/\"]+/[^/\"]+)/tar\\.gz/(?<currentDigest>[0-9a-f]{40})"
@@ -307,7 +281,7 @@
       "customType": "regex",
       "description": "Tailscale Linux package. Renovate only reports it.",
       "managerFilePatterns": [
-        "/^installer/linux-package-pins\\.json$/"
+        "/^installer/tools/tailscale/linux-package-pins\\.json$/"
       ],
       "matchStrings": [
         "pkgs\\.tailscale\\.com/stable/tailscale_(?<currentValue>[0-9.]+)_"
@@ -332,7 +306,7 @@
       "customType": "regex",
       "description": "Homebrew install script commit of the macOS bootstrap. Renovate only reports a newer commit.",
       "managerFilePatterns": [
-        "/^installer/homebrew_bootstrap\\.go$/"
+        "/^installer/system/homebrew_bootstrap\\.go$/"
       ],
       "matchStrings": [
         "homebrewBootstrapCommit = \"(?<currentDigest>[0-9a-f]{40})\""
@@ -410,13 +384,12 @@
     },
     {
       "matchManagers": [
-        "custom.regex"
+        "github-actions"
       ],
       "matchDatasources": [
         "docker"
       ],
       "matchDepNames": [
-        "ubuntu",
         "debian"
       ],
       "matchUpdateTypes": [
@@ -429,11 +402,11 @@
     },
     {
       "matchFileNames": [
-        "installer/archive-pins.json",
-        "installer/linux-code-pins.json",
-        "installer/linux-package-pins.json",
+        "installer/tools/*/pins.json",
+        "installer/tools/vscode/linux-code-pins.json",
+        "installer/tools/tailscale/linux-package-pins.json",
         "installer/bootstrap-toolchain.tsv",
-        "installer/homebrew_bootstrap.go",
+        "installer/system/homebrew_bootstrap.go",
         "nvim/mason-registry/lock.json"
       ],
       "dependencyDashboardApproval": true,
@@ -444,7 +417,7 @@
     },
     {
       "matchFileNames": [
-        "installer/archive-pins.json"
+        "installer/tools/*/pins.json"
       ],
       "matchDepNames": [
         "jqlang/jq"
@@ -454,7 +427,7 @@
     },
     {
       "matchFileNames": [
-        "installer/archive-pins.json"
+        "installer/tools/*/pins.json"
       ],
       "matchDepNames": [
         "xremap/xremap"
@@ -465,7 +438,7 @@
     {
       "description": "Ubuntu 24.04 keeps the last Ghostty build for its GTK 4.14. Ghostty 1.4 needs GTK 4.18.",
       "matchFileNames": [
-        "installer/archive-pins.json"
+        "installer/tools/*/pins.json"
       ],
       "matchDepNames": [
         "mkasberg/ghostty-ubuntu"

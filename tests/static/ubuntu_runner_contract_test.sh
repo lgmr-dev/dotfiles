@@ -6,9 +6,8 @@ ruby - <<'RUBY'
 require 'yaml'
 
 load_workflow = ->(name) { YAML.load_file(".github/workflows/#{name}.yml") }
-test = load_workflow.call('test')
-ubuntu = test.fetch('jobs').fetch('ubuntu')
-install = ubuntu.fetch('steps').find { |step| step['name'] == 'Install deps' }.fetch('run')
+lint = load_workflow.call('ci').fetch('jobs').fetch('lint')
+install = lint.fetch('steps').find { |step| step['name'] == 'Install Linux deps' }.fetch('run')
 abort 'FAIL: hosted PowerShell must not use the unavailable Microsoft apt package' if
   install.include?('packages.microsoft.com') || install.include?('apt-get install -y powershell')
 abort 'FAIL: hosted PowerShell must be required, not silently skipped' unless

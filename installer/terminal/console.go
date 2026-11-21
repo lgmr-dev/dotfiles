@@ -23,7 +23,6 @@ type Option struct {
 	ID, Label, Detail, Category string
 }
 
-// Category rows exist only in the selector. Results always contain leaf IDs.
 type selectionRow struct {
 	Option
 	members []string
@@ -91,11 +90,12 @@ type Console struct {
 	closed        bool
 }
 
-// Open refuses redirected input/output before changing terminal state. Machine
-// requests have a separate explicit interface; EOF must never imply "all".
+// Open refuses redirected input and output before it changes the terminal
+// state. Automation uses the commands with explicit flags: end of input never
+// selects or approves.
 func Open(input, output *os.File) (*Console, error) {
 	if !term.IsTerminal(int(input.Fd())) || !term.IsTerminal(int(output.Fd())) {
-		return nil, errors.New("interactive setup needs a terminal; use an explicit machine request for automation")
+		return nil, errors.New("interactive setup needs a terminal; automation uses the plan, apply, update and check commands")
 	}
 	restore, err := prepareOutput(output)
 	if err != nil {
@@ -117,8 +117,6 @@ func (c *Console) Close() error {
 	return errors.Join(err, c.restore())
 }
 
-// interact reads keys in raw mode and always restores cooked input afterwards,
-// so no raw mode or reader survives into elevation or provider prompts.
 func (c *Console) interact(read func() error) error {
 	if c.closed {
 		return errors.New("terminal is closed")
@@ -147,9 +145,6 @@ func (c *Console) leaveRaw() error {
 	return err
 }
 
-// cooked runs slow work inside a screen with ordinary input, so Ctrl-C
-// interrupts it like any other inspection. Keys typed meanwhile are discarded
-// on return: they answered nothing that was on the screen.
 func (c *Console) cooked(ctx context.Context, work func() error) error {
 	if err := c.leaveRaw(); err != nil {
 		return err
@@ -288,8 +283,6 @@ func (c *Console) choose(ctx context.Context, title string, options []Option, in
 	}
 }
 
-// summary counts the pending change against the recorded selection, followed
-// by the status of installed tools once it is known.
 func (tools *ToolScreen) summary(options []Option, selected map[string]bool) (string, map[string]string) {
 	added, removed := 0, 0
 	for _, option := range options {
@@ -324,7 +317,6 @@ func render(title string, options []selectionRow, selected map[string]bool, curs
 	if multiple {
 		line("j/k: move | Space: toggle")
 		line("a: all | n: none | Enter: next")
-		// The footer includes the back key even on narrow terminals.
 	} else {
 		line("j/k: move | Enter: choose")
 		line("")
@@ -374,9 +366,6 @@ func render(title string, options []selectionRow, selected map[string]bool, curs
 	return b.String()
 }
 
-// Terminal labels are plain text. Strip control characters so even future
-// externally supplied descriptions cannot inject terminal escape sequences.
-// Non-ASCII runes conservatively reserve two cells to avoid wrapped rows.
 func fit(s string, cells int) string {
 	var b strings.Builder
 	for _, r := range s {

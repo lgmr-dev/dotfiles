@@ -1,0 +1,271 @@
+{
+  "schema": 1,
+  "resources": {
+    "tmux.sensible": {
+      "darwin/arm64": {
+        "version": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-sensible/tar.gz/25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "sha256": "0af1e1eb7139ded74fe03c1ebba7fb4533f5c7d345e42b73f718a9d822d88903",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "sensible.tmux"
+        ]
+      },
+      "linux/amd64": {
+        "version": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-sensible/tar.gz/25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "sha256": "0af1e1eb7139ded74fe03c1ebba7fb4533f5c7d345e42b73f718a9d822d88903",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "sensible.tmux"
+        ]
+      },
+      "linux/arm64": {
+        "version": "25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-sensible/tar.gz/25cb91f42d020f675bb0a2ce3fbd3a5d96119efa",
+        "sha256": "0af1e1eb7139ded74fe03c1ebba7fb4533f5c7d345e42b73f718a9d822d88903",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "sensible.tmux"
+        ]
+      }
+    },
+    "tmux.yank": {
+      "darwin/arm64": {
+        "version": "acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-yank/tar.gz/acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "sha256": "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "yank.tmux"
+        ]
+      },
+      "linux/amd64": {
+        "version": "acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-yank/tar.gz/acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "sha256": "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "yank.tmux"
+        ]
+      },
+      "linux/arm64": {
+        "version": "acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-yank/tar.gz/acfd36e4fcba99f8310a7dfb432111c242fe7392",
+        "sha256": "702c4f164fee51c70798264917e9c53854c2e357ddf6f1982ed89dba563d4e84",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "yank.tmux"
+        ]
+      }
+    },
+    "tmux.resurrect": {
+      "darwin/arm64": {
+        "version": "cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-resurrect/tar.gz/cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "sha256": "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "resurrect.tmux"
+        ],
+        "excluded_files": [
+          "run_tests",
+          "tests/helpers/helpers.sh",
+          "tests/run_tests_in_isolation"
+        ],
+        "replacements": [
+          {
+            "file": "scripts/helpers.sh",
+            "before": "\t$CURRENT_DIR/check_tmux_version.sh \"$SUPPORTED_VERSION\"",
+            "after": "\t\"$CURRENT_DIR/check_tmux_version.sh\" \"$SUPPORTED_VERSION\""
+          },
+          {
+            "file": "scripts/save.sh",
+            "before": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files\n\tfiles=($(ls -t $(resurrect_dir)/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6))\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}",
+            "after": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files=()\n\tlocal file\n\twhile IFS= read -r file; do\n\t\tfiles+=(\"$file\")\n\tdone < <(QUOTING_STYLE=literal ls -1t -- \"$(resurrect_dir)\"/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6)\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": " $(last_resurrect_file)",
+            "after": " \"$(last_resurrect_file)\"",
+            "count": 8
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "[ ! -f $resurrect_file ]",
+            "after": "[ ! -f \"$resurrect_file\" ]"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "pane_creation_command() {\n\techo \"cat '$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")'; exec $(tmux_default_command)\"\n}",
+            "after": "pane_creation_command() {\n\tlocal file=\"$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")\"\n\tfile=${file//\\'/\\'\\\"\\'\\\"\\'}\n\tprintf \"cat '%s'; exec %s\\n\" \"$file\" \"$(tmux_default_command)\"\n}"
+          },
+          {
+            "file": "scripts/spinner_helpers.sh",
+            "before": "\t$CURRENT_DIR/tmux_spinner.sh \"$1\" \"$2\" &",
+            "after": "\t\"$CURRENT_DIR/tmux_spinner.sh\" \"$1\" \"$2\" &"
+          }
+        ]
+      },
+      "linux/amd64": {
+        "version": "cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-resurrect/tar.gz/cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "sha256": "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "resurrect.tmux"
+        ],
+        "excluded_files": [
+          "run_tests",
+          "tests/helpers/helpers.sh",
+          "tests/run_tests_in_isolation"
+        ],
+        "replacements": [
+          {
+            "file": "scripts/helpers.sh",
+            "before": "\t$CURRENT_DIR/check_tmux_version.sh \"$SUPPORTED_VERSION\"",
+            "after": "\t\"$CURRENT_DIR/check_tmux_version.sh\" \"$SUPPORTED_VERSION\""
+          },
+          {
+            "file": "scripts/save.sh",
+            "before": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files\n\tfiles=($(ls -t $(resurrect_dir)/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6))\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}",
+            "after": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files=()\n\tlocal file\n\twhile IFS= read -r file; do\n\t\tfiles+=(\"$file\")\n\tdone < <(QUOTING_STYLE=literal ls -1t -- \"$(resurrect_dir)\"/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6)\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": " $(last_resurrect_file)",
+            "after": " \"$(last_resurrect_file)\"",
+            "count": 8
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "[ ! -f $resurrect_file ]",
+            "after": "[ ! -f \"$resurrect_file\" ]"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "pane_creation_command() {\n\techo \"cat '$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")'; exec $(tmux_default_command)\"\n}",
+            "after": "pane_creation_command() {\n\tlocal file=\"$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")\"\n\tfile=${file//\\'/\\'\\\"\\'\\\"\\'}\n\tprintf \"cat '%s'; exec %s\\n\" \"$file\" \"$(tmux_default_command)\"\n}"
+          },
+          {
+            "file": "scripts/spinner_helpers.sh",
+            "before": "\t$CURRENT_DIR/tmux_spinner.sh \"$1\" \"$2\" &",
+            "after": "\t\"$CURRENT_DIR/tmux_spinner.sh\" \"$1\" \"$2\" &"
+          }
+        ]
+      },
+      "linux/arm64": {
+        "version": "cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-resurrect/tar.gz/cff343cf9e81983d3da0c8562b01616f12e8d548",
+        "sha256": "9f1dda18554291ee7f8a0f499e2af90bbadc2ebceb7a995bb13b76529fe0c5c9",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "resurrect.tmux"
+        ],
+        "excluded_files": [
+          "run_tests",
+          "tests/helpers/helpers.sh",
+          "tests/run_tests_in_isolation"
+        ],
+        "replacements": [
+          {
+            "file": "scripts/helpers.sh",
+            "before": "\t$CURRENT_DIR/check_tmux_version.sh \"$SUPPORTED_VERSION\"",
+            "after": "\t\"$CURRENT_DIR/check_tmux_version.sh\" \"$SUPPORTED_VERSION\""
+          },
+          {
+            "file": "scripts/save.sh",
+            "before": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files\n\tfiles=($(ls -t $(resurrect_dir)/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6))\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}",
+            "after": "remove_old_backups() {\n\t# remove resurrect files older than 30 days (default), but keep at least 5 copies of backup.\n\tlocal delete_after=\"$(get_tmux_option \"$delete_backup_after_option\" \"$default_delete_backup_after\")\"\n\tlocal -a files=()\n\tlocal file\n\twhile IFS= read -r file; do\n\t\tfiles+=(\"$file\")\n\tdone < <(QUOTING_STYLE=literal ls -1t -- \"$(resurrect_dir)\"/${RESURRECT_FILE_PREFIX}_*.${RESURRECT_FILE_EXTENSION} | tail -n +6)\n\t[[ ${#files[@]} -eq 0 ]] ||\n\t\tfind \"${files[@]}\" -type f -mtime \"+${delete_after}\" -exec rm -v \"{}\" \\; > /dev/null\n}"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": " $(last_resurrect_file)",
+            "after": " \"$(last_resurrect_file)\"",
+            "count": 8
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "[ ! -f $resurrect_file ]",
+            "after": "[ ! -f \"$resurrect_file\" ]"
+          },
+          {
+            "file": "scripts/restore.sh",
+            "before": "pane_creation_command() {\n\techo \"cat '$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")'; exec $(tmux_default_command)\"\n}",
+            "after": "pane_creation_command() {\n\tlocal file=\"$(pane_contents_file \"restore\" \"${1}:${2}.${3}\")\"\n\tfile=${file//\\'/\\'\\\"\\'\\\"\\'}\n\tprintf \"cat '%s'; exec %s\\n\" \"$file\" \"$(tmux_default_command)\"\n}"
+          },
+          {
+            "file": "scripts/spinner_helpers.sh",
+            "before": "\t$CURRENT_DIR/tmux_spinner.sh \"$1\" \"$2\" &",
+            "after": "\t\"$CURRENT_DIR/tmux_spinner.sh\" \"$1\" \"$2\" &"
+          }
+        ]
+      }
+    },
+    "tmux.continuum": {
+      "darwin/arm64": {
+        "version": "0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-continuum/tar.gz/0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "sha256": "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "continuum.tmux"
+        ]
+      },
+      "linux/amd64": {
+        "version": "0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-continuum/tar.gz/0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "sha256": "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "continuum.tmux"
+        ]
+      },
+      "linux/arm64": {
+        "version": "0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "url": "https://codeload.github.com/tmux-plugins/tmux-continuum/tar.gz/0698e8f4b17d6454c71bf5212895ec055c578da0",
+        "sha256": "a1b9a2f0715163472ca713679204a1ca55d3f845cf1c659ae04222db3553424f",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "continuum.tmux"
+        ]
+      }
+    }
+  }
+}

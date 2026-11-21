@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "starship",
+      "name": "Starship",
+      "description": "Cross-shell prompt",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 6,
+      "requires": [
+        "config.starship",
+        "integration.starship"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.starship",
+      "name": "Starship",
+      "action": "starship",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.starship"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.starship"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.starship"
+        }
+      }
+    },
+    {
+      "id": "config.starship",
+      "name": "starship configuration",
+      "requires": [
+        "tool.starship"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "integration.starship",
+      "name": "Starship shell integration",
+      "requires": [
+        "config.starship",
+        "integration.shells"
+      ],
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.starship",
+      "source": "starship/starship.toml",
+      "folder": "config",
+      "path": "starship.toml"
+    }
+  ]
+}

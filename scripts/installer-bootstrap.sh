@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
-# Build and launch the installer from this trusted checkout. No system installs.
 set -euo pipefail
 
 fail() { printf 'Dotfiles bootstrap: %s\n' "$*" >&2; exit 1; }
-[[ $# == 0 || ( $# == 1 && $1 == machine ) ]] ||
-  fail "run without arguments for the menu; automation uses 'machine' with JSON on stdin"
+accepted_arguments() {
+  [[ $# != 0 ]] || return 0
+  case $1 in
+    plan|apply|update|check|restore-v2) ;;
+    *) return 1 ;;
+  esac
+  shift
+  local argument
+  for argument in "$@"; do
+    case $argument in
+      --yes|--select=*|--remove-shared=*|--replace=*) ;;
+      *) return 1 ;;
+    esac
+  done
+}
+accepted_arguments "$@" ||
+  fail 'run without arguments for the menu; automation uses plan, apply, update, check or restore-v2 with --yes, --select=<ids>, --remove-shared=<ids> and --replace=<ids>'
 
 checkout="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 launch_directory=$PWD
@@ -46,7 +60,6 @@ sha256() {
     fail 'SHA-256 verification requires sha256sum or shasum'
   fi
 }
-# Hash each NUL-separated path from stdin in one process.
 sha256_files() {
   if command -v sha256sum >/dev/null 2>&1; then
     xargs -0 sha256sum
@@ -87,10 +100,6 @@ launch() {
   umask "$caller_umask"
   exec "$binary" "$@"
 }
-# A verified build is reused without extracting or running the toolchain only
-# when nothing it could have been built from changed: this script, the pin and
-# every file under installer/, a superset of the compiler-selected inputs. Any
-# change, link or special file there takes the full verified path below.
 checkout_fingerprint() {
   [[ -z $(find "$checkout/installer" ! -type f ! -type d -print) ]] || return 1
   {
@@ -126,14 +135,11 @@ if [[ ! -f $archive ]]; then
 fi
 [[ ! -L $archive && $(wc -c < "$archive" | tr -d ' ') == "$size" && $(sha256 < "$archive") == "$digest" ]] ||
   fail "cached Go archive is damaged; remove $archive and retry"
-# Re-extract the verified cached archive before executing compiler code. A
-# cached compiler's version string cannot prove its bytes are still authentic.
 toolchain="$stage/toolchain"
 mkdir "$toolchain"
 tar -xzf "$archive" -C "$toolchain"
 [[ -x $toolchain/go/bin/go ]] || fail 'verified archive has no Go executable'
 go="$toolchain/go/bin/go"
-# Ignore personal Go settings/workspaces and keep all compiler writes in this cache.
 compiler() (
   export GOENV=off GOWORK=off GOTOOLCHAIN=local CGO_ENABLED=0 GOFLAGS='' GOEXPERIMENT='' GO111MODULE=on GOFIPS140=off
   export GOCACHEPROG=''
@@ -147,7 +153,6 @@ compiler() (
 )
 [[ $(compiler version) == "go version $version ${platform%-*}/${platform#*-}" ]] || fail 'cached compiler version mismatch'
 cd "$checkout/installer"
-# Failures still reach stderr and stop the bootstrap; success needs no line.
 compiler mod verify >/dev/null
 source_identity() {
   compiler list -mod=readonly -deps -f '{{if .Module}}{{if .Module.Main}}{{range .GoFiles}}{{$.Dir}}/{{.}}{{println}}{{end}}{{range .SFiles}}{{$.Dir}}/{{.}}{{println}}{{end}}{{range .HFiles}}{{$.Dir}}/{{.}}{{println}}{{end}}{{range .SysoFiles}}{{$.Dir}}/{{.}}{{println}}{{end}}{{range .EmbedFiles}}{{$.Dir}}/{{.}}{{println}}{{end}}{{end}}{{end}}' ./cmd/dotfiles > "$stage/inputs"
@@ -172,7 +177,6 @@ if [[ ! -f $binary ]]; then
   mv "$stage/dotfiles" "$binary"
 fi
 verified_binary
-# Record the mapping only if nothing changed while this build was verified.
 if [[ -n $fingerprint && $(checkout_fingerprint) == "$fingerprint" ]]; then
   printf '%s\n' "$identity" > "$stage/record"
   mv "$stage/record" "$record"

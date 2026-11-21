@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.clipboard",
+      "name": "Clipboard provider",
+      "action": "clipboard",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "clipboard"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "xclip"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist",
+          "integration.shells"
+        ],
+        "linux": [
+          "tool.clipboard-wayland"
+        ]
+      }
+    },
+    {
+      "id": "tool.clipboard-wayland",
+      "name": "Wayland clipboard helper",
+      "platforms": [
+        "linux"
+      ],
+      "action": "clipboard",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "wl-clipboard"
+        }
+      }
+    }
+  ]
+}

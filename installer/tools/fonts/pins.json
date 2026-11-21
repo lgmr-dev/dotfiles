@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "resources": {
+    "font.hack": {
+      "darwin/arm64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      },
+      "linux/amd64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      },
+      "linux/arm64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      },
+      "windows/amd64": {
+        "version": "3.5.1",
+        "url": "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.zip",
+        "sha256": "fa24da7de7cefe7766614d27762570b20453c852fc1d5b657111666df9a5e449",
+        "format": "zip",
+        "commands": {},
+        "bin_dirs": [],
+        "required_files": [
+          "HackNerdFont-Italic.ttf",
+          "HackNerdFontPropo-Regular.ttf",
+          "HackNerdFontMono-Bold.ttf",
+          "HackNerdFontPropo-Bold.ttf",
+          "HackNerdFontMono-BoldItalic.ttf",
+          "HackNerdFont-Regular.ttf",
+          "HackNerdFontMono-Regular.ttf",
+          "HackNerdFont-BoldItalic.ttf",
+          "HackNerdFont-Bold.ttf",
+          "HackNerdFontPropo-Italic.ttf",
+          "HackNerdFontMono-Italic.ttf",
+          "HackNerdFontPropo-BoldItalic.ttf"
+        ]
+      }
+    }
+  }
+}

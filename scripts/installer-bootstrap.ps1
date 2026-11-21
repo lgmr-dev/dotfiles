@@ -1,8 +1,15 @@
-# Build and launch the installer from this trusted checkout. No system installs.
 $ErrorActionPreference = 'Stop'
-$ForwardedArguments = @($args)
-if ($args.Count -ne 0 -and ($args.Count -ne 1 -or $args[0] -cne 'machine')) {
-    throw "Run without arguments for the menu; automation uses 'machine' with JSON on stdin"
+$ForwardedArguments = @(foreach ($Argument in $args) {
+        if ($Argument -is [array]) { $Argument -join ',' } else { [string]$Argument }
+    })
+if ($ForwardedArguments.Count -ne 0) {
+    $Accepted = @('plan', 'apply', 'update', 'check', 'restore-v2') -ccontains $ForwardedArguments[0]
+    for ($Index = 1; $Index -lt $ForwardedArguments.Count; $Index++) {
+        if ($ForwardedArguments[$Index] -cnotmatch '^(--yes|--(select|remove-shared|replace)=.*)$') { $Accepted = $false }
+    }
+    if (-not $Accepted) {
+        throw 'Run without arguments for the menu; automation uses plan, apply, update, check or restore-v2 with --yes, --select=<ids>, --remove-shared=<ids> and --replace=<ids>'
+    }
 }
 if ($env:OS -ne 'Windows_NT' -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -or
     ($env:PROCESSOR_ARCHITEW6432 -and $env:PROCESSOR_ARCHITEW6432 -ne 'AMD64')) {
@@ -51,7 +58,6 @@ $Stage = Join-Path $Cache ('.prepare.' + [Guid]::NewGuid().ToString('N'))
 $LockPath = Join-Path $Cache 'lock'
 $Lock = $null
 $PreviousLocation = Get-Location
-# Keep phase diagnostics off stdout: machine mode returns only its JSON result.
 function Invoke-BootstrapPhase {
     param([string]$Name, [scriptblock]$Action)
     $Timer = [Diagnostics.Stopwatch]::StartNew()
@@ -120,10 +126,6 @@ function Get-SourceIdentity {
     try { ([BitConverter]::ToString($Hasher.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant() }
     finally { $Hasher.Dispose() }
 }
-# A verified build is reused without extracting or running the toolchain only
-# when nothing it could have been built from changed: this script, the pin and
-# every file under installer/, a superset of the compiler-selected inputs. A
-# reparse point there returns no fingerprint and takes the full verified path.
 function Get-CheckoutFingerprint {
     $Root = [IO.Path]::GetFullPath((Join-Path $Checkout 'installer'))
     $Lines = [Collections.Generic.List[string]]::new()
@@ -155,8 +157,6 @@ try {
     try { $Lock = [IO.File]::Open($LockPath, 'OpenOrCreate', 'ReadWrite', 'None') }
     catch [IO.IOException] { throw 'Another bootstrap is running; retry after it finishes' }
     New-Item -ItemType Directory -Path $Stage | Out-Null
-    # Fingerprinting only selects reuse. Any failure takes the full path, which
-    # reports the underlying problem itself.
     try { $Fingerprint = Get-CheckoutFingerprint } catch { $Fingerprint = $null }
     $Binary = $null
     if ($Fingerprint) {
@@ -194,8 +194,6 @@ try {
             Move-Item -LiteralPath $Download -Destination $Archive
         }
         Invoke-BootstrapPhase 'archive verification' { Assert-Archive }
-        # Execute only bytes freshly extracted from the reverified cached archive.
-        # The reported version of an extracted compiler is not an integrity check.
         $Toolchain = Join-Path $Stage 'toolchain'
         Invoke-BootstrapPhase 'toolchain extraction' {
             # Avoid per-entry PowerShell/progress overhead in the archive module.
@@ -225,7 +223,6 @@ try {
         (Get-SHA256 $Binary) -cne [IO.File]::ReadAllText("$Binary.sha256").Trim()) {
         throw "Cached installer is damaged; remove $Binary and retry"
     }
-    # Record the mapping only if nothing changed while this build was verified.
     if (-not $Reused -and $Fingerprint) {
         try { $Current = Get-CheckoutFingerprint } catch { $Current = $null }
         if ($Current -ceq $Fingerprint) {

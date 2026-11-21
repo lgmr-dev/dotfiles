@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
-# Herdr must consume the same tmux-style full navigator and forced-dark Rose
-# Pine theme on POSIX and through Windows' roaming ApplicationData folder.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 CONFIG="$REPO_ROOT/herdr/config.toml"
-MANIFEST="$REPO_ROOT/installer/config-targets.json"
+MANIFEST="$REPO_ROOT/installer/tools/herdr/tool.json"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -23,7 +21,7 @@ manifest = json.loads(manifest_path.read_text())
 windows = [target for target in manifest["targets"] if target["resource"] == "config.herdr" and "windows" in target.get("platforms", [])]
 if len(windows) != 1:
     raise SystemExit("Expected one active Windows Herdr target")
-paths = [pathlib.Path(sys.argv[1]), manifest_path.parent.parent / windows[0]["source"]]
+paths = [pathlib.Path(sys.argv[1]), manifest_path.parents[3] / windows[0]["source"]]
 configs = []
 for path in paths:
     with path.open("rb") as handle:

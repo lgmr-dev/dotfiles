@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Source-policy guard. The real publisher, Git precedence, global writes,
-# divergent pulls and removal are exercised by installer/git_settings_test.go.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"

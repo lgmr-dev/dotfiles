@@ -1,0 +1,6 @@
+.cache/**
+.local
+.local/state
+.local/state/nvim/**
+Library/Caches/**
+Library/Logs/**

@@ -1,0 +1,348 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.rust": {
+      "windows/amd64": {
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+        "sha256": "94301a26b63fa0861b4b5a588afa92310ae4a5aa1751609bbcef1142e9664baa",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc.exe",
+          "cargo": "bin/cargo.exe",
+          "rustfmt": "bin/rustfmt.exe",
+          "cargo-fmt": "bin/cargo-fmt.exe",
+          "cargo-clippy": "bin/cargo-clippy.exe",
+          "clippy-driver": "bin/clippy-driver.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "x86_64-pc-windows-msvc",
+        "windows_rust_launcher": {
+          "revision": 1
+        },
+        "rust_components": [
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "3414e3504c016e8e17f9be2b359c1585c26a7589515bd775367b754a3a0a8c9d",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "8f8d40104ab98eab12e5d48a3a8b1499d1fb14d1c01399954ea78e76a2693b0d",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-x86_64-pc-windows-msvc/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "8dc17cbc6f2b2a6954bd35deece48791ef4e01fdca12d74ac1be2a2e55e3a28d",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-x86_64-pc-windows-msvc.tar.gz",
+            "sha256": "a153b4b68afffb14b1fd4310c2403b3ca3cfc801ba65f72ab1c3d352cb12d3ef",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ]
+      },
+      "darwin/arm64": {
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "6781021dd0f71f0a3e2d72e2945ced97a925e4f513996d33a2550de187fe6d6c",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc",
+          "cargo": "bin/cargo",
+          "rustfmt": "bin/rustfmt",
+          "cargo-fmt": "bin/cargo-fmt",
+          "cargo-clippy": "bin/cargo-clippy",
+          "clippy-driver": "bin/clippy-driver"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "aarch64-apple-darwin",
+        "rust_components": [
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "b3bbd1d2c6a5c263b43ca0751fd6d25238bc88aac5b0fdd85d33d6275c41891e",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "4709763e3033e3e31d219db1457b0f4d7251f77525f8c312df2867d2d617dea5",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-aarch64-apple-darwin/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "64dbe653b1424c6ea54c4a2ec1e1e4dc90db1493d0b9ee6a795a6656b40fb8d3",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-aarch64-apple-darwin.tar.gz",
+            "sha256": "2d69c78974c84d6a762164fdef5bed30e6839cc23b0cb90e2e4ed51d131a4044",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+        "sha256": "67b0e85ff4b3eee83c48b8ae1da10dd0bcd60b43d02cd0e7df78c59d19f6b960",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc",
+          "cargo": "bin/cargo",
+          "rustfmt": "bin/rustfmt",
+          "cargo-fmt": "bin/cargo-fmt",
+          "cargo-clippy": "bin/cargo-clippy",
+          "clippy-driver": "bin/clippy-driver"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "x86_64-unknown-linux-gnu",
+        "rust_components": [
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "4e7fc3cbe98e23c88a3c6ce37f834e3ffbc91536789782c4c4a9670df6b16a49",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "61eb09d68b338e230d698716927bd4623049c9910ef4a4972e66d763d66ed9e1",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-x86_64-unknown-linux-gnu/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "b62ba6e046a5580c52f24a817101734b73e76ea0724fc6a21d57fba4db345ced",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "277a9abd9378561d11fb67a9eb5c08895e207d07dfd985a67197aa47e030856f",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.100.0",
+        "url": "https://static.rust-lang.org/dist/2026-11-12/rustc-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "7ccc960846f81e016086f1931dedadd837a3317da80e0114df68651145c0f43b",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "rustc": "bin/rustc",
+          "cargo": "bin/cargo",
+          "rustfmt": "bin/rustfmt",
+          "cargo-fmt": "bin/cargo-fmt",
+          "cargo-clippy": "bin/cargo-clippy",
+          "clippy-driver": "bin/clippy-driver"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "required_files": [
+          "lib/rustlib/src/rust/library/core/src/lib.rs"
+        ],
+        "rust_target": "aarch64-unknown-linux-gnu",
+        "rust_components": [
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/cargo-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "b3acccbba065da7e97c20592442f104bd9554d54bf87a323bba8a1d6e61282eb",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "cargo/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-std-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "89b01323a6611c9382a401282fb66eb80f1f3241df3e139d3df41afbd2da314b",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-std-aarch64-unknown-linux-gnu/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rustfmt-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "e555f81eccd5e2f741732be3f6784d073946eadbf2e00f4112dfdabc6c36c13e",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rustfmt-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/clippy-1.100.0-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "41920025e43c858e777177468698a88fc270bcceb6ba61059aac1dfee4da1d37",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "clippy-preview/manifest.in"
+            ]
+          },
+          {
+            "version": "1.100.0",
+            "url": "https://static.rust-lang.org/dist/2026-11-12/rust-src-1.100.0.tar.gz",
+            "sha256": "f37ba90547b1075da3a0953742cab9f9e33b5c08bce747bb0ff8382537b2fa8c",
+            "format": "tar.gz",
+            "strip_components": 1,
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "rust-src/manifest.in"
+            ]
+          }
+        ],
+        "libc": "glibc"
+      }
+    }
+  }
+}

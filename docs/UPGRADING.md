@@ -1,8 +1,166 @@
 # Upgrading
 
+## From v2 to v3.0.0
+
+Release v3.0.0 imports the state of v2.3.0 (commit `fb15ce5`) one time. It
+reads no older state. Use `setup.sh` on macOS and Linux, and `setup.ps1` on
+Windows. Migrate the machines in this order: Ubuntu and WSL, then the Mac,
+then Windows.
+
+`<state>` is `${XDG_STATE_HOME:-~/.local/state}/dotfiles` on macOS and Linux,
+and `%LOCALAPPDATA%\dotfiles` on Windows.
+
+### Steps on each machine
+
+1. Preserve your local changes. Check out `v2.3.0`:
+
+   ```bash
+   git fetch --tags
+   git checkout v2.3.0
+   ```
+
+2. Open setup and choose **Update tools**. Finish or abandon each interrupted
+   operation. Run **Check installation**, and fix each problem that it reports.
+3. Quit Neovim. Keep it closed until the import is complete. After step 4, the
+   new configuration runs with the v2 runtime until the switch.
+4. Get release v3:
+
+   ```bash
+   git checkout main
+   git pull --ff-only
+   ```
+
+5. Run setup with no argument. Setup finds the v2 state and shows the import
+   for review. It changes nothing before you approve.
+6. Read the review. It shows these parts:
+   - the plan of the private builds and the targets
+   - **Records of release v2**, with the result for each record
+   - the applications that stay on release v2 in this run (macOS only)
+   - the folders of release v2 that stay
+   - the folder that holds the restore set, `<state>/v2-restore`
+7. Choose **Apply changes**.
+8. When the report shows that the import is complete, run **Check
+   installation**. Open a new terminal.
+
+Without the menu, `./setup.sh plan` prints the same review, and
+`./setup.sh apply --yes` runs the import. The import takes no `--select`,
+`--remove-shared` or `--replace` flag. Before the import, `./setup.sh check`
+prints the review and returns exit code 1.
+
+### What the import does
+
+The import has three stages.
+
+1. **Build.** Setup builds the private tools again in `<state>/tools`, beside
+   the v2 payloads. This includes the new Neovim runtime. It changes no system
+   package and no Sentinel file.
+2. **Verify.** Setup checks each new build from its final path. When a build
+   fails, release v2 stays active, and you can run setup again with either
+   checkout.
+3. **Switch.** Setup saves each target that the switch can change in
+   `<state>/v2-restore`. Then it publishes the schema-2 state and moves the
+   shell initialization, the launchers, the links and the Neovim runtime link
+   to the new builds.
+
+The import stops before the switch when one of these conditions applies.
+Release v2 then stays active. Correct the condition with the `v2.3.0`
+checkout, then start again at step 4.
+
+- The v2 state has an interrupted operation or a record that v2.3.0 does not
+  read.
+- A system package that a selected tool needs is missing or needs a repair.
+
+If the switch stops before its end, the state stays in the import. Run setup
+again and choose **Complete the import** or **Restore release v2**. Without
+the menu, use `./setup.sh apply --yes` or `./setup.sh restore-v2 --yes`.
+
+### What changes
+
+- The state file has schema 2. The v2.3.0 setup refuses it.
+- The commands change. `machine` is gone. Automation uses `plan`,
+  `apply --yes`, `update --yes` and `check`.
+- There is no **Resume** and no **Abandon**. After an interruption, run setup
+  again.
+- Setup never removes a system package or a vendor application. The review
+  shows a removal command for a recorded package that nothing needs, and you
+  run it.
+- Setup records a system package only when release v2 installed it and it is
+  there now. Other packages get no record, and setup never changes them.
+- The old Sentinel records of dotfiles 1.0 go away. The Sentinel install and
+  `<state>/sentinel/record.json` stay as they are. The first later Sentinel
+  release moves the v2 checkout aside one time, and Check reports that folder.
+
+### What stays
+
+- Your selection and your kept resources.
+- Your content. For a target that you changed, setup keeps your content and
+  records only its baseline. Setup asks before it replaces such a target.
+- The system packages and the Sentinel files.
+- The folders of release v2 in `<state>`: `packages`, `nvim-sync`,
+  `configuration`, `profiles` and `recovery`. Setup never deletes them.
+  Delete them yourself after the fallback closes. Check then names each
+  folder that no recorded target or baseline uses.
+- On the Mac, VS Code, Ghostty and OpenWhispr. See the next section.
+
+### The three Mac applications
+
+In the import run, VS Code, Ghostty and OpenWhispr keep their v2 payloads and
+their v2 commands. Release v3 installs them from the Homebrew casks
+`visual-studio-code`, `ghostty` and `openwhispr`.
+
+A later **Update tools** run offers each cask install in its review.
+**Choose tools** keeps the v2 payload. Each move is one reviewed decision.
+Quit the application first.
+Setup installs the signed app in `/Applications` and verifies it. Then it
+moves the `code` or `ghostty` command to the new app and releases the v2
+application link. For VS Code, it also releases the managed `update.mode`
+field and restores its earlier value. Setup keeps and reports a v2 entry that
+you changed.
+
+The first confirmed run that changes something closes the v2 fallback. A cask
+move is such a change. Do it only when the Mac works with release v3.
+
+### Go back to release v2
+
+`restore-v2` is available from the switch until the fallback closes.
+
+1. Run `./setup.sh restore-v2`. It prints the preview and changes nothing.
+2. Run `./setup.sh restore-v2 --yes`. Setup gives back the saved targets and
+   removes the targets that the switch created. Then it publishes the saved
+   v2 state. It keeps each target that you changed after the switch. In the
+   menu, **Restore release v2** lets you select the changed targets that it
+   replaces, and it saves your content first.
+3. Run `git checkout v2.3.0`. Open setup and run **Check installation**.
+
+If `restore-v2` stops before it publishes the v2 state, release v3 stays
+active. Resolve the items that it lists and run the same command again. The
+private builds in `<state>/tools` and the restore set stay. Delete them
+yourself when you do not need them.
+
+The first confirmed **Choose tools** or **Update tools** run that changes
+something closes the fallback, immediately before its first change. A run
+that changes nothing keeps the fallback open. The preview of a run that
+closes the fallback shows this line:
+`This closes the v2 fallback: after you confirm this run, restore-v2 is not
+available. The v2 folders stay for your cleanup.` **Check installation** does
+not close the fallback.
+
+Release v3.1.0 deletes the import and `restore-v2`. Import each machine and
+close each fallback before you update to v3.1.0. An older state then gets an
+error that names the v3.0.0 tag.
+
+## Releases before v3.0.0
+
+The sections below describe the v2 installer and older releases. Their
+Resume, Abandon, journal and receipt steps apply only to a v2 checkout, up to
+`v2.3.0`. Use them to finish v2 work before the import.
+
 ## From a release before v1.2.0
 
-This release reads the installer states that v1.2.0 and later leave on a
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
+Release v2 reads the installer states that v1.2.0 and later leave on a
 machine. Update an older machine to v1.2.0 first. The steps are the same on each
 platform. Use `setup.sh` on macOS and Linux, and `setup.ps1` on Windows.
 
@@ -12,7 +170,8 @@ From v1.0.0, v1.0.1 or v1.1.0:
    operation.
 2. Check out `v1.2.0`. Open setup and choose **Update tools**. Run **Check**, and
    fix each problem that it reports.
-3. Check out `main`. Open setup and choose **Update tools**.
+3. Check out `v2.3.0`. Open setup and choose **Update tools**.
+4. Follow [From v2 to v3.0.0](#from-v2-to-v300).
 
 From v0.4.x (Nix and chezmoi):
 
@@ -27,7 +186,7 @@ dotfiles 1.0 copied, and the records of unreleased builds. Setup does not change
 such a record. It shows the resource and the v1.2.0 step. For most of these
 records, the whole request stops before any change. An old package generation
 and an unticked Sentinel only make their own resource wait. Do the step with the
-`v1.2.0` checkout, then update to `main` again.
+`v1.2.0` checkout, then update to `v2.3.0` again.
 
 Setup releases its record of Flatpak, and Flatpak stays installed.
 
@@ -38,6 +197,9 @@ checkout to examine them.
 
 ## Windows
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The new Windows installer discovers actual known folders independently, including
 redirected Documents and Start Menu Programs. Neovim uses a directory junction;
 other configuration uses copies/scoped settings. Developer Mode is not required.
@@ -47,6 +209,9 @@ contains ambiguous legacy combined actions, launch it once to let Terminal migra
 its own settings, then retry the reviewed setup.
 
 ## Interruptions and conflicts
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 An unfinished transaction from a released old installer must first be recovered
 with that exact retained release and recovery directory. Recover an unfinished
@@ -123,6 +288,9 @@ manufacture a clean install. A changed file, unreadable baseline or live consume
 remains a visible action item until its real cause is resolved.
 
 ## Later updates and removal
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 OpenWhispr, Obsidian, Tailscale and Zen are new optional selections; updating
 the checkout does not select them automatically. Consult the README platform
@@ -207,6 +375,9 @@ Exclude `update.mode` from sync in Code if those machines should update separate
 
 ## Sentinel rules and skills
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The Sentinel rules and skills selection runs the installer of the latest
 Sentinel release. Before you update the checkout, finish or abandon an
 interrupted Sentinel operation with the release that started it. Follow
@@ -222,6 +393,9 @@ Kiro files in `${KIRO_HOME:-~/.kiro}`. Copilot CLI reads `~/.agents/skills` also
 when you set `COPILOT_HOME`.
 
 ## T3 Code
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 The **T3 Code** selection now installs the desktop app on macOS and on
 Ubuntu/Debian. The earlier selection keeps its standalone `t3` package and is
@@ -265,6 +439,9 @@ or Update all buttons in T3; those can invoke the CLI's own updater.
 
 ### Zen macOS native application
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 The macOS selection now uses Homebrew's official `zen` cask and normal browser
 updates. Existing authentic app bundles are reused without acquiring removal
 rights. Finish an interrupted earlier operation using its original checkout
@@ -280,6 +457,9 @@ at the same path is indistinguishable from a normal browser update. An unverifie
 app, changed uninstall recipe or an existing shared `zen` command blocks removal.
 
 ### Windows Neovim formatter correction
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 Windows now uses standalone Gersemi and clang-format archives at the same pinned
 versions as the POSIX Mason tools. An approved Update builds a fresh Neovim
@@ -300,6 +480,9 @@ abandoned safely; preserve it for recovery rather than deleting its journal.
 
 ### Windows VC++ registry reconciliation
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 Build Tools installation can leave differing VC++ version entries across the
 Windows registry views. Setup now accepts the newer entry only when the installed
 bundle, both MSI providers and the runtime DLL versions agree. Older entries are
@@ -311,19 +494,22 @@ cannot be reinterpreted as the new recipe.
 
 ### Windows legacy profile ownership
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 An earlier elevated setup can leave Git configuration or a PowerShell profile
 owned by `BUILTIN\Administrators`. Windows may let your normal account edit its
 contents but refuse to assign that owner to a replacement file. Setup preserves
 the original file and its permissions, removes its refused staged copy, and
-retains the saved operation. Repeating the same non-elevated attempt cannot fix
+reports the failed step. Repeating the same non-elevated attempt cannot fix
 that refusal.
 
 Open PowerShell as administrator **under the same Windows account**, return to
-the same checkout, and run `./setup.ps1`. Choose Resume (or finish the saved
-restoration if restoration was already started). Review and approve only the
-one-resource recovery plan. After that resource recovers, leave the elevated
+the same checkout, and run `./setup.ps1` again. Review the plan and approve it.
+After that file is written, leave the elevated
 terminal and run setup from a normal PowerShell window to review remaining work.
 Do not approve an entire new installation as administrator for this exception.
+With a v2 checkout, choose Resume in the elevated run.
 
 Setup never takes ownership or elevates profile writes automatically. You can
 instead explicitly resolve the file's ownership outside setup if that is your
@@ -335,6 +521,9 @@ ownership explicitly outside setup; administrator elevation alone is not a
 general way to preserve an arbitrary owner SID.
 
 ### Private Python tools and existing terminal sessions
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 The managed `latex2text` and `yamllint` commands now use their own command-only
 directories. Their private Python/pip executables no longer enter your shell PATH.
@@ -361,6 +550,9 @@ journal fragment omits the full file's BOM.
 
 ### Continuing removal after restoring personal settings
 
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
+
 Restoring an adopted settings file completes removal of that integration even
 when the personal file remains present. A subsequent removal preview releases
 its former prerequisites when the saved completion and restored baseline still
@@ -382,6 +574,9 @@ the affected configuration, then remove it again to establish a new verified
 lifecycle. The released chezmoi/Nix migration uses the separate v1.0.1 migrate workflow.
 
 ## A personal Homebrew Zen without its app
+
+This section applies only to a v2 checkout (`v2.3.0` or older). Release v3 has
+no such action.
 
 If you installed Zen yourself through Homebrew and then removed only its app,
 restore it with

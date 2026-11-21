@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "windows-terminal",
+      "name": "Windows Terminal",
+      "description": "Terminal with scoped profile and theme merge",
+      "capability": true,
+      "category": "Terminal apps",
+      "order": 22,
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "integration.windows-terminal",
+        "desktop.windows-terminal"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.windows-terminal",
+      "name": "Windows Terminal",
+      "platforms": [
+        "windows"
+      ],
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "tool.windows-terminal"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.powershell"
+        ]
+      },
+      "action": "archive",
+      "scope": "user",
+      "shared": true,
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "integration.windows-terminal",
+      "name": "Windows Terminal merge",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.windows-terminal",
+        "tool.font"
+      ],
+      "action": "windows-terminal-settings",
+      "scope": "user"
+    },
+    {
+      "id": "desktop.windows-terminal",
+      "name": "Windows Terminal application launcher",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.windows-terminal"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    }
+  ]
+}

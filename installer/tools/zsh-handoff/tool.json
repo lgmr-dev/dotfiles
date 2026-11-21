@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "zsh-handoff",
+      "name": "zsh from bash terminals",
+      "description": "Switch interactive bash terminals to zsh when the account's login shell is bash and cannot be changed",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 4,
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.zsh",
+        "integration.zsh-handoff"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "integration.zsh-handoff",
+      "name": "zsh handoff from interactive bash",
+      "platforms": [
+        "darwin",
+        "linux"
+      ],
+      "requires": [
+        "config.zsh",
+        "integration.shells"
+      ],
+      "scope": "user"
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.claude": {
+      "darwin/arm64": {
+        "version": "2.1.329",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.329.tgz",
+        "sha256": "705b53d7138e476686708921e321b4603a7973823362bd079b0400e54756df39",
+        "format": "tar.gz",
+        "commands": {
+          "claude": "claude"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      },
+      "linux/amd64": {
+        "version": "2.1.329",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.329.tgz",
+        "sha256": "a74d6c8441a19b2d2f44c1f5735b37dc0a34b2d4f224f8333d08ce03cf2060bb",
+        "format": "tar.gz",
+        "commands": {
+          "claude": "claude"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc",
+        "strip_components": 1
+      },
+      "linux/arm64": {
+        "version": "2.1.329",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.329.tgz",
+        "sha256": "144f8c33cebc8830d8dc82c275a8172ac0330000a71df562d8a8d09795bcdc8e",
+        "format": "tar.gz",
+        "commands": {
+          "claude": "claude"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc",
+        "strip_components": 1
+      },
+      "windows/amd64": {
+        "version": "2.1.329",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.329.tgz",
+        "sha256": "e54e1378a9fc3478b4f8769ec8ab7c48a0d234a807c6853edb17a886cd905280",
+        "format": "tar.gz",
+        "commands": {
+          "claude": "claude.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.superfile": {
+      "darwin/arm64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-darwin-v1.6.0-arm64.tar.gz",
+        "sha256": "131f654e7f8366fd37dbe9363739f8d82e57ff3f632f45963cd233c049cfad2a",
+        "format": "tar.gz",
+        "commands": {
+          "spf": "spf"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      },
+      "linux/amd64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-linux-v1.6.0-amd64.tar.gz",
+        "sha256": "d45b0e95072629a6aa7983a84eedca9cd7a98861e67ef91be1415496e3dda309",
+        "format": "tar.gz",
+        "commands": {
+          "spf": "spf"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      },
+      "linux/arm64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-linux-v1.6.0-arm64.tar.gz",
+        "sha256": "2e8150dab1a139e3a081bd74a9c775155e8d0241c34ae3f8d30817a3df1b8f06",
+        "format": "tar.gz",
+        "commands": {
+          "spf": "spf"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      },
+      "windows/amd64": {
+        "version": "1.6.0",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-windows-v1.6.0-amd64.zip",
+        "sha256": "4264a84d38c5d13804960a5da9ea8dedb8a00439e2612d6b8a28699836ed0143",
+        "format": "zip",
+        "commands": {
+          "spf": "spf.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "strip_components": 2
+      }
+    }
+  }
+}

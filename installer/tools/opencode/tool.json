@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "opencode",
+      "name": "OpenCode CLI",
+      "description": "Standalone terminal coding agent; sign in after installation; managed shells keep its self-update off so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "order": 32,
+      "requires": [
+        "tool.opencode"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.opencode",
+      "name": "OpenCode CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.opencode"
+        }
+      }
+    }
+  ]
+}

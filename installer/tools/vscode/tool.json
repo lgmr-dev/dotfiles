@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "vscode",
+      "name": "VS Code",
+      "description": "Editor with Rose Pine, fonts and updates via setup; Settings Sync can copy the update preference",
+      "capability": true,
+      "category": "Editors",
+      "order": 2,
+      "requires": [
+        "tool.vscode",
+        "integration.vscode-managed"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "darwin": [
+          "desktop.vscode"
+        ],
+        "windows": [
+          "desktop.vscode"
+        ]
+      }
+    },
+    {
+      "id": "tool.vscode",
+      "name": "VS Code",
+      "action": "vscode",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-cask",
+          "package": "visual-studio-code"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "code"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.vscode"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "integration.shells",
+          "infra.homebrew"
+        ],
+        "windows": [
+          "integration.shells"
+        ]
+      }
+    },
+    {
+      "id": "integration.vscode-managed",
+      "name": "VS Code theme, fonts and update policy (may sync to other machines)",
+      "requires": [
+        "tool.vscode",
+        "tool.font",
+        "vscode.rose-pine",
+        "desktop.rose-pine"
+      ],
+      "action": "profile",
+      "scope": "user"
+    },
+    {
+      "id": "vscode.rose-pine",
+      "name": "VS Code Rose Pine theme files",
+      "action": "theme-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "vscode.rose-pine"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "vscode.rose-pine"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "vscode.rose-pine"
+        }
+      }
+    },
+    {
+      "id": "desktop.vscode",
+      "name": "VS Code application launcher",
+      "requires": [
+        "tool.vscode"
+      ],
+      "action": "desktop",
+      "scope": "user",
+      "platforms": [
+        "darwin",
+        "windows"
+      ]
+    },
+    {
+      "id": "desktop.rose-pine",
+      "name": "VS Code Rose Pine registration",
+      "requires": [
+        "vscode.rose-pine"
+      ],
+      "action": "desktop",
+      "scope": "user"
+    }
+  ]
+}

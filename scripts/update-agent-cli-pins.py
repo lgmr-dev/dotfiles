@@ -51,7 +51,7 @@ import urllib.request
 import zipfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PINS = ROOT / "installer" / "archive-pins.json"
+TOOLS = ROOT / "installer" / "tools"
 AGENT_TOOLS = ("tool.claude", "tool.codex", "tool.copilot", "tool.kiro", "tool.muse")
 POLICY = ROOT / "scripts" / "archive-pin-updates.json"
 STABLE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?")
@@ -466,8 +466,19 @@ def muse(network, pins: dict, work: pathlib.Path):
 BUMPERS = {"tool.claude": claude, "tool.codex": codex, "tool.copilot": copilot, "tool.kiro": kiro, "tool.muse": muse}
 
 
+def load_pins(tools: pathlib.Path) -> tuple[dict, dict]:
+    documents = {path: json.loads(path.read_text(encoding="utf-8")) for path in sorted(tools.glob("*/pins.json"))}
+    pins = {}
+    for path, document in documents.items():
+        for tool, targets in document["resources"].items():
+            if tool in pins:
+                raise BumpError(f"{tool} has pins in more than one file: {path}")
+            pins[tool] = targets
+    return documents, pins
+
+
 def apply_updates(pins: dict, tool: str, updates: dict) -> None:
-    current = pins["resources"][tool]
+    current = pins[tool]
     if set(updates) != set(current):
         raise BumpError(f"{tool} release does not cover exactly its pinned targets")
     for target, fields in updates.items():
@@ -476,7 +487,7 @@ def apply_updates(pins: dict, tool: str, updates: dict) -> None:
 
 def main(argv=None, network=None, verify=gpg_verify, now=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--pins", type=pathlib.Path, default=PINS)
+    parser.add_argument("--pins", type=pathlib.Path, default=TOOLS, help="the folder that holds <tool>/pins.json")
     parser.add_argument("--tools")
     parser.add_argument("--check-coverage", action="store_true")
     parser.add_argument("--summary", type=pathlib.Path)
@@ -484,25 +495,24 @@ def main(argv=None, network=None, verify=gpg_verify, now=None) -> int:
     args = parser.parse_args(argv)
     network = network or Network(os.environ.get("GITHUB_TOKEN", ""))
     now = now or datetime.datetime.now(datetime.timezone.utc)
-    document = json.loads(args.pins.read_text(encoding="utf-8"))
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     try:
-        check_coverage(document["resources"], policy)
+        documents, pins = load_pins(args.pins)
+        check_coverage(pins, policy)
     except BumpError as error:
         print(f"Pin coverage failed: {error}", file=sys.stderr)
         return 1
     if args.check_coverage:
-        print(f"Pin coverage passed: {len(document['resources'])} resources")
+        print(f"Pin coverage passed: {len(pins)} resources in {len(documents)} files")
         return 0
     lines, failures, held = [], [], []
     selected = args.tools.split(",") if args.tools else [*AGENT_TOOLS, *policy["github"]]
     for tool in selected:
         if tool not in BUMPERS and tool not in policy["github"]:
             parser.error(f"unknown tool {tool}")
-        current = sorted({pin["version"] for pin in document["resources"][tool].values()})
+        current = sorted({pin["version"] for pin in pins[tool].values()})
         try:
             with tempfile.TemporaryDirectory() as work:
-                pins = document["resources"]
                 if tool == "tool.claude":
                     version, updates = claude(network, pins, pathlib.Path(work), verify)
                 elif tool == "tool.copilot":
@@ -511,7 +521,7 @@ def main(argv=None, network=None, verify=gpg_verify, now=None) -> int:
                     version, updates = github_release(network, pins, pathlib.Path(work), tool, policy["github"][tool], held, now)
                 else:
                     version, updates = BUMPERS[tool](network, pins, pathlib.Path(work))
-            apply_updates(document, tool, updates)
+            apply_updates(pins, tool, updates)
             lines.append(f"- `{tool}`: {', '.join(current)} -> {version}")
             lines += [f"  - {target}: `{fields['sha256']}`" for target, fields in sorted(updates.items())]
         except UnchangedRelease as reason:
@@ -519,7 +529,8 @@ def main(argv=None, network=None, verify=gpg_verify, now=None) -> int:
         except (BumpError, KeyError, ValueError, TypeError, AttributeError, OSError, EOFError, http.client.HTTPException,
                 tarfile.TarError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
             failures.append(f"- `{tool}`: {error}")
-    args.pins.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    for path, document in documents.items():
+        path.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     manual = [f"- `{tool}`: {reason}" for tool, reason in sorted(policy["manual"].items())]
     summary = "\n".join(["Archive pins:", *lines, *(["", "Held for major version review:", *held] if held else []),
                          *(["", "Failed verification:", *failures] if failures else []),

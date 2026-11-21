@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "git",
+      "name": "Git",
+      "description": "Git with rebasing pulls and automatic fetch pruning; preserves personal settings",
+      "capability": true,
+      "category": "Version control",
+      "order": 14,
+      "requires": [
+        "integration.git"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.git",
+      "name": "Git",
+      "action": "git",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "darwin": {
+          "provider": "homebrew-formula",
+          "package": "git"
+        },
+        "linux": {
+          "provider": "apt",
+          "package": "git"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.git"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.homebrew"
+        ]
+      }
+    },
+    {
+      "id": "integration.git",
+      "name": "Git defaults",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "profile",
+      "scope": "user"
+    }
+  ]
+}

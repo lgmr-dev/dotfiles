@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "powershell",
+      "name": "PowerShell 7",
+      "description": "Interactive shell profile and fuzzy pickers",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 5,
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "config.powershell",
+        "integration.fzf"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.powershell",
+      "name": "PowerShell 7",
+      "platforms": [
+        "windows"
+      ],
+      "action": "powershell",
+      "scope": "user",
+      "shared": true,
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "powershell"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "config.powershell",
+      "name": "powershell configuration",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.powershell",
+        "integration.shells"
+      ],
+      "scope": "user"
+    }
+  ],
+  "shell": [
+    {
+      "resource": "config.powershell",
+      "shell": "powershell",
+      "source": "shell/powershell-core.ps1"
+    }
+  ]
+}

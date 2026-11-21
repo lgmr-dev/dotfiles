@@ -1,0 +1,280 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.nvim": {
+      "linux/amd64": {
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-linux-x86_64.tar.gz",
+        "sha256": "474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87",
+        "format": "tar.gz",
+        "commands": {
+          "nvim": "bin/nvim"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-win64.zip",
+        "sha256": "4e12b7103b601ffc8f25954b4da100f339faa73dccb69a5b135e897fa3d893ed",
+        "format": "zip",
+        "commands": {
+          "nvim": "bin/nvim.exe"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-linux-arm64.tar.gz",
+        "sha256": "8f1f64a0bdb97247034038c3823c6cbad5bdf9ecd5751b85494b71c3ee04c815",
+        "format": "tar.gz",
+        "commands": {
+          "nvim": "bin/nvim"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ],
+        "libc": "glibc"
+      },
+      "darwin/arm64": {
+        "version": "0.12.6",
+        "url": "https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-macos-arm64.tar.gz",
+        "sha256": "1dbd148222b051ba6c307c4d17a318ed083df018a4f6a5a0ce46955ffc9ab87b",
+        "format": "tar.gz",
+        "commands": {
+          "nvim": "bin/nvim"
+        },
+        "bin_dirs": [
+          "bin"
+        ],
+        "strip_components": 1,
+        "required_files": [
+          "share/nvim/runtime/filetype.lua"
+        ]
+      }
+    },
+    "tool.tree-sitter": {
+      "darwin/arm64": {
+        "version": "0.27.2",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.2/tree-sitter-macos-arm64.gz",
+        "sha256": "5a08b66e5713b0c69691611250b2191d07139647a3c6e39ba85954284b634d2d",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter"
+      },
+      "linux/amd64": {
+        "version": "0.27.2",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.2/tree-sitter-linux-x64.gz",
+        "sha256": "7ed56d152c52437397b9fcaa43cf341f49933cecc1ca291843f0d347c6e2cb3a",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter",
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "0.27.2",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.2/tree-sitter-linux-arm64.gz",
+        "sha256": "34fcc5c4fa7bdd2058a2a45a03b6eb9a49b03a93b6d52ec750f99b1516d98d33",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter",
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "0.27.2",
+        "url": "https://github.com/tree-sitter/tree-sitter/releases/download/v0.27.2/tree-sitter-windows-x64.gz",
+        "sha256": "230779ee4a729e3044d4a8ed57490b776ea1bac0671d12afbd6f5b4d1878f1d0",
+        "format": "gzip",
+        "commands": {
+          "tree-sitter": "tree-sitter.exe"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "file": "tree-sitter.exe"
+      }
+    },
+    "tool.latex2text": {
+      "darwin/arm64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "commands/latex2text"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.2.1",
+            "url": "https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl",
+            "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+            "format": "file",
+            "file": "setuptools-84.2.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.2.1-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "linux/amd64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "commands/latex2text"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.2.1",
+            "url": "https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl",
+            "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+            "format": "file",
+            "file": "setuptools-84.2.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.2.1-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "linux/arm64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "commands/latex2text"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.2.1",
+            "url": "https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl",
+            "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+            "format": "file",
+            "file": "setuptools-84.2.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.2.1-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      },
+      "windows/amd64": {
+        "version": "2.11",
+        "url": "https://files.pythonhosted.org/packages/52/45/ddb0fb04acf95fe9cf9c369814dbdd08651bd2c9ee455f142651e06f4488/pylatexenc-2.11.tar.gz",
+        "sha256": "305a072a99ce736246049c9da05841b9d718c0f7ea8888f5f596cf15cb621053",
+        "format": "file",
+        "file": "pylatexenc-2.11.tar.gz",
+        "commands": {
+          "latex2text": "commands/latex2text.exe"
+        },
+        "bin_dirs": [
+          "commands"
+        ],
+        "required_files": [],
+        "latex2text": {
+          "backend": {
+            "version": "84.2.1",
+            "url": "https://files.pythonhosted.org/packages/ef/55/6dc6d6bb953bdfc52519a0059592c52b6e3b8ad51cf8256dffceb55b0610/setuptools-84.2.1-py3-none-any.whl",
+            "sha256": "ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2",
+            "format": "file",
+            "file": "setuptools-84.2.1-py3-none-any.whl",
+            "commands": {},
+            "bin_dirs": [],
+            "required_files": [
+              "setuptools-84.2.1-py3-none-any.whl"
+            ]
+          },
+          "python_pin_id": ""
+        }
+      }
+    },
+    "tool.gersemi": {
+      "windows/amd64": {
+        "version": "0.29.2",
+        "url": "https://github.com/BlankSpruce/gersemi/releases/download/0.29.2/gersemi-windows.exe",
+        "sha256": "ff2e6d6335110c71e4a16d4138c5bafdbf22cc3af7f4b2ece4c5d03f66ad021a",
+        "format": "file",
+        "file": "gersemi.exe",
+        "commands": {
+          "gersemi": "gersemi.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
+    "tool.clang-format": {
+      "windows/amd64": {
+        "version": "23.1.5",
+        "url": "https://files.pythonhosted.org/packages/7b/67/b91fb3483ca5cdb468fa5e72d836736de5ec29154cc3f58718de6192bc12/clang_format-23.1.5-py2.py3-none-win_amd64.whl",
+        "sha256": "18a4a1a698dd52ed4e288c97d99e93910f8f9d0128b266f65021ecf39c85d034",
+        "format": "zip",
+        "commands": {
+          "clang-format": "clang_format/data/bin/clang-format.exe"
+        },
+        "bin_dirs": [
+          "clang_format/data/bin"
+        ],
+        "required_files": [
+          "clang_format-23.1.5.dist-info/licenses/LICENSE.md",
+          "clang_format-23.1.5.dist-info/licenses/COPYING.md"
+        ]
+      }
+    }
+  }
+}

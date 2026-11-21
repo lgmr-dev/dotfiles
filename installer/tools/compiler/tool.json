@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.make",
+      "name": "Make",
+      "action": "make",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "make"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.make"
+        }
+      },
+      "platform_requires": {
+        "darwin": [
+          "infra.apple-clt"
+        ],
+        "windows": [
+          "integration.shells",
+          "tool.git"
+        ]
+      }
+    },
+    {
+      "id": "tool.cmake",
+      "name": "CMake",
+      "action": "cmake",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "cmake"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "cmake"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "cmake"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "tool.compiler",
+      "name": "C/C++ toolchain",
+      "action": "compiler",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "build-essential"
+        }
+      },
+      "platform_requires": {
+        "windows": [
+          "tool.vcredist"
+        ],
+        "darwin": [
+          "infra.apple-clt"
+        ]
+      }
+    },
+    {
+      "id": "infra.apple-clt",
+      "name": "Apple developer tools",
+      "action": "apple-clt",
+      "scope": "machine",
+      "platforms": [
+        "darwin"
+      ],
+      "retain": true,
+      "replan_after": true
+    }
+  ]
+}

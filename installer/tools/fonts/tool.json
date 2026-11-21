@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "tool.font",
+      "name": "Hack Nerd Font",
+      "action": "font",
+      "scope": "user",
+      "shared": true,
+      "requires": [
+        "font.hack"
+      ],
+      "platform_requires": {
+        "linux": [
+          "tool.fontconfig"
+        ]
+      }
+    },
+    {
+      "id": "font.hack",
+      "name": "Hack Nerd Font files",
+      "action": "font-archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "hack-nerd-font"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "hack-nerd-font"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "hack-nerd-font"
+        }
+      }
+    },
+    {
+      "id": "tool.fontconfig",
+      "name": "Font discovery/cache",
+      "platforms": [
+        "linux"
+      ],
+      "action": "fontconfig",
+      "scope": "machine",
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "fontconfig"
+        }
+      }
+    }
+  ]
+}

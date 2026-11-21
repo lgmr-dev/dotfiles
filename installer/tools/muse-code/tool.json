@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "muse-code",
+      "name": "Muse Code CLI",
+      "description": "Standalone terminal coding agent from Meta; sign in after installation; setup installs the pinned binary without Meta's self-updating launcher, so Update applies the reviewed version",
+      "capability": true,
+      "category": "AI coding",
+      "order": 31,
+      "requires": [
+        "tool.muse"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.muse",
+      "name": "Muse Code CLI",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.muse"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.muse"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.muse"
+        }
+      }
+    }
+  ]
+}

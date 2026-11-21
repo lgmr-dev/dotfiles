@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "pi",
+      "name": "Pi coding agent",
+      "description": "Standalone terminal coding agent; sign in after installation; setup installs the pinned release binary, which does not update itself",
+      "capability": true,
+      "category": "AI coding",
+      "order": 33,
+      "requires": [
+        "tool.pi"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.pi",
+      "name": "Pi coding agent",
+      "requires": [
+        "tool.git",
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.pi"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.pi"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.pi"
+        }
+      }
+    }
+  ]
+}

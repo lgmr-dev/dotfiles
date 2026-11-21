@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "fzf",
+      "name": "fzf",
+      "description": "Interactive fuzzy finding",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 9,
+      "requires": [
+        "tool.fzf",
+        "integration.fzf"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.fzf",
+      "name": "fzf",
+      "action": "fzf",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.fzf"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.fzf"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.fzf"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "powershell.psfzf",
+      "name": "PSFzf module",
+      "platforms": [
+        "windows"
+      ],
+      "requires": [
+        "tool.fzf"
+      ],
+      "action": "psfzf",
+      "scope": "user",
+      "bindings": {
+        "windows": {
+          "provider": "archive",
+          "package": "powershell.psfzf"
+        }
+      }
+    },
+    {
+      "id": "integration.fzf",
+      "name": "fzf shell integration",
+      "requires": [
+        "tool.fzf",
+        "integration.shells"
+      ],
+      "scope": "user",
+      "platform_requires": {
+        "windows": [
+          "powershell.psfzf"
+        ]
+      }
+    }
+  ],
+  "shell": [
+    {
+      "resource": "integration.fzf",
+      "shell": "powershell",
+      "source": "shell/fzf.ps1"
+    }
+  ]
+}

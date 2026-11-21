@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.xremap": {
+      "linux/amd64": {
+        "version": "0.15.18",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.18/xremap-linux-x86_64-full.zip",
+        "sha256": "7500554a4bf0152685e5f0937cbf26a03d422bbe075193cf24d285bbde3aa6d3",
+        "format": "zip",
+        "commands": {
+          "xremap": "xremap"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.15.18",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.18/xremap-linux-aarch64-full.zip",
+        "sha256": "11ca3b03e9474b398838df57575920399cc980f284fc6f6c18ab437dff7ab428",
+        "format": "zip",
+        "commands": {
+          "xremap": "xremap"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    }
+  }
+}

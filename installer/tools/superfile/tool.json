@@ -1,0 +1,155 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "superfile",
+      "name": "superfile",
+      "description": "Terminal file manager; Shift+Q quits into the folder you browsed",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 13,
+      "requires": [
+        "tool.superfile",
+        "config.superfile",
+        "integration.superfile"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.superfile",
+      "name": "superfile",
+      "action": "superfile",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.superfile"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.superfile"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.superfile"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "config.superfile",
+      "name": "superfile configuration",
+      "requires": [
+        "tool.superfile"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "integration.superfile",
+      "name": "superfile shell integration",
+      "requires": [
+        "tool.superfile",
+        "integration.shells"
+      ],
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.superfile",
+      "source": "superfile/config.toml",
+      "folder": "home",
+      "path": "Library/Application Support/superfile/config.toml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/config.toml",
+      "folder": "config",
+      "path": "superfile/config.toml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/config.toml",
+      "folder": "local_app_data",
+      "path": "superfile/config.toml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/hotkeys.toml",
+      "folder": "home",
+      "path": "Library/Application Support/superfile/hotkeys.toml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/hotkeys.toml",
+      "folder": "config",
+      "path": "superfile/hotkeys.toml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/hotkeys.toml",
+      "folder": "local_app_data",
+      "path": "superfile/hotkeys.toml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/theme/rose-pine-dotfiles.toml",
+      "folder": "home",
+      "path": "Library/Application Support/superfile/theme/rose-pine-dotfiles.toml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/theme/rose-pine-dotfiles.toml",
+      "folder": "config",
+      "path": "superfile/theme/rose-pine-dotfiles.toml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.superfile",
+      "source": "superfile/theme/rose-pine-dotfiles.toml",
+      "folder": "local_app_data",
+      "path": "superfile/theme/rose-pine-dotfiles.toml",
+      "platforms": [
+        "windows"
+      ]
+    }
+  ],
+  "shell": [
+    {
+      "resource": "integration.superfile",
+      "shell": "powershell",
+      "source": "shell/superfile.ps1"
+    },
+    {
+      "resource": "integration.superfile",
+      "shell": "posix",
+      "source": "shell/superfile.sh"
+    }
+  ]
+}

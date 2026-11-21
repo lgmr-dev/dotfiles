@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class AppleReceiptFixtureTest(unittest.TestCase):
     def run_receipts(self, receipts, files="Library/Developer/CommandLineTools/usr/bin/clang\n", query_status=0, files_status=0, info_status=0, location="/", directories=".\nLibrary\nLibrary/Developer\nLibrary/Developer/CommandLineTools\n"):
-        workflow = (ROOT / ".github/workflows/installer-engine.yml").read_text()
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         start = workflow.index('          receipts="$(pkgutil')
-        end = workflow.index('          DOTFILES_TEST_NATIVE_PACKAGES=1 DOTFILES_TEST_APPLE_CLT=1 "$RUNNER_TEMP/installer.test" -test.v -test.timeout=5m -test.run=\'^TestNativeAppleCLTRecordOutsideReceiptPreservation$\'', start)
+        end = workflow.index('          shopt -s nullglob', start)
         block = "\n".join(line[10:] for line in workflow[start:end].splitlines())
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
@@ -91,11 +91,9 @@ esac
         self.assertLess(len(result.stderr.encode()), 7000)
 
     def test_receipts_are_checked_before_any_payload_move(self):
-        workflow = (ROOT / ".github/workflows/installer-engine.yml").read_text()
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
         self.assertNotIn("pkgutil --forget", workflow)
-        self.assertLess(workflow.index("# Historical receipts remain unchanged;"), workflow.index('sudo mv "$application" "$baseline/"'))
-        self.assertLess(workflow.index("TestNativeAppleCLTPreinstalledReuse$"), workflow.index('receipts="$(pkgutil'))
-        self.assertLess(workflow.index("TestNativeAppleCLTRecordOutsideReceiptPreservation$"), workflow.index('sudo mv "$application" "$baseline/"'))
+        self.assertLess(workflow.index('done <<< "$receipts"'), workflow.index('sudo mv "$application" "$baseline/"'))
 
     def test_package_and_payload_query_failures_remain_fatal(self):
         for query, files, info in ((2, 0, 0), (0, 3, 0), (0, 0, 4)):

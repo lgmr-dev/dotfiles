@@ -1,0 +1,445 @@
+package builds
+
+import (
+	"context"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/luisgui1757/dotfiles/installer/fetch"
+	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/luisgui1757/dotfiles/installer/state"
+)
+
+// Sweep removes the unused private builds. The roots are the targets of the
+// current links and of each staged link, the builds that a recorded target
+// names, and the builds that the manifests of those builds use. A recorded
+// target names a build in its record values, in its decoded inline baseline
+// value, in each file and link of its backup baseline, in the live target of
+// a recorded link, in the complete live content of a recorded file, block or
+// field, or of a regular file in the place of a recorded link, and in each
+// file and link of a recorded tree. A folder in the place of a target of
+// another kind names no build. When a read of a recorded target or of its
+// baseline fails, Sweep removes no build and returns the reason. It removes
+// an unused build only while its tree still equals its manifest, then the
+// manifest of that build and an empty resource folder. It leaves a changed
+// build, a folder without a valid manifest, a manifest file without its
+// build, a staged link that no unfinished publication records and each entry
+// that it does not know, and returns them in left. An entry that appears
+// during the removal also stays.
+func Sweep(ctx context.Context, stateDir string, st state.State) (removed, left []string, err error) {
+	return sweep(ctx, stateDir, st, true)
+}
+
+// Leftovers returns what Sweep would leave, and removes nothing. Check uses
+// it.
+func Leftovers(ctx context.Context, stateDir string, st state.State) ([]string, error) {
+	_, left, err := sweep(ctx, stateDir, st, false)
+	return left, err
+}
+
+type resourceFolder struct {
+	id        string
+	builds    []string
+	manifests []string
+}
+
+func sweep(ctx context.Context, stateDir string, st state.State, remove bool) (removed, left []string, err error) {
+	tools := ToolsDir(stateDir)
+	if err := bound(filepath.Join(tools, "current")); err != nil {
+		return nil, nil, err
+	}
+	ids, err := platform.ReadPlainDirectory(tools)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	folders := []resourceFolder{}
+	roots := []string{}
+	for _, entry := range ids {
+		dir := filepath.Join(tools, entry.Name())
+		if !entry.IsDir() || !resourceID.MatchString(entry.Name()) {
+			left = append(left, dir)
+			continue
+		}
+		folder := resourceFolder{id: entry.Name()}
+		entries, err := platform.ReadPlainDirectory(dir)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, item := range entries {
+			name, path := item.Name(), filepath.Join(dir, item.Name())
+			switch {
+			case name == "current", strings.HasPrefix(name, ".previous-"), strings.HasPrefix(name, ".next-"):
+				target, err := linkTarget(path)
+				if err != nil {
+					return nil, nil, fmt.Errorf("setup cannot read which build %s uses, so it removed no build: %w", path, err)
+				}
+				roots = append(roots, target)
+				if name != "current" && !recordedStagedLink(dir, path, st.Targets[CurrentDir(stateDir, folder.id)]) {
+					left = append(left, path)
+				}
+			case item.IsDir() && buildName.MatchString(name):
+				folder.builds = append(folder.builds, path)
+			case !item.IsDir() && buildName.MatchString(strings.TrimSuffix(name, manifestSuffix)) && strings.HasSuffix(name, manifestSuffix):
+				folder.manifests = append(folder.manifests, path)
+			default:
+				left = append(left, path)
+			}
+		}
+		folders = append(folders, folder)
+	}
+	all := []string{}
+	for _, folder := range folders {
+		all = append(all, folder.builds...)
+	}
+	for key, record := range st.Targets {
+		named, err := recordedBuilds(key, record, all)
+		if err != nil {
+			return nil, nil, fmt.Errorf("setup cannot read the recorded target %s, which can name a build, so it removed no build: %w", key, err)
+		}
+		roots = append(roots, named...)
+	}
+	used := map[string]bool{}
+	for len(roots) != 0 {
+		build := roots[0]
+		roots = roots[1:]
+		id := filepath.Base(filepath.Dir(build))
+		if used[build] || !ownBuild(stateDir, id, build) {
+			continue
+		}
+		used[build] = true
+		if _, err := os.Lstat(build); errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		manifest, err := readManifest(stateDir, id, build)
+		if err != nil {
+			return nil, nil, fmt.Errorf("setup cannot read which builds %s uses, so it removed no build: %w", build, err)
+		}
+		roots = append(roots, manifest.Uses...)
+	}
+	for _, folder := range folders {
+		if err := ctx.Err(); err != nil {
+			return removed, sortedUnique(left), err
+		}
+		dir := ResourceDir(stateDir, folder.id)
+		for _, build := range folder.builds {
+			if used[build] {
+				continue
+			}
+			kept, err := discardBuild(stateDir, folder.id, build, remove)
+			if err != nil {
+				return removed, sortedUnique(append(left, build)), err
+			}
+			if len(kept) == 0 && remove {
+				removed = append(removed, build)
+			}
+			left = append(left, kept...)
+		}
+		for _, path := range folder.manifests {
+			if _, err := os.Lstat(strings.TrimSuffix(path, manifestSuffix)); !errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			if _, err := os.Lstat(path); err == nil {
+				left = append(left, path)
+			}
+		}
+		if !remove {
+			continue
+		}
+		if _, err := platform.RemoveEmptyDirectory(dir); err != nil {
+			return removed, sortedUnique(left), err
+		}
+	}
+	return removed, sortedUnique(left), nil
+}
+
+const referenceChunk = 64 << 10
+
+func recordedBuilds(key string, record state.Record, all []string) ([]string, error) {
+	named := map[string]bool{}
+	scan := func(text string) {
+		for _, build := range all {
+			if !named[build] && namesBuild(text, build) {
+				named[build] = true
+			}
+		}
+	}
+	result := func() []string { return slices.Sorted(maps.Keys(named)) }
+	overlap := 0
+	for _, build := range all {
+		overlap = max(overlap, len(strings.ReplaceAll(build, `\`, `\\`))+1)
+	}
+	for _, value := range []string{record.Applied, record.Next, record.Before} {
+		scan(value)
+	}
+	if encoded, ok := strings.CutPrefix(record.Before, "value:"); ok {
+		value, err := base64.StdEncoding.DecodeString(encoded)
+		if err != nil {
+			return nil, fmt.Errorf("the baseline value is not base64: %w", err)
+		}
+		scan(string(value))
+	}
+	if backup, ok := strings.CutPrefix(record.Before, "backup:"); ok {
+		if err := scanTree(backup, scan, overlap); err != nil {
+			return nil, err
+		}
+	}
+	if !slices.Contains([]string{"link", "file", "block", "field", "tree"}, record.Kind) {
+		return result(), nil
+	}
+	path := key
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		if cut := strings.LastIndex(key, "#"); cut > 0 {
+			path = key[:cut]
+			info, err = os.Lstat(path)
+		}
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return result(), nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if record.Kind == "tree" {
+		if err := scanTree(path, scan, overlap); err != nil {
+			return nil, err
+		}
+		return result(), nil
+	}
+	if info.Mode()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+		if err := scanLink(path, scan); err != nil {
+			return nil, err
+		}
+		if record.Kind == "link" {
+			return result(), nil
+		}
+		info, err = os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) {
+			return result(), nil
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	if !info.Mode().IsRegular() {
+		return result(), nil
+	}
+	if err := scanFile(path, scan, overlap); err != nil {
+		return nil, err
+	}
+	return result(), nil
+}
+
+func scanTree(root string, scan func(string), overlap int) error {
+	if _, err := os.Lstat(root); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		switch {
+		case err != nil:
+			return err
+		case entry.Type()&(fs.ModeSymlink|fs.ModeIrregular) != 0:
+			return scanLink(path, scan)
+		case entry.Type().IsRegular():
+			return scanFile(path, scan, overlap)
+		}
+		return nil
+	})
+}
+
+func scanLink(path string, scan func(string)) error {
+	target, err := os.Readlink(path)
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(path), target)
+	}
+	scan(filepath.Clean(target))
+	return nil
+}
+
+func scanFile(path string, scan func(string), overlap int) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	window := make([]byte, 0, overlap+referenceChunk)
+	for {
+		n, readErr := io.ReadFull(file, window[len(window):cap(window)])
+		window = window[:len(window)+n]
+		scan(string(window))
+		if readErr == io.EOF || readErr == io.ErrUnexpectedEOF {
+			break
+		}
+		if readErr != nil {
+			return errors.Join(readErr, file.Close())
+		}
+		window = window[:copy(window, window[max(0, len(window)-overlap):])]
+	}
+	return file.Close()
+}
+
+func namesBuild(text, build string) bool {
+	for _, spelling := range []string{build, filepath.ToSlash(build), strings.ReplaceAll(build, `\`, `\\`)} {
+		for rest := text; ; {
+			at := strings.Index(rest, spelling)
+			if at < 0 {
+				break
+			}
+			rest = rest[at+len(spelling):]
+			if rest == "" || !strings.ContainsRune("0123456789", rune(rest[0])) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func sortedUnique(values []string) []string {
+	result := slices.Clone(values)
+	slices.Sort(result)
+	return slices.Compact(result)
+}
+
+func discardBuild(stateDir, id, build string, remove bool) ([]string, error) {
+	manifest, err := readManifest(stateDir, id, build)
+	if err != nil {
+		return []string{build}, nil
+	}
+	if err := bound(build); err != nil {
+		return []string{build}, nil
+	}
+	entries, err := platform.InspectTree(build, fetch.MaxPackageBytes, fetch.MaxPackageEntries)
+	if err != nil {
+		return []string{build}, nil
+	}
+	tree, err := platform.SnapshotEntries(entries)
+	if err != nil || tree != manifest.Tree {
+		return []string{build}, nil
+	}
+	if !remove {
+		return nil, nil
+	}
+	kept, err := discardRecordedTree(build, entries, fetch.MaxPackageBytes, fetch.MaxPackageEntries)
+	if err != nil || len(kept) != 0 {
+		return kept, err
+	}
+	if err := os.Remove(manifestPath(build)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func preserved(path string, kept []string) bool {
+	for _, keep := range kept {
+		relative, err := filepath.Rel(keep, path)
+		if err == nil && (relative == "." || filepath.IsLocal(relative)) {
+			return true
+		}
+	}
+	return false
+}
+
+func discardRecordedTree(path string, entries []platform.Entry, byteLimit int64, entryLimit int) ([]string, error) {
+	if err := validateCleanupEntries(entries, entryLimit); err != nil {
+		return nil, err
+	}
+	if err := bound(path); err != nil {
+		return []string{path}, nil
+	}
+	actual, err := platform.InspectTree(path, byteLimit, entryLimit)
+	if err != nil {
+		return nil, err
+	}
+	wanted := map[string]platform.Entry{}
+	for _, entry := range entries {
+		wanted[entry.Path] = entry
+	}
+	kept := []string{}
+	for _, entry := range actual {
+		if want, ok := wanted[entry.Path]; !ok || want != entry {
+			kept = append(kept, filepath.Join(path, entry.Path))
+		}
+	}
+	for _, entry := range slices.Backward(actual) {
+		name := filepath.Join(path, entry.Path)
+		if preserved(name, kept) {
+			continue
+		}
+		if err := bound(name); err != nil {
+			kept = append(kept, name)
+			continue
+		}
+		current, err := platform.InspectTree(name, byteLimit, entryLimit)
+		if err != nil {
+			return sortedUnique(kept), err
+		}
+		if len(current) == 0 {
+			continue
+		}
+		want := entry
+		want.Path = "."
+		if current[0] != want {
+			kept = append(kept, name)
+			continue
+		}
+		if len(current) != 1 {
+			for _, child := range current[1:] {
+				kept = append(kept, filepath.Join(name, child.Path))
+			}
+			continue
+		}
+		if err := platform.RemoveOwned(name); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return sortedUnique(kept), fmt.Errorf("cleanup remains at %s; retry after releasing it: %w", name, err)
+		}
+	}
+	return sortedUnique(kept), nil
+}
+
+func validateCleanupEntries(entries []platform.Entry, limit int) error {
+	if len(entries) == 0 || len(entries) > limit || entries[0].Path != "." {
+		return errors.New("invalid cleanup entry list")
+	}
+	seen := map[string]platform.Entry{}
+	for i, entry := range entries {
+		if !filepath.IsLocal(entry.Path) || filepath.Clean(entry.Path) != entry.Path || entry.Mode > 0777 {
+			return errors.New("cleanup entry has an invalid path or mode")
+		}
+		if _, exists := seen[entry.Path]; exists {
+			return errors.New("duplicate cleanup entry")
+		}
+		if i > 0 && seen[filepath.Dir(entry.Path)].Kind != "directory" {
+			return errors.New("cleanup entry parent is not a recorded directory")
+		}
+		switch entry.Kind {
+		case "file":
+			if !sha256Text.MatchString(entry.Content) {
+				return errors.New("invalid cleanup content hash")
+			}
+		case "directory":
+			if entry.Content != "" {
+				return errors.New("invalid cleanup directory")
+			}
+		case "link", "junction":
+			if entry.Content == "" || len(entry.Content) > 32768 || entry.Mode != 0 {
+				return errors.New("invalid cleanup link")
+			}
+		default:
+			return errors.New("invalid cleanup entry kind")
+		}
+		seen[entry.Path] = entry
+	}
+	return nil
+}

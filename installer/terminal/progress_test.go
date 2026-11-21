@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	engine "github.com/luisgui1757/dotfiles/installer"
+	"github.com/luisgui1757/dotfiles/installer/engine"
 )
 
 func TestProgressOutputRemovesWholeEscapeSequences(t *testing.T) {
@@ -55,9 +55,6 @@ func TestProgressRewritesCarriageReturnLinesAndIndentsOutput(t *testing.T) {
 	}
 }
 
-// Windows PowerShell children serialize progress and information records as
-// CLIXML on stderr. The live display hides that markup, including a document
-// the 4096-byte wrap splits, and keeps the plain lines around it.
 func TestProgressHidesPowerShellCLIXMLRecords(t *testing.T) {
 	view, screen := progressFixture(t)
 	view.Step("[1/2] Remove the earlier fd")
@@ -86,6 +83,24 @@ func TestProgressHidesPowerShellCLIXMLRecords(t *testing.T) {
 	}
 }
 
+func TestProgressWritesPlainLinesToRedirectedOutput(t *testing.T) {
+	view, screen := progressFixture(t)
+	view.plain = true
+	view.Step("[1/1] Installing Neovim")
+	for _, chunk := range []string{"Get:1 pack", "age\n10%\r50", "%\r100%\n", "\x1b[32mwindows line\x1b[0m\r\n", "\n", "partial"} {
+		if n, err := view.Write([]byte(chunk)); err != nil || n != len(chunk) {
+			t.Fatal(n, err)
+		}
+	}
+	if err := view.Close(); err != nil {
+		t.Fatal(err)
+	}
+	want := "==> [1/1] Installing Neovim\n    Get:1 package\n    100%\n    windows line\n\n    partial\n"
+	if got := screen(); got != want {
+		t.Fatalf("got  %q\nwant %q", got, want)
+	}
+}
+
 func TestProgressWrapsEndlessLinesAtCharacterBoundaries(t *testing.T) {
 	view, screen := progressFixture(t)
 	line := strings.Repeat("é", 3000)
@@ -100,7 +115,6 @@ func TestProgressWrapsEndlessLinesAtCharacterBoundaries(t *testing.T) {
 	}
 }
 
-// A display failure must not fail the provider's pipe; the report returns it.
 func TestProgressKeepsDisplayFailureForTheReport(t *testing.T) {
 	view, _ := progressFixture(t)
 	if err := view.output.Close(); err != nil {
@@ -116,10 +130,10 @@ func TestProgressKeepsDisplayFailureForTheReport(t *testing.T) {
 }
 
 func TestReportSeparatesNotesFromActions(t *testing.T) {
-	text := reportText(engine.Result{Status: "needs-action", Message: "nvim.sync: waiting for git\nExternal application not exercised: X11 clipboard\nPreserved files for inspection: /saved"})
+	text := ReportText(engine.Result{Status: "needs-action", Message: "nvim.sync: waiting for git\nNote: the X11 clipboard was not exercised\nPreserved files for inspection: /saved"})
 	actions := strings.Index(text, "  - nvim.sync: waiting for git")
 	notes := strings.Index(text, "Notes (informational, not failures):")
-	if actions < 0 || notes < actions || !strings.Contains(text[notes:], "  - External application not exercised: X11 clipboard") || !strings.Contains(text[notes:], "  - Preserved files for inspection: /saved") {
+	if actions < 0 || notes < actions || !strings.Contains(text[notes:], "  - Note: the X11 clipboard was not exercised") || !strings.Contains(text[notes:], "  - Preserved files for inspection: /saved") {
 		t.Fatalf("%q", text)
 	}
 }

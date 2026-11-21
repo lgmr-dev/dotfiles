@@ -84,15 +84,11 @@ Invoke-Step 'PSScriptAnalyzer' {
         'setup.ps1',
         'scripts/installer-bootstrap.ps1',
         'test.ps1',
-        'installer/shells',
+        'installer/tools',
         'tmux/rose-pine.ps1',
         'tests/nvim/run.ps1',
         'tests/powershell'
     )
-    # Reviewed baseline for broad analyzer coverage. Counts retain the rationale
-    # per rule group; the fingerprint below additionally binds the exact stable
-    # script/rule/message/extent identities, so one warning cannot silently
-    # replace another while preserving a filename/rule/count total.
     $analyzerWarningFingerprint = '55d9d54d663a97d7cff2a741cfc4aa67f9973868ff075a06a34c322985853b0a'
     $analyzerWarningBaseline = @{
         'Profile.Tests.ps1, PSAvoidUsingWriteHost' = @{ Count = 1; Reason = 'test fixture command output assertion' }
@@ -166,7 +162,23 @@ Invoke-Step 'Installer format, vet and race tests' {
     }
 }
 
-Invoke-Step 'Public launchers and release scripts' {
+Invoke-Step 'Package boundaries' {
+    if (-not (Require-OrSkip 'node' ([bool](Get-Command node -ErrorAction SilentlyContinue)) 'install Node 22 or later')) {
+        return
+    }
+    $previousSystem = $env:GOOS
+    try {
+        foreach ($system in @('linux', 'darwin', 'windows')) {
+            $env:GOOS = $system
+            & node scripts/featuremap/featuremap.mjs check
+            if ($LASTEXITCODE -ne 0) { throw "Package boundary check failed for GOOS=$system" }
+        }
+    } finally {
+        $env:GOOS = $previousSystem
+    }
+}
+
+Invoke-Step 'Launchers and pin scripts' {
     & python -m unittest discover -s tests/bootstrap -p '*_test.py'
     if ($LASTEXITCODE -ne 0) { throw 'Bootstrap regression tests failed' }
 }

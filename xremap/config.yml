@@ -16,7 +16,7 @@
 # dock apps). Ctrl+Option+L/H moves to the next/previous window, and Option+Tab
 # stays Alt+Tab, where a quick tap returns to the previous window.
 #
-# Safety rules (checked by TestNativeMacKeyboardMappings):
+# Safety rules:
 # - Rules apply only to windows xremap identifies. An unidentified window, for
 #   example on GNOME Wayland without xremap's Shell extension, keeps plain keys.
 # - In terminals every Cmd combination is mapped or swallowed: Cmd never sends a

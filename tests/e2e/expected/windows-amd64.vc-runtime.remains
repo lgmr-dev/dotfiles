@@ -1,0 +1,7 @@
+AppData/Local/go-build/**
+AppData/Local/Microsoft/**
+AppData/Local/Temp/**
+AppData/LocalLow/Microsoft/**
+AppData/Roaming/Microsoft/**
+ntuser.*
+NTUSER.DAT*

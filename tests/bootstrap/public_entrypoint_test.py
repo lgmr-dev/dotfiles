@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class PublicEntrypointTest(unittest.TestCase):
     def test_posix_launchers_bind_entrypoint_and_preserve_cwd_arguments_and_exit(self):
         entrypoint = "setup"
-        for arguments in [[], ["machine"]]:
+        for arguments in [[], ["check"], ["apply", "--yes", "--select=neovim,zsh"]]:
             with self.subTest(entrypoint=entrypoint, arguments=arguments), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary) / "trusted clone ü with spaces"
                 (root / "scripts").mkdir(parents=True)
@@ -36,7 +36,7 @@ class PublicEntrypointTest(unittest.TestCase):
     @unittest.skipUnless(shutil.which("pwsh"), "PowerShell process-boundary test requires pwsh")
     def test_powershell_launchers_bind_entrypoint_and_preserve_arguments_and_exit(self):
         entrypoint = "setup"
-        for arguments in [[], ["machine"]]:
+        for arguments in [[], ["check"], ["apply", "--yes", "--select=neovim,zsh"]]:
             with self.subTest(entrypoint=entrypoint, arguments=arguments), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary) / "trusted clone ü with spaces"
                 (root / "scripts").mkdir(parents=True)

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "us-intl-keyboard",
+      "name": "US International dead keys",
+      "description": "Linux only: with English (US, intl., with dead keys), ' then s types 's and ' then c types ç, as on Windows",
+      "capability": true,
+      "category": "Desktop apps",
+      "order": 42,
+      "platforms": [
+        "linux"
+      ],
+      "requires": [
+        "config.xcompose"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "config.xcompose",
+      "name": "US International Compose rules",
+      "platforms": [
+        "linux"
+      ],
+      "action": "config",
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.xcompose",
+      "source": "xcompose/XCompose",
+      "folder": "home",
+      "path": ".XCompose",
+      "platforms": [
+        "linux"
+      ]
+    }
+  ]
+}

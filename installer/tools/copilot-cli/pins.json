@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.copilot": {
+      "darwin/arm64": {
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-darwin-arm64.tar.gz",
+        "sha256": "4a4a6aa624dceb76a23e1a53fb5f64e87a0bb5a2161a5017e0edf78d7082ce68",
+        "format": "tar.gz",
+        "commands": {
+          "copilot": "copilot"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-linux-x64.tar.gz",
+        "sha256": "dfe7e59acf04f0b7f59b024ea9db101a9246503e9bf7152eb668fbb2a469b151",
+        "format": "tar.gz",
+        "commands": {
+          "copilot": "copilot"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc"
+      },
+      "linux/arm64": {
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-linux-arm64.tar.gz",
+        "sha256": "491d18303505935675dc20987ef0c5f3ae899f81e66c53d567ad97a8b03e504e",
+        "format": "tar.gz",
+        "commands": {
+          "copilot": "copilot"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "libc": "glibc"
+      },
+      "windows/amd64": {
+        "version": "1.0.112",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-win32-x64.zip",
+        "sha256": "159a5e610c7b64c4b68b97a812fd7913182f372cb84ce688d81167d5277896d9",
+        "format": "zip",
+        "commands": {
+          "copilot": "copilot.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    }
+  }
+}

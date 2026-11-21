@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "resources": {
+    "tool.openwhispr": {
+      "linux/amd64": {
+        "version": "1.12.0",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.0/OpenWhispr-1.12.0-linux-x64.tar.gz",
+        "sha256": "d455f71cec4428410ea2237f91c3abc9664807a46bc04cce40bda4b80b942d64",
+        "format": "tar.gz",
+        "strip_components": 1,
+        "commands": {
+          "open-whispr": "open-whispr"
+        },
+        "bin_dirs": [
+          "."
+        ],
+        "required_files": [
+          "open-whispr-app",
+          "resources/src/assets/icon.png"
+        ],
+        "libc": "glibc"
+      }
+    }
+  }
+}

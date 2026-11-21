@@ -10,6 +10,7 @@ import importlib.util
 import io
 import json
 import pathlib
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -25,6 +26,21 @@ SPEC = importlib.util.spec_from_file_location("update_agent_cli_pins", ROOT / "s
 pins_script = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pins_script)
 NOW = datetime.datetime(2026, 11, 12, 6, 0, tzinfo=datetime.timezone.utc)
+
+
+def copy_pins(tools):
+    for source in sorted((ROOT / "installer" / "tools").glob("*/pins.json")):
+        target = tools / source.parent.name / "pins.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+
+
+def pin_texts(tools):
+    return {path.parent.name: path.read_text(encoding="utf-8") for path in sorted(tools.glob("*/pins.json"))}
+
+
+def pin_resources(tools):
+    return {tool: targets for text in pin_texts(tools).values() for tool, targets in json.loads(text)["resources"].items()}
 
 
 def tgz(files):
@@ -77,10 +93,10 @@ class AgentCLIPinBumpTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.pins_path = pathlib.Path(self.temporary.name) / "archive-pins.json"
-        self.original = (ROOT / "installer" / "archive-pins.json").read_text(encoding="utf-8")
-        self.pins_path.write_text(self.original, encoding="utf-8")
-        self.pins = json.loads(self.original)["resources"]
+        self.pins_path = pathlib.Path(self.temporary.name) / "tools"
+        copy_pins(self.pins_path)
+        self.original = pin_texts(self.pins_path)
+        self.pins = pin_resources(self.pins_path)
         self.network = FakeNetwork()
         self.verified = []
         self.copilot_releases = []
@@ -172,7 +188,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         argv += ["--tools", tools or ",".join(self.versions)]
         with mock.patch("builtins.print"):
             self.assertEqual(pins_script.main(argv, network=self.network, verify=self.verify, now=NOW), expected_status)
-        return json.loads(self.pins_path.read_text(encoding="utf-8"))["resources"], summary.read_text(encoding="utf-8"), failures.read_text(encoding="utf-8")
+        return pin_resources(self.pins_path), summary.read_text(encoding="utf-8"), failures.read_text(encoding="utf-8")
 
     def test_bumps_every_tool_after_its_vendor_verification(self):
         resources, summary, failures = self.run_bump()
@@ -200,7 +216,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.publish_muse()
         _, summary, failures = self.run_bump()
         self.assertEqual(failures, "")
-        self.assertEqual(self.pins_path.read_text(encoding="utf-8"), self.original)
+        self.assertEqual(pin_texts(self.pins_path), self.original)
         self.assertEqual(summary.count("is current"), 5)
 
     def assertOnlyToolFailed(self, tool, message):
@@ -290,10 +306,10 @@ class GitHubPinBumpTest(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
-        self.path = pathlib.Path(self.temporary.name) / "archive-pins.json"
-        self.original = (ROOT / "installer/archive-pins.json").read_text()
-        self.path.write_text(self.original)
-        self.pins = json.loads(self.original)["resources"]
+        self.path = pathlib.Path(self.temporary.name) / "tools"
+        copy_pins(self.path)
+        self.original = pin_texts(self.path)
+        self.pins = pin_resources(self.path)
         self.policy = json.loads((ROOT / "scripts/archive-pin-updates.json").read_text())
         self.network = FakeNetwork()
         self.releases = []
@@ -331,7 +347,7 @@ class GitHubPinBumpTest(unittest.TestCase):
         with mock.patch("builtins.print"):
             result = pins_script.main(["--pins", str(self.path), "--tools", tool, "--summary", str(summary)], network=self.network, now=NOW)
         self.assertEqual(result, expected)
-        return json.loads(self.path.read_text())["resources"], summary.read_text()
+        return pin_resources(self.path), summary.read_text()
 
     def test_github_archives_and_single_files_update_all_targets(self):
         for tool, version in [("tool.fzf", "0.99.0"), ("tool.t3", "0.99.0"), ("tool.jq", "1.99.0"), ("tool.taplo", "0.99.0")]:
@@ -347,7 +363,7 @@ class GitHubPinBumpTest(unittest.TestCase):
     def test_invalid_github_releases_leave_every_target_unchanged(self):
         for fault in ("missing digest", "bad digest", "missing asset", "layout", "prerelease"):
             with self.subTest(fault=fault):
-                self.path.write_text(self.original)
+                copy_pins(self.path)
                 self.releases.clear()
                 self.publish("tool.fzf", "0.99.0")
                 asset = self.release["assets"][-1]
@@ -409,7 +425,7 @@ class GitHubPinBumpTest(unittest.TestCase):
     def test_github_release_waits_until_it_is_three_days_old(self):
         for age, expected in [(datetime.timedelta(days=3) - datetime.timedelta(seconds=1), None), (datetime.timedelta(days=3), "0.99.0")]:
             with self.subTest(age=age):
-                self.path.write_text(self.original)
+                copy_pins(self.path)
                 self.releases.clear()
                 self.publish("tool.fzf", "0.99.0", age=age)
                 resources, summary = self.run_bump("tool.fzf")
@@ -428,7 +444,7 @@ class GitHubPinBumpTest(unittest.TestCase):
     def test_github_release_without_a_publication_date_is_never_pinned(self):
         for published in (None, "not a date"):
             with self.subTest(published=published):
-                self.path.write_text(self.original)
+                copy_pins(self.path)
                 self.releases.clear()
                 self.publish("tool.fzf", "0.99.0")
                 self.release["published_at"] = published
@@ -439,7 +455,7 @@ class GitHubPinBumpTest(unittest.TestCase):
     def test_github_assets_respect_the_installer_download_limit(self):
         for size, status in [(538_725_004, 0), (1_073_741_824, 0), (1_073_741_825, 1)]:
             with self.subTest(size=size):
-                self.path.write_text(self.original)
+                copy_pins(self.path)
                 self.releases.clear()
                 self.publish("tool.t3", "0.99.0")
                 self.release["assets"][-1]["size"] = size
@@ -454,7 +470,7 @@ class GitHubPinBumpTest(unittest.TestCase):
     def test_one_malformed_reply_fails_only_its_tool(self):
         for fault in ("list reply", "null size", "truncated download"):
             with self.subTest(fault=fault):
-                self.path.write_text(self.original)
+                copy_pins(self.path)
                 self.releases = []
                 self.publish("tool.fd", "10.99.0")
                 self.releases = []
@@ -492,17 +508,20 @@ class GitHubPinBumpTest(unittest.TestCase):
         with mock.patch("sys.stderr", new=io.StringIO()), mock.patch("builtins.print"), self.assertRaises(SystemExit) as rejected:
             pins_script.main(["--pins", str(self.path), "--tools", "tool.gersemi"], network=self.network)
         self.assertEqual(rejected.exception.code, 2)
-        self.assertEqual(self.path.read_text(), self.original)
+        self.assertEqual(pin_texts(self.path), self.original)
 
-    def test_coverage_rejects_an_unlisted_resource_and_an_unlisted_target(self):
-        for change in ("resource", "target"):
+    def test_coverage_rejects_an_unlisted_resource_an_unlisted_target_and_a_second_file(self):
+        for change in ("resource", "target", "second file"):
             with self.subTest(change=change):
-                document = json.loads(self.original)
+                copy_pins(self.path)
+                document = json.loads(self.original["fzf"])
                 if change == "resource":
                     document["resources"]["tool.new"] = copy.deepcopy(self.pins["tool.fzf"])
-                else:
+                elif change == "target":
                     document["resources"]["tool.fzf"]["linux/new"] = copy.deepcopy(self.pins["tool.fzf"]["linux/amd64"])
-                self.path.write_text(json.dumps(document))
+                else:
+                    document["resources"]["tool.fd"] = copy.deepcopy(self.pins["tool.fd"])
+                (self.path / "fzf" / "pins.json").write_text(json.dumps(document))
                 result = subprocess.run([sys.executable, str(ROOT / "scripts/update-agent-cli-pins.py"),
                                          "--pins", str(self.path), "--check-coverage"], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 1)

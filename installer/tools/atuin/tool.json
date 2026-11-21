@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "atuin",
+      "name": "Atuin",
+      "description": "Searchable shell history on Ctrl+R that stays on this machine",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 12,
+      "requires": [
+        "tool.atuin",
+        "config.atuin",
+        "integration.atuin"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.atuin",
+      "name": "Atuin",
+      "action": "atuin",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.atuin"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.atuin"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.atuin"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    },
+    {
+      "id": "config.atuin",
+      "name": "atuin configuration",
+      "requires": [
+        "tool.atuin"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "integration.atuin",
+      "name": "Atuin shell integration",
+      "requires": [
+        "tool.atuin",
+        "integration.shells"
+      ],
+      "scope": "user"
+    }
+  ],
+  "targets": [
+    {
+      "resource": "config.atuin",
+      "source": "atuin/config.toml",
+      "folder": "home",
+      "path": ".atuin/config.toml"
+    },
+    {
+      "resource": "config.atuin",
+      "source": "atuin/themes/rose-pine.toml",
+      "folder": "home",
+      "path": ".atuin/themes/rose-pine.toml"
+    }
+  ]
+}

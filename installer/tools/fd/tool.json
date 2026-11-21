@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "resources": [
+    {
+      "id": "fd",
+      "name": "fd",
+      "description": "Fast file finding",
+      "capability": true,
+      "category": "Shell essentials",
+      "order": 11,
+      "requires": [
+        "tool.fd"
+      ],
+      "scope": "user"
+    },
+    {
+      "id": "tool.fd",
+      "name": "fd",
+      "action": "fd",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.fd"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.fd"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.fd"
+        }
+      },
+      "requires": [
+        "integration.shells"
+      ]
+    }
+  ]
+}

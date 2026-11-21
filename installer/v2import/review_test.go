@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -943,6 +944,34 @@ func TestRestoreNeverReplacesAnEditMadeAfterTheReview(t *testing.T) {
 	}
 	if st := f.current(); st.V2Restore != "open" || read(t, env) != later {
 		t.Fatalf("the restore replaced an edit that the review did not show: %+v %q", st, read(t, env))
+	}
+}
+
+func TestRestoreNeverRestoresATargetThatTheReviewKept(t *testing.T) {
+	t.Cleanup(func() { v2import.SetFault(nil) })
+	f := linuxFixture(t)
+	f.save()
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	write(t, env, "# v3 env\n# reviewed edit\n", 0644)
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(restoration.Changed(), func(item v2import.RestoreItem) bool { return item.Key == env }) {
+		t.Fatalf("the review must keep the edited target: %+v", restoration.Items)
+	}
+	v2import.SetFault(func(at string) error {
+		if at == "restore-plan" {
+			write(t, env, "# v3 env\n", 0644)
+		}
+		return nil
+	})
+	if _, err := restoration.Run(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "the files changed after the review; run restore-v2 again") {
+		t.Fatalf("a target that the review kept must not get its value of release v2: %v", err)
+	}
+	if st := f.current(); st.V2Restore != "open" || read(t, env) != "# v3 env\n" || read(t, f.fontPath()) != "v3 font bytes\n" {
+		t.Fatalf("the stop must come before the first write: %+v %q", st, read(t, env))
 	}
 }
 

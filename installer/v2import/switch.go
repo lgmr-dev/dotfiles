@@ -336,6 +336,15 @@ func (p *Proposal) publish(ctx context.Context) (resultErr error) {
 	if err != nil || !bytes.Equal(current, p.Mapping.Original) {
 		return errors.Join(fmt.Errorf("the state of release v2 changed after the review: %w", engine.ErrPlanChanged), err)
 	}
+	broken := []string{}
+	for _, application := range deferredApplications {
+		if slices.Contains(p.Mapping.Deferred, application.tool) && !runnable(e.StateDir, p.Mapping.State, application.tool) {
+			broken = append(broken, p.o.name(application.tool))
+		}
+	}
+	if len(broken) != 0 {
+		return fmt.Errorf("the import stopped before the switch, and release v2 stays active. These applications of release v2 do not start: %s. Repair them with the setup of %s (%s), or deselect them there, then run this setup again", strings.Join(broken, ", "), SourceCommit, SourceRelease)
+	}
 	st := p.Mapping.State.Clone()
 	for key, record := range p.o.staged() {
 		st.Targets[key] = record
@@ -491,8 +500,9 @@ func clearConfirmed(stateDir, target string, marks []string) error {
 }
 
 // Run does the approved import: it builds the private tools beside release
-// v2, stops before the switch when a build fails or a system item needs
-// work, saves the restore set, publishes the schema-2 state and switches the
+// v2, stops before the switch when a deferred macOS application of release
+// v2 does not start, a build fails or a system item needs work, saves the
+// restore set, publishes the schema-2 state and switches the
 // targets through the engine. For an unfinished switch it only completes
 // the switch. The switch refuses a step that would change a unit that
 // restore-v2 cannot give back, such as a native font registration: when

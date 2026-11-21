@@ -755,6 +755,7 @@ func darwinFixture(t *testing.T) *fx {
 	f.units[shells] = f.shellUnits
 	application := filepath.Join(f.state, "packages", "tool.vscode", "versions", "cccc", "payload")
 	write(t, filepath.Join(application, "Visual Studio Code.app", "Contents", "Resources", "app", "bin", "code"), "#!/bin/sh\n", 0755)
+	write(t, filepath.Join(application, "Visual Studio Code.app", "Contents", "MacOS", "Code"), "v2 code\n", 0755)
 	link(t, application, filepath.Join(f.state, "packages", "tool.vscode", "current"))
 	f.receipt("tool.vscode", "archive", "created", true)
 	f.configuration("desktop.vscode", "configuration", map[string]func(string){

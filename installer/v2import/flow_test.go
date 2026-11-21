@@ -587,6 +587,28 @@ func TestTheMacImportKeepsTheDeferredApplicationsOnReleaseV2(t *testing.T) {
 	before.restored(t, f)
 }
 
+func TestTheMacImportStopsWhenADeferredApplicationCannotStart(t *testing.T) {
+	f := darwinFixture(t)
+	if err := os.Remove(filepath.Join(f.state, "packages", "tool.vscode", "current", "Visual Studio Code.app", "Contents", "MacOS", "Code")); err != nil {
+		t.Fatal(err)
+	}
+	before := capture(t, f, f.save())
+	proposal, err := f.preview()
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := proposal.Run(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "do not start: VS Code program (tool.vscode). Repair them with the setup of "+v2import.SourceCommit) {
+		t.Fatalf("the import must stop and name the application that does not start: %v\n%s", err, result.Message)
+	}
+	before.restored(t, f)
+	for _, name := range []string{"v2-restore", "tools"} {
+		if _, err := os.Lstat(filepath.Join(f.state, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("the stop must come before the builds and the restore set: %s %v", name, err)
+		}
+	}
+}
+
 func TestStateOfTheImportedMachineIsValidSchema2(t *testing.T) {
 	f := linuxFixture(t)
 	f.save()

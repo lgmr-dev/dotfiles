@@ -791,6 +791,44 @@ func TestFontRetryLoadsAFaceThatAFailedActivationRegistered(t *testing.T) {
 	}
 }
 
+func TestFontRemovalAfterAFailedActivationLeavesNoRegistrationWithoutARecord(t *testing.T) {
+	failed := func(t *testing.T) *fontFixture {
+		f := newFontFixture(t, "windows")
+		f.archive()
+		f.engine.loadFail = "HackNerdFont-Italic.ttf"
+		if err := f.provider.Apply(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true), f); err == nil || len(f.engine.registry) != 3 {
+			t.Fatal("the fixture activation did not fail at one face", err, f.engine.registry)
+		}
+		f.engine.loadFail = ""
+		return f
+	}
+	t.Run("own registration", func(t *testing.T) {
+		f := failed(t)
+		desktopRemove(t, f.provider, f.sentinelEnv, hooks.FontResource)
+		if len(f.engine.registry) != 0 || len(f.engine.loaded) != 0 || sentinelExists(f.folder) {
+			t.Fatal("the removal left a registration without a record", f.engine.registry, f.engine.loaded)
+		}
+	})
+	t.Run("changed registration", func(t *testing.T) {
+		f := failed(t)
+		face := fontFixtureFaces()[0]
+		name := "Dotfiles " + face.file + " (TrueType)"
+		f.engine.registry[name] = `C:\personal\Hack.ttf`
+		err := f.provider.Remove(context.Background(), fontResource, desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, false), f)
+		if err == nil || !strings.Contains(err.Error(), face.file) {
+			t.Fatal("the removal did not report the registration that setup cannot prove", err)
+		}
+		if f.engine.registry[name] != `C:\personal\Hack.ttf` || len(f.engine.registry) != 3 || len(f.records("font")) != 12 {
+			t.Fatal("the removal changed a registration or dropped its record", f.engine.registry)
+		}
+		for _, item := range fontFixtureFaces() {
+			if !sentinelExists(f.path(item)) {
+				t.Fatal("the removal deleted a font file while a registration names it", item.file)
+			}
+		}
+	})
+}
+
 func fontScript(t *testing.T, c platform.Command) string {
 	t.Helper()
 	data, err := base64.StdEncoding.DecodeString(c.Args[len(c.Args)-1])

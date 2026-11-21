@@ -33,7 +33,7 @@ type RestoreItem struct {
 	Key, Resource, Action, Detail string
 	Replacement                   string
 
-	live, saved string
+	live, saved, observed string
 }
 
 // Restoration is the preview of restore-v2. Done is true when the schema-1
@@ -58,18 +58,12 @@ const afterRestore = "Release v2 is active again. Check out " + SourceCommit + "
 func (r *Restoration) classify(set *restoreSet, st state.State, key string) RestoreItem {
 	slot := set.manifest.Slots[key]
 	item := RestoreItem{Key: key, Resource: slot.Resource, Action: "blocked"}
-	inspect := func(before string) (targets.Live, error) {
-		live, err := set.writer.InspectRecord(key, &memory{state.State{Targets: map[string]state.Record{key: {Resource: slot.Resource, Kind: slot.Kind, Before: before}}}})
-		if err == nil && live.State == targets.StateUnreadable {
-			err = errors.New(live.Detail)
-		}
-		return live, err
-	}
-	live, err := inspect(slot.Saved)
+	live, err := set.inspect(key, slot.Saved)
 	if err != nil {
 		item.Detail = "setup cannot compare it with its saved value: " + err.Error()
 		return item
 	}
+	item.observed = live.Fingerprint
 	if live.Want != slot.Fingerprint {
 		item.Detail = "its saved copy in " + set.dir + " changed after the switch, and setup does not give back a changed copy"
 		return item
@@ -87,7 +81,7 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		baseline, hasBaseline = imported.Before, true
 	}
 	if hasBaseline {
-		if released, err := inspect(baseline); err == nil {
+		if released, err := set.inspect(key, baseline); err == nil {
 			candidates = append(candidates, released.Want)
 		}
 	}
@@ -96,7 +90,7 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		candidates = append(candidates, targets.Absent)
 	}
 	if restoring && !slices.Contains(candidates, started) {
-		copied, err := inspect(set.manifest.Edited[key])
+		copied, err := set.inspect(key, set.manifest.Edited[key])
 		restoring = set.manifest.Edited[key] != "" && err == nil && copied.Want == started
 	}
 	switch {
@@ -130,6 +124,15 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.live = started
 	}
 	return item
+}
+
+func (s *restoreSet) inspect(key, before string) (targets.Live, error) {
+	slot := s.manifest.Slots[key]
+	live, err := s.writer.InspectRecord(key, &memory{state.State{Targets: map[string]state.Record{key: {Resource: slot.Resource, Kind: slot.Kind, Before: before}}}})
+	if err == nil && live.State == targets.StateUnreadable {
+		err = errors.New(live.Detail)
+	}
+	return live, err
 }
 
 func (s *restoreSet) movedAside(key string, record state.Record, candidates []string) bool {
@@ -279,11 +282,14 @@ func (r *Restoration) Changed() []RestoreItem {
 // unless replace names its key: then setup saves the changed content first
 // and reports where. A replacement applies only to the content that the
 // review showed: when that target changed again, Run stops before its first
-// write of a saved value. At the end it publishes the saved schema-1 state,
-// exactly as the review read it. A pending mark that is not in Confirmed
-// stops it before the first write with engine.ErrPending and the report
-// text; it clears the confirmed marks before the first write. When a step
-// fails, the schema-2 state stays and the same command can run again.
+// write of a saved value. Run first completes or rolls back each unfinished
+// switch write. Then it stops before its first write of a saved value when a
+// target differs from the review, unless that rollback made the difference.
+// At the end it publishes the saved schema-1 state, exactly as the review
+// read it. A pending mark that is not in Confirmed stops it before the first
+// write with engine.ErrPending and the report text; it clears the confirmed
+// marks before the first write. When a step fails, the schema-2 state stays
+// and the same command can run again.
 func (r *Restoration) Run(ctx context.Context, replace []string) (message string, resultErr error) {
 	e := r.o.Engine
 	release, err := platform.Lock(filepath.Join(e.StateDir, state.LockFile))
@@ -305,20 +311,21 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 		return afterRestore, nil
 	}
 	if !reviewed {
-		digest = r.digest
+		digest, approved = r.digest, slices.Clone(r.Items)
 	}
 	if slices.ContainsFunc(r.Pending, func(mark string) bool { return !slices.Contains(r.Confirmed, mark) }) {
 		return pendingStop(r.Pending)
 	}
-	if reviewed && !slices.EqualFunc(approved, r.Items, func(a, b RestoreItem) bool {
+	same := func(a, b RestoreItem) bool {
 		return a.Key == b.Key && a.Action == b.Action && a.Replacement == b.Replacement && a.live == b.live && a.saved == b.saved
-	}) {
+	}
+	if reviewed && !slices.EqualFunc(approved, r.Items, same) {
 		return "", errors.New("the files changed after the review; run restore-v2 again. Nothing was changed")
 	}
 	if err := clearPending(e.StateDir, e.Target); err != nil {
 		return "", err
 	}
-	failures, err := r.recoverSwitch(ctx, set)
+	recovered, failures, err := r.recoverSwitch(ctx, set)
 	if err != nil {
 		return "", err
 	}
@@ -330,6 +337,14 @@ func (r *Restoration) Run(ctx context.Context, replace []string) (message string
 	}
 	if set, err = r.plan(); err != nil {
 		return "", err
+	}
+	if len(approved) != len(r.Items) {
+		return "", errors.New("the files changed after the review; run restore-v2 again")
+	}
+	for i, item := range r.Items {
+		if fingerprint, changed := recovered[item.Key]; !same(approved[i], item) && (!changed || item.observed != fingerprint) {
+			return "", errors.New("the files changed after the review; run restore-v2 again")
+		}
 	}
 	for _, item := range r.Items {
 		if item.Action == "changed" && slices.Contains(replace, item.Key) && !slices.ContainsFunc(approved, func(shown RestoreItem) bool {
@@ -463,41 +478,44 @@ func (s *restoreSet) intend(key, replaced string) error {
 	return s.save()
 }
 
-func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) ([]string, error) {
-	failures := []string{}
+func (r *Restoration) recoverSwitch(ctx context.Context, set *restoreSet) (map[string]string, []string, error) {
+	recovered, failures := map[string]string{}, []string{}
 	st, err := state.Peek(r.o.Engine.StateDir, r.o.Engine.Target)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, key := range slotOrder(set.manifest.Slots) {
-		record, has := st.Targets[key]
-		if _, restoring := set.manifest.Restoring[key]; !has || record.Next == "" || restoring {
+		slot, record := set.manifest.Slots[key], st.Targets[key]
+		if _, restoring := set.manifest.Restoring[key]; record.Next == "" || restoring {
 			continue
 		}
 		if record.Release {
 			if err := set.writer.Recover(ctx, key, &memory{state.State{Targets: map[string]state.Record{key: record}}}); err != nil {
 				failures = append(failures, key+": "+err.Error())
+				continue
 			}
-			continue
-		}
-		if err := set.verifySaved(key); err != nil {
-			failures = append(failures, key+": "+err.Error())
-			continue
-		}
-		slot := set.manifest.Slots[key]
-		forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: slot.Saved, Made: slices.Clone(slot.Made)}
-		if err := set.writer.Release(ctx, key, &rollback{memory{state.State{Targets: map[string]state.Record{key: forward}}}, set, key}, targets.Preserve); err != nil {
-			failures = append(failures, key+": "+err.Error())
-			continue
-		}
-		if _, intended := set.manifest.Restoring[key]; intended {
-			delete(set.manifest.Restoring, key)
-			if err := set.save(); err != nil {
-				return nil, err
+		} else {
+			if err := set.verifySaved(key); err != nil {
+				failures = append(failures, key+": "+err.Error())
+				continue
 			}
+			forward := state.Record{Resource: record.Resource, Kind: record.Kind, Next: record.Next, Before: slot.Saved, Made: slices.Clone(slot.Made)}
+			if err := set.writer.Release(ctx, key, &rollback{memory{state.State{Targets: map[string]state.Record{key: forward}}}, set, key}, targets.Preserve); err != nil {
+				failures = append(failures, key+": "+err.Error())
+				continue
+			}
+			if _, intended := set.manifest.Restoring[key]; intended {
+				delete(set.manifest.Restoring, key)
+				if err := set.save(); err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+		if live, err := set.inspect(key, slot.Saved); err == nil {
+			recovered[key] = live.Fingerprint
 		}
 	}
-	return failures, nil
+	return recovered, failures, nil
 }
 
 type rollback struct {

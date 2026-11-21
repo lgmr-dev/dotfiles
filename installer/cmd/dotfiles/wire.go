@@ -299,7 +299,7 @@ func (w *wiring) route(r catalog.Resource) (engine.Provider, error) {
 	case goos == "darwin" && (r.ID == "tool.compiler" || r.ID == "tool.make" || r.ID == "tool.clipboard"):
 		return w.macPrerequisites, nil
 	case r.ID == "infra.homebrew" && goos == "darwin":
-		return w.homebrew, nil
+		return w.deferred(r, w.homebrew), nil
 	case goos == "darwin" && homebrewBinding(binding):
 		return w.deferred(r, w.brew), nil
 	case r.ID == "system.keyboard-access" && goos == "linux":

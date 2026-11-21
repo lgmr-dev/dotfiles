@@ -471,6 +471,14 @@ func fontClearMark(rec engine.Records, mark string) error {
 	return rec.Update(func(s *state.State) error { s.Clear(mark); return nil })
 }
 
+func fontSelected(face fontFace, probe fontNativeFace, path string) (bool, error) {
+	hash, err := fontFileHash(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return false, err
+	}
+	return probe.Name == face.PostScript && probe.Hash == hash, nil
+}
+
 func fontNativeFailure(rec engine.Records, mark string, err error) error {
 	if _, started := platform.ExitCode(err); started {
 		return fmt.Errorf("%w; run setup again and confirm that the command exited", err)
@@ -528,11 +536,11 @@ func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.F
 			if value == "" {
 				continue
 			}
-			hash, err := fontFileHash(o.paths[i])
-			if err != nil && !errors.Is(err, os.ErrNotExist) {
+			selected, err := fontSelected(faces[i], o.probe[i], o.paths[i])
+			if err != nil {
 				return errors.Join(err, fontClearMark(rec, mark))
 			}
-			if o.probe[i].Name == faces[i].PostScript && o.probe[i].Hash == hash {
+			if selected {
 				loaded = append(loaded, i)
 			}
 		}
@@ -594,8 +602,11 @@ func (p *Fonts) Apply(ctx context.Context, r catalog.Resource, approved engine.F
 // Remove implements engine.Provider. It releases the native registrations
 // that setup recorded, then the font files through the write order, then
 // refreshes the font cache on Linux and drops the registration records. A
-// registration value that is not the path of the managed file stays and
-// stops the removal.
+// registration that an unfinished activation wrote with the path of the
+// managed file is released like a recorded one. When the native font engine
+// does not select that face, setup deletes the registration after the font
+// file. A registration value that is not the path of the managed file stays
+// and stops the removal before any change.
 func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -613,17 +624,36 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 		return err
 	}
 	keys := p.keys(paths)
-	owned, unowned := []int{}, []int{}
+	values := fontRegistrations(probe)
+	faces := fontFaces()
+	owned, unloaded, unowned, retained := []int{}, []int{}, []int{}, []string{}
 	st := rec.State()
 	for i, key := range keys {
 		if !slices.Contains(recorded, key) {
 			continue
 		}
-		if record := st.Targets[key]; record.Applied != "" || record.Release {
+		record := st.Targets[key]
+		switch {
+		case record.Applied != "" || record.Release:
 			owned = append(owned, i)
-		} else {
+		case record.Next == "" || values[i] == "":
 			unowned = append(unowned, i)
+		case values[i] != paths[i]:
+			retained = append(retained, "current-user font registration: "+faces[i].File)
+		default:
+			selected, err := fontSelected(faces[i], probe[i], paths[i])
+			if err != nil {
+				return err
+			}
+			if selected {
+				owned = append(owned, i)
+			} else {
+				unloaded = append(unloaded, i)
+			}
 		}
+	}
+	if len(retained) != 0 {
+		return errors.New("an unfinished font registration names another file; setup keeps it, its record and the font files: " + strings.Join(retained, ", "))
 	}
 	mark := r.ID + ":release"
 	if err := rec.Update(func(s *state.State) error {
@@ -639,7 +669,7 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 	}); err != nil {
 		return err
 	}
-	if err := p.activate(ctx, owned, paths, fontRegistrations(probe), false); err != nil {
+	if err := p.activate(ctx, owned, paths, values, false); err != nil {
 		return fontNativeFailure(rec, mark, err)
 	}
 	if err := fontClearMark(rec, mark); err != nil {
@@ -653,6 +683,18 @@ func (p *Fonts) Remove(ctx context.Context, r catalog.Resource, approved engine.
 			}
 		}
 	}
+	if len(unloaded) != 0 {
+		if err := rec.Update(func(s *state.State) error { s.Mark(mark); return nil }); err != nil {
+			return err
+		}
+		if err := p.activate(ctx, unloaded, paths, values, false); err != nil {
+			return fontNativeFailure(rec, mark, err)
+		}
+		if err := fontClearMark(rec, mark); err != nil {
+			return err
+		}
+	}
+	owned = append(owned, unloaded...)
 	if p.Context.OS == "linux" {
 		if err := p.refreshLinux(ctx, paths); err != nil {
 			return err

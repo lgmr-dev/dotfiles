@@ -76,24 +76,23 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 	}
 	started, restoring := set.manifest.Restoring[key]
 	record, has := st.Targets[key]
-	deleted := has && record.Applied != "" && record.Next == "" && !record.Release && !restoring
 	candidates := []string{live.Want}
-	if !deleted {
-		candidates = append(candidates, targets.Absent)
-	}
-	baseline := ""
+	baseline, hasBaseline := "", false
 	switch imported, had := set.manifest.Imported.Targets[key]; {
 	case has && record.Release:
-		candidates, baseline = append(candidates, record.Applied), record.Before
+		candidates, baseline, hasBaseline = append(candidates, record.Applied), record.Before, true
 	case has:
 		candidates = append(candidates, record.Applied, record.Next)
 	case had:
-		baseline = imported.Before
+		baseline, hasBaseline = imported.Before, true
 	}
-	if baseline != "" {
+	if hasBaseline {
 		if released, err := inspect(baseline); err == nil {
 			candidates = append(candidates, released.Want)
 		}
+	}
+	if restoring || has && record.Next != "" && set.movedAside(key, record, candidates) {
+		candidates = append(candidates, targets.Absent)
 	}
 	if restoring && !slices.Contains(candidates, started) {
 		copied, err := inspect(set.manifest.Edited[key])
@@ -116,7 +115,7 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.Replacement = "remove"
 	}
 	switch {
-	case deleted && live.Fingerprint == targets.Absent:
+	case live.Fingerprint == targets.Absent && !slices.Contains(candidates, targets.Absent):
 		item.Action, item.Detail = "changed", "you deleted it after the switch; restore-v2 keeps the deletion unless you choose its replacement"
 	case !slices.Contains(candidates, live.Fingerprint):
 		item.Action, item.Detail = "changed", "it changed after the switch; restore-v2 keeps it unless you choose its replacement"
@@ -130,6 +129,20 @@ func (r *Restoration) classify(set *restoreSet, st state.State, key string) Rest
 		item.live = started
 	}
 	return item
+}
+
+func (s *restoreSet) movedAside(key string, record state.Record, candidates []string) bool {
+	sum := sha256.Sum256([]byte(key))
+	name := ".dotfiles-" + hex.EncodeToString(sum[:8]) + ".previous"
+	if i := strings.LastIndexByte(key, '#'); i > 0 {
+		data, file, readErr := readProfileFile(filepath.Join(filepath.Dir(key[:i]), name))
+		if value, err := s.writer.ObserveContent(key, record, data); err == nil {
+			return readErr == nil && file.Kind != "absent" && slices.Contains(candidates, value)
+		}
+	}
+	path := filepath.Join(filepath.Dir(key), name)
+	moved, err := s.writer.InspectRecord(path, &memory{state.State{Targets: map[string]state.Record{path: {Resource: record.Resource, Kind: record.Kind, Before: targets.Absent}}}})
+	return err == nil && moved.State != targets.StateUnreadable && moved.Fingerprint != targets.Absent && slices.Contains(candidates, moved.Fingerprint)
 }
 
 func (r *Restoration) plan() (*restoreSet, error) {

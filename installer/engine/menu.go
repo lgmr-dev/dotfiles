@@ -439,7 +439,7 @@ func (e *Engine) runMode(ctx context.Context, ui Interaction, session *menuSessi
 		if err != nil {
 			return result, err
 		}
-		result = e.checkResult(ctx, plan)
+		result = e.checkResult(ctx, session.state, plan)
 		session.checkFailed = result.Status != "ready"
 		return result, ui.Report(result)
 	}

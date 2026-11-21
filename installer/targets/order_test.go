@@ -142,7 +142,7 @@ func restored(e *env, f fixture, d targets.Desired, origin string) bool {
 func TestInterruptedWriteCompletesOnTheNextRunAndRestoresTheBaseline(t *testing.T) {
 	for _, f := range fixtures() {
 		for _, start := range []string{"absent", "personal", "owned"} {
-			for _, point := range []string{"baseline", "next", "recheck", "move", "write", "promote"} {
+			for _, point := range []string{"baseline", "next", "recheck", "move", "publish", "write", "promote"} {
 				t.Run(f.name+"/"+start+"/"+point, func(t *testing.T) {
 					e := newEnv(t)
 					d, choice, origin := prepare(e, f, start)
@@ -161,9 +161,9 @@ func TestInterruptedWriteCompletesOnTheNextRunAndRestoresTheBaseline(t *testing.
 					case !fired:
 					case point == "promote" && len(*seen) != 0:
 						t.Fatal("a completed write ran again", *seen)
-					case point == "write" && !slices.Equal(*seen, []string{"promote"}):
+					case (point == "publish" || point == "write") && !slices.Equal(*seen, []string{"promote"}):
 						t.Fatal("a match with the intended value did not complete the write", *seen)
-					case point != "write" && point != "promote" && !slices.Contains(*seen, "write"):
+					case point != "publish" && point != "write" && point != "promote" && !slices.Contains(*seen, "write"):
 						t.Fatal("the approved write did not run again", *seen)
 					}
 					targets.SetFault(nil)
@@ -223,7 +223,7 @@ func TestInterruptedWriteNeverReplacesContentThatChangedMeanwhile(t *testing.T) 
 func TestInterruptedReleaseCompletesOnTheNextRun(t *testing.T) {
 	for _, f := range fixtures() {
 		for _, start := range []string{"absent", "personal", "owned"} {
-			for _, point := range []string{"release", "move", "restore", "made"} {
+			for _, point := range []string{"release", "move", "publish", "restore", "made"} {
 				t.Run(f.name+"/"+start+"/"+point, func(t *testing.T) {
 					e := newEnv(t)
 					d, choice, origin := prepare(e, f, start)
@@ -239,7 +239,7 @@ func TestInterruptedReleaseCompletesOnTheNextRun(t *testing.T) {
 					}
 					seen = record()
 					e.mustRelease(d, targets.Preserve)
-					if fired && (point == "restore" || point == "made") && slices.Contains(*seen, "restore") {
+					if fired && (point == "publish" || point == "restore" || point == "made") && slices.Contains(*seen, "restore") {
 						t.Fatal("a match with the baseline did not complete the removal", *seen)
 					}
 					if fired && (point == "release" || point == "move") && start == "personal" && !slices.Contains(*seen, "restore") {

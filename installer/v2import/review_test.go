@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -887,4 +888,111 @@ func TestRestoreRefusesAnotherV2StateInTheRestoreSet(t *testing.T) {
 	if read(t, filepath.Join(f.state, "state.json")) != published {
 		t.Fatal("the refusal must change nothing")
 	}
+}
+
+func TestRestoreAcceptsAnAbsenceAfterAnInterruptedSwitchOnlyWithItsEvidence(t *testing.T) {
+	for _, evidence := range []string{"none", "staged", "aside"} {
+		for _, replace := range []bool{false, true} {
+			if evidence == "aside" && replace {
+				continue
+			}
+			t.Run(fmt.Sprintf("%s/%v", evidence, replace), func(t *testing.T) {
+				f := linuxFixture(t)
+				before := capture(t, f, f.save())
+				v2env := read(t, filepath.Join(f.state, "shells", "env.sh"))
+				f.mustImport()
+				env := filepath.Join(f.state, "shells", "env.sh")
+				saved := ""
+				editManifest(t, f, func(slots map[string]any) {
+					saved = strings.TrimPrefix(slots[env].(map[string]any)["saved"].(string), "backup:")
+				})
+				editState(t, f, func(document map[string]any) {
+					record := document["targets"].(map[string]any)[env].(map[string]any)
+					record["applied"], record["next"] = editedFingerprint(t, saved), editedFingerprint(t, env)
+				})
+				staged := strings.TrimSuffix(aside(env), ".previous") + ".next"
+				switch evidence {
+				case "staged":
+					err := os.Rename(env, staged)
+					if err != nil {
+						t.Fatal(err)
+					}
+				case "aside":
+					if err := os.Link(saved, aside(env)); err != nil {
+						t.Fatal(err)
+					}
+					fallthrough
+				default:
+					if err := os.Remove(env); err != nil {
+						t.Fatal(err)
+					}
+				}
+				restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+				if err != nil {
+					t.Fatal(err)
+				}
+				changed := restoration.Changed()
+				if evidence == "aside" {
+					if len(changed) != 0 {
+						t.Fatalf("a target that the switch moved aside is not changed content: %+v", restoration.Items)
+					}
+					if _, err := restoration.Run(context.Background(), nil); err != nil {
+						t.Fatal(err)
+					}
+					before.restored(t, f)
+					return
+				}
+				if len(changed) != 1 || changed[0].Key != env || changed[0].Replacement != "restore" {
+					t.Fatalf("an absence without evidence of the switch is your deletion: %+v", restoration.Items)
+				}
+				chosen := []string{}
+				if replace {
+					chosen = []string{env}
+				}
+				message, err := restoration.Run(context.Background(), chosen)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if replace {
+					if read(t, env) != v2env {
+						t.Fatalf("an approved replacement must give back the value of release v2: %q", read(t, env))
+					}
+					return
+				}
+				if _, err := os.Lstat(env); !errors.Is(err, os.ErrNotExist) || !strings.Contains(message, "Kept your changed content: "+env) {
+					t.Fatalf("without a decision the deletion must stay and be reported: %v %q", err, message)
+				}
+			})
+		}
+	}
+}
+
+func TestAnAlteredV2ConfigurationBaselineGivesNoOwnership(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	tmux := filepath.Join(f.home, ".tmux.conf")
+	backup := filepath.Join(f.home, ".dotfiles-config-"+operation("config.tmux")+"-0", "previous")
+	path := filepath.Join(f.state, f.recovery("config.tmux"), "configuration.json")
+	var document map[string]any
+	if err := json.Unmarshal([]byte(read(t, path)), &document); err != nil {
+		t.Fatal(err)
+	}
+	document["targets"].([]any)[0].(map[string]any)["original"] = map[string]any{"kind": "absent"}
+	data, err := json.MarshalIndent(document, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, path, string(data)+"\n", 0600)
+	mapping := mustMap(t, f)
+	record := mapping.State.Targets[tmux]
+	if record.Applied != "" || !strings.HasPrefix(record.Before, "fp:") || len(record.Made) != 0 {
+		t.Fatalf("a unit whose saved original differs from its v2 receipt must be baseline-only: %+v", record)
+	}
+	if notes := strings.Join(mapping.Notes, "\n"); !strings.Contains(notes, tmux) || !strings.Contains(notes, backup) {
+		t.Fatalf("the note must name the unit and the place of its earlier content: %v", mapping.Notes)
+	}
+	if read(t, backup) != "# my own tmux configuration\n" {
+		t.Fatal("the mapping must leave the earlier content in place")
+	}
+	owned(t, mapping.State, filepath.Join(f.home, ".config", "nvim"), "config.nvim", "link", "absent", filepath.Join(f.home, ".config"))
 }

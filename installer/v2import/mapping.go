@@ -187,6 +187,20 @@ func (m *mapper) configuration(id string, receipt Receipt) error {
 		Path     string
 		Snapshot platform.Snapshot
 	}
+	originals, paths, backups := []observed{}, []string{}, []string{}
+	for _, target := range baseline.Targets {
+		originals, paths, backups = append(originals, observed{target.Destination, target.Original}), append(paths, target.Destination), append(backups, target.Backup)
+	}
+	originalsDigest, originalsErr := digest(originals)
+	pathsDigest, pathsErr := digest(paths)
+	if err := errors.Join(originalsErr, pathsErr); err != nil {
+		return err
+	}
+	verified := originalsDigest == receipt.Before.Fingerprint && pathsDigest == receipt.Before.Identity
+	if !verified {
+		m.note("%s: the saved baseline %s is not the one that release v2 recorded. Setup cannot prove the earlier content of %s, so it takes no ownership of this resource and asks before it replaces its content. The earlier content that release v2 saved stays at %s.",
+			id, filepath.Join(m.dir, receipt.Recovery, "configuration.json"), strings.Join(paths, ", "), strings.Join(backups, ", "))
+	}
 	actual, readable := []observed{}, true
 	for _, target := range baseline.Targets {
 		snapshot, err := platform.SnapshotTree(target.Destination)
@@ -200,7 +214,7 @@ func (m *mapper) configuration(id string, receipt Receipt) error {
 	if err != nil {
 		return err
 	}
-	owned := m.created(receipt) && readable && fingerprint == receipt.After.Fingerprint
+	owned := verified && m.created(receipt) && readable && fingerprint == receipt.After.Fingerprint
 	for i, target := range baseline.Targets {
 		live := actual[i].Snapshot
 		kind := recordKind(live.Kind)
@@ -213,7 +227,10 @@ func (m *mapper) configuration(id string, receipt Receipt) error {
 		}
 		record := state.Record{Resource: id, Kind: kind, Before: targets.Absent, Made: slices.Clone(target.Created)}
 		unitOwned := owned
-		if target.Original.Kind != "absent" {
+		switch {
+		case !verified:
+			record.Made, record.Before = nil, "fp:"+receipt.Before.Fingerprint
+		case target.Original.Kind != "absent":
 			record.Made = nil
 			record.Before = "backup:" + target.Backup
 			if backup, err := platform.SnapshotTree(target.Backup); err != nil || backup != target.Original {

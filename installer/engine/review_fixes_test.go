@@ -360,3 +360,32 @@ func TestCheckKeepsAV2FolderThatOnlyASavedBaselineNames(t *testing.T) {
 		t.Fatal("check gave a cleanup instruction although a saved baseline is unreadable", check.Message)
 	}
 }
+
+func TestCheckReportsAnUnfinishedRemovalOfADeselectedResource(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor", "other"))
+	edit(t, e, func(s *state.State) {
+		s.Selected = []string{"editor"}
+		if err := s.BeginRelease(w.key("tool.other")); err != nil {
+			t.Fatal(err)
+		}
+	})
+	check, err := e.Check(context.Background())
+	if err != nil || check.Status != "needs-action" || !strings.Contains(check.Message, "unfinished change: "+w.key("tool.other")+" (tool.other)") {
+		t.Fatal("check hid the unfinished removal of a deselected resource", check, err)
+	}
+}
+
+func TestCheckReportsAnUnfinishedWriteOfAWantedResource(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("other"))
+	edit(t, e, func(s *state.State) {
+		if err := s.BeginTarget(w.key("tool.other"), state.Record{Resource: "tool.other", Kind: "file", Next: "fp:2"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	check, err := e.Check(context.Background())
+	if err != nil || check.Status != "needs-action" || !strings.Contains(check.Message, "unfinished change: "+w.key("tool.other")+" (tool.other)") {
+		t.Fatal("check hid the unfinished write of a wanted resource", check, err)
+	}
+}

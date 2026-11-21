@@ -3,6 +3,7 @@ package targets_test
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/luisgui1757/dotfiles/installer/targets"
@@ -92,5 +93,43 @@ func TestInterruptedApprovedReplacementNeverLeavesTheDestinationAbsent(t *testin
 				}
 			})
 		}
+	}
+}
+
+func TestInterruptedPublicationKeepsAnEditedPreviousFile(t *testing.T) {
+	edits := map[string][2]string{"block": {"export A=1", "export A=9"}, "field": {`"rose-pine"`, `"mine"`}}
+	for name, edit := range edits {
+		t.Run(name, func(t *testing.T) {
+			e := newEnv(t)
+			f := fixtureNamed(name)
+			f.outside(e)
+			d := f.first(e)
+			e.mustConverge(d, targets.Preserve)
+			_, aside := targets.Siblings(d)
+			edited := ""
+			targets.SetFault(func(point string) error {
+				if point != "publish" || edited != "" {
+					return nil
+				}
+				edited = strings.Replace(read(t, aside), edit[0], edit[1], 1)
+				if !strings.Contains(edited, edit[1]) {
+					t.Fatal("the fixture needs an edit inside the managed part", edited)
+				}
+				write(t, aside, edited, 0640)
+				return errFault
+			})
+			if err := e.converge(f.second(e), targets.Preserve); !errors.Is(err, errFault) {
+				t.Fatal(err)
+			}
+			targets.SetFault(nil)
+			published := read(t, d.Path)
+			err := e.converge(f.second(e), targets.Preserve)
+			if err == nil || !strings.Contains(err.Error(), aside) {
+				t.Fatal("the next run must keep the edited previous file and name it", err)
+			}
+			if _, err := os.Lstat(aside); err != nil || read(t, aside) != edited || read(t, d.Path) != published {
+				t.Fatal("the edit in the previous file was lost", err)
+			}
+		})
 	}
 }

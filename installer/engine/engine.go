@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"slices"
 	"strings"
@@ -139,13 +140,21 @@ func (e *Engine) PreviewState(ctx context.Context, st state.State, request Reque
 }
 
 // Check inspects the saved selection and reports each difference, pending
-// mark and resource that setup cannot inspect. It never installs or repairs.
+// mark, unfinished change of a target record and resource that setup cannot
+// inspect. It never installs or repairs.
 func (e *Engine) Check(ctx context.Context) (Result, error) {
-	plan, err := e.Preview(ctx, Request{Mode: "check"})
+	if err := e.validate(); err != nil {
+		return Result{Status: "failed"}, err
+	}
+	st, err := state.Peek(e.StateDir, e.Target)
 	if err != nil {
 		return Result{Status: "failed"}, err
 	}
-	return e.checkResult(ctx, plan), nil
+	plan, err := e.PreviewState(ctx, st, Request{Mode: "check"})
+	if err != nil {
+		return Result{Status: "failed"}, err
+	}
+	return e.checkResult(ctx, st, plan), nil
 }
 
 func pendingLine(mark string) string {
@@ -168,13 +177,18 @@ func (e *Engine) disclosures(plan Plan) string {
 	return message
 }
 
-func (e *Engine) checkResult(ctx context.Context, plan Plan) Result {
+func (e *Engine) checkResult(ctx context.Context, st state.State, plan Plan) Result {
 	reasons := []string{}
 	if plan.V2Restore == "switching" {
 		reasons = append(reasons, switchingLine)
 	}
 	for _, mark := range plan.Pending {
 		reasons = append(reasons, pendingLine(mark))
+	}
+	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
+		if record := st.Targets[key]; record.Next != "" {
+			reasons = append(reasons, "unfinished change: "+key+" ("+record.Resource+"). Run setup again to finish it.")
+		}
 	}
 	retainedNotes := []string{}
 	for _, op := range plan.Operations {

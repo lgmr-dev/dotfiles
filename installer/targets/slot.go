@@ -196,25 +196,25 @@ func (k slotKind) Recover(ctx context.Context, d Desired, record state.Record) e
 		if err != nil {
 			return err
 		}
+		expected := record.Applied
+		if expected == "" {
+			if expected, err = k.Baseline(baselineOf(record)); err != nil {
+				return err
+			}
+		}
+		value, part, err := k.valueOf(earlier, d)
+		replaced := err == nil && part != nil && savedIn(ctx, func(saved string) bool {
+			info, err := os.Lstat(saved)
+			if err != nil || !info.Mode().IsRegular() || info.Size() != int64(len(part)) {
+				return false
+			}
+			copied, err := os.ReadFile(saved)
+			return err == nil && bytes.Equal(copied, part)
+		})
+		if err != nil || !replaced && (value != expected || file == Absent && value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path) {
+			return errors.Join(leftover(aside), err)
+		}
 		if file == Absent {
-			expected := record.Applied
-			if expected == "" {
-				if expected, err = k.Baseline(baselineOf(record)); err != nil {
-					return err
-				}
-			}
-			value, part, err := k.valueOf(earlier, d)
-			replaced := err == nil && part != nil && savedIn(ctx, func(saved string) bool {
-				info, err := os.Lstat(saved)
-				if err != nil || !info.Mode().IsRegular() || info.Size() != int64(len(part)) {
-					return false
-				}
-				copied, err := os.ReadFile(saved)
-				return err == nil && bytes.Equal(copied, part)
-			})
-			if err != nil || !replaced && (value != expected || value == Absent && len(record.Made) != 0 && record.Made[0] == d.Path) {
-				return errors.Join(leftover(aside), err)
-			}
 			err = platform.MoveNoReplace(aside, d.Path)
 		} else {
 			expected, replaceErr := k.slot.Replace(earlier, d, raw, raw != nil)
@@ -358,6 +358,9 @@ func (k slotKind) publish(ctx context.Context, d Desired, from string, value []b
 	}
 	if !remove {
 		if err := moveIn(staged, d.Path); err != nil {
+			return err
+		}
+		if err := hit("publish"); err != nil {
 			return err
 		}
 	}

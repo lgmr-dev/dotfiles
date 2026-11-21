@@ -451,7 +451,7 @@ func TestDeselectingAResourceKeepsItWhileItsWriteIsUnfinished(t *testing.T) {
 	if got := actions(plan); !slices.Equal(got, []string{"retain:config.editor", "retain:tool.editor", "retain:tool.git"}) {
 		t.Fatal(got)
 	}
-	want := "an unfinished change of " + w.key("config.editor") + " stays until setup finishes it; run setup again with the tool selected, or finish it"
+	want := "an unfinished change of " + w.key("config.editor") + " stays until setup finishes it: select Editor configuration again and run setup until its step passes, then deselect it"
 	if reason := operation(t, plan, "config.editor").Reason; reason != want {
 		t.Fatal(reason)
 	}
@@ -524,5 +524,22 @@ func TestCheckKeepsAV2FolderThatAUTF16ProfileNames(t *testing.T) {
 				t.Fatal("check gave a cleanup instruction for a UTF-16 profile that does not decode", check.Message)
 			}
 		})
+	}
+}
+
+func TestARetainedResourceThatIsBlockedShowsItsRepairCommand(t *testing.T) {
+	st := state.State{Schema: 2, Target: target, Selected: []string{}, Keep: []string{}, System: map[string][]string{},
+		Targets: map[string]state.Record{"/home/tool.other": {Resource: "tool.other", Kind: "file", Applied: "fp:1"}}}
+	repair := engine.CommandBlock{Title: "Repair the dependent", Lines: []string{"brew reinstall --formula consumer"}, By: "you"}
+	found := engine.Findings{Wanted: map[string]engine.Finding{}, Released: map[string]engine.Finding{
+		"tool.other": {Status: engine.Blocked, Reason: "consumer is broken", Commands: []engine.CommandBlock{repair}, Token: "1"},
+	}}
+	plan, err := engine.PlanChanges(fixtureCatalog(), linux, st, engine.Request{Mode: "apply", SelectSet: true, Selected: []string{}}, found, "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := operation(t, plan, "tool.other")
+	if !slices.ContainsFunc(op.Commands, func(b engine.CommandBlock) bool { return b.Title == repair.Title && b.By == "you" }) {
+		t.Fatalf("the repair command of a blocked retained resource is hidden: %s %+v", op.Action, op.Commands)
 	}
 }

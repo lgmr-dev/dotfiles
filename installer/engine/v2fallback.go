@@ -116,7 +116,7 @@ func names(text, folder string) bool {
 	return false
 }
 
-func treeTexts(root string) ([]string, error) {
+func treeTexts(root, origin string) ([]string, error) {
 	texts := []string{}
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		switch {
@@ -126,6 +126,10 @@ func treeTexts(root string) ([]string, error) {
 			return nil
 		case entry.Type()&(fs.ModeSymlink|fs.ModeIrregular) != 0:
 			target, err := os.Readlink(path)
+			if err == nil && !filepath.IsAbs(target) {
+				inside, _ := filepath.Rel(root, path)
+				target = filepath.Join(filepath.Dir(filepath.Join(origin, inside)), target)
+			}
 			texts = append(texts, target)
 			return err
 		}
@@ -143,6 +147,10 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 	users = map[string]string{}
 	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
 		record := st.Targets[key]
+		path := key
+		if cut := strings.LastIndex(key, "#"); cut > 0 && (record.Kind == "block" || record.Kind == "field") {
+			path = key[:cut]
+		}
 		texts := []string{}
 		for _, value := range []string{record.Applied, record.Next, record.Before} {
 			if encoded, inline := strings.CutPrefix(value, "value:"); inline {
@@ -153,7 +161,7 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 				}
 			}
 			if backup, saved := strings.CutPrefix(value, "backup:"); saved {
-				contents, err := treeTexts(backup)
+				contents, err := treeTexts(backup, path)
 				if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
 					unreadable = key + " (its backup " + backup + "): " + err.Error()
 				}
@@ -161,15 +169,11 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 			}
 			texts = append(texts, value)
 		}
-		path := key
-		if cut := strings.LastIndex(key, "#"); cut > 0 && (record.Kind == "block" || record.Kind == "field") {
-			path = key[:cut]
-		}
 		var contents []string
 		var err error
 		switch record.Kind {
 		case "link":
-			contents, err = treeTexts(path)
+			contents, err = treeTexts(path, path)
 		case "file", "block", "field":
 			var text string
 			text, err = readText(path)

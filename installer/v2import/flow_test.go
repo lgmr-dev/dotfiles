@@ -372,6 +372,67 @@ func TestImportStopsBeforeTheSwitchAndLeavesSchema1(t *testing.T) {
 	})
 }
 
+func deselectNeovim(t *testing.T, f *fx) {
+	t.Helper()
+	f.v1.Selected = slices.DeleteFunc(f.v1.Selected, func(id string) bool { return id == "neovim" })
+	for _, id := range []string{"config.nvim", "tool.nvim", hooks.NvimResource} {
+		delete(f.v1.Receipts, id)
+	}
+	for _, path := range []string{filepath.Join(f.home, ".config", "nvim"), f.publicRuntime()} {
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.save()
+}
+
+func TestAStagedBuildOfADeselectedToolDoesNotStopTheNextImport(t *testing.T) {
+	for _, earlier := range []string{"restored import", "failed build"} {
+		t.Run(earlier, func(t *testing.T) {
+			f := linuxFixture(t)
+			f.save()
+			if earlier == "restored import" {
+				f.mustImport()
+				mustRestore(t, f)
+			} else {
+				f.failBuild[hooks.NvimResource] = true
+				proposal, err := f.preview()
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := proposal.Run(context.Background()); err == nil {
+					t.Fatal("the fixture must stop at the failed build")
+				}
+				f.failBuild[hooks.NvimResource] = false
+			}
+			deselectNeovim(t, f)
+			proposal, err := f.preview()
+			if err != nil {
+				t.Fatalf("a staged build of a deselected tool must not stop the import: %v", err)
+			}
+			for _, op := range proposal.Plan.Operations {
+				if op.Action == "remove" || op.Action == "forget" {
+					t.Fatalf("the import must not remove %s", op.Resource)
+				}
+			}
+			if result, err := proposal.Run(context.Background()); err != nil {
+				t.Fatalf("%v\n%s", err, result.Message)
+			}
+			st := f.current()
+			if st.Schema != 2 || st.V2Restore != "open" || slices.Contains(st.Selected, "neovim") {
+				t.Fatalf("after the import the state must be schema 2 without Neovim: %+v", st)
+			}
+			current := filepath.Join(f.state, "tools", "tool.nvim", "current")
+			if _, has := st.Targets[current]; has {
+				t.Fatalf("the state records the staged build of a deselected tool: %+v", st.Targets[current])
+			}
+			if read(t, filepath.Join(current, "bin", "tool")) != "v3 tool.nvim\n" {
+				t.Fatal("the import must leave the staged build for the sweep")
+			}
+		})
+	}
+}
+
 func TestAnInterruptedSwitchCompletesOrRestores(t *testing.T) {
 	t.Cleanup(func() { v2import.SetFault(nil) })
 	for _, point := range []string{"restore-set", "publish", "published", "apply", "open"} {

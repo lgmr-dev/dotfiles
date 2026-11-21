@@ -251,7 +251,7 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 		case request.Mode != "apply":
 			op.Action, op.Reason = "retain", reasonLaterApply
 		case written != "":
-			op.Action, op.Reason = "retain", "an unfinished change of "+written+" stays until setup finishes it; run setup again with the tool selected, or finish it"
+			op.Action, op.Reason = "retain", "an unfinished change of "+written+" stays until setup finishes it: select "+r.Name+" again and run setup until its step passes, then deselect it"
 		case f.Status == Unknown || f.Status == Blocked:
 			op.Action, op.Reason = "retain", withReason("setup could not inspect this resource", f.Reason)
 		case f.Status == Changed:
@@ -287,7 +287,7 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 		if op.Action == "remove" && held[op.Resource] {
 			op.Action, op.Reason = "retain", reasonRetainedBy
 		}
-		if op.Action != "retain" || op.Reason != reasonSystem || held[op.Resource] {
+		if (op.Action != "retain" || op.Reason != reasonSystem || held[op.Resource]) && op.Finding.Status != Blocked {
 			op.Commands = slices.DeleteFunc(slices.Clone(op.Commands), func(block CommandBlock) bool { return block.By == "you" })
 		}
 	}

@@ -143,7 +143,7 @@ func (s *brewSession) removalBlock(name string, cask bool) (engine.CommandBlock,
 type brewFormulaObservation struct {
 	Name, Version, Source           string
 	Present, Linked, Held, Recorded bool
-	Checked, Outdated               bool
+	Checked, Outdated, Due          bool
 	Issue, Current                  string
 	Broken                          []brewBrokenDependent
 }
@@ -193,8 +193,8 @@ func (s *brewSession) observeFormula(ctx context.Context, r catalog.Resource, b 
 		o.Issue = err.Error()
 		return o, nil
 	}
-	o.Checked = true
-	if want.Present && brewLinkageDue(st, r.ID) {
+	o.Checked, o.Due = true, brewLinkageDue(st, r.ID)
+	if o.Due {
 		if o.Broken, err = s.brokenDependents(ctx, installed, b.name, st); err != nil {
 			return o, err
 		}
@@ -223,9 +223,25 @@ func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b 
 		return engine.Finding{}, err
 	}
 	f := engine.Finding{Status: engine.Satisfied, Version: o.Version, Token: token}
+	repairs := func(selected bool) string {
+		names := []string{}
+		for _, broken := range o.Broken {
+			names = append(names, broken.Name)
+			by := "you"
+			if selected && broken.Repair {
+				by, f.Pending = "setup", true
+			}
+			f.Commands = append(f.Commands, engine.CommandBlock{Title: "Repair " + broken.Name + " with Homebrew", By: by, Lines: []string{s.line(false, "reinstall", "--formula", broken.Source)}})
+		}
+		return "after setup changed " + b.name + ", these installed Homebrew formulae fail their linkage check: " + strings.Join(names, ", ")
+	}
 	if !want.Present {
 		if !o.Present {
 			f.Status, f.Reason = engine.Absent, "the package is not installed"
+			return f, nil
+		}
+		if len(o.Broken) != 0 {
+			f.Status, f.Reason = engine.Blocked, repairs(false)+"; repair each one yourself, then run setup again"
 			return f, nil
 		}
 		if o.Recorded {
@@ -259,17 +275,10 @@ func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b 
 			setup("reinstall")
 		}
 	case len(o.Broken) != 0:
-		names := []string{}
-		for _, broken := range o.Broken {
-			names = append(names, broken.Name)
-			by := "you"
-			if broken.Repair {
-				by, f.Pending = "setup", true
-			}
-			f.Commands = append(f.Commands, engine.CommandBlock{Title: "Repair " + broken.Name + " with Homebrew", By: by, Lines: []string{s.line(false, "reinstall", "--formula", broken.Source)}})
-		}
-		f.Status, f.Reason = engine.Unhealthy, "after setup changed "+b.name+", these installed Homebrew formulae fail their linkage check: "+strings.Join(names, ", ")
+		f.Status, f.Reason = engine.Unhealthy, repairs(true)
 		f.Notes = append(f.Notes, "Setup reinstalls only a formula that it installed. Repair each other formula yourself, then run setup again.")
+	case o.Due:
+		f.Status, f.Reason = engine.Unhealthy, "a linkage check of its dependents is due; setup records the result"
 	case o.Outdated && o.Held:
 		f.Notes = append(f.Notes, fmt.Sprintf("Homebrew has version %s of %s. The package is pinned, and setup keeps the pin.", o.Current, b.name))
 	case o.Outdated && foreign:
@@ -289,8 +298,10 @@ func brewUnavailable(reason string) (engine.Finding, error) {
 // Inspect reports the package of the resource. Without Homebrew, or with a
 // Homebrew that setup cannot use, the result is unknown. After setup changed
 // a formula, Inspect checks the linkage of the installed formulae that use
-// the formula or its dependencies, until such a check in Apply passes.
-// A failed check makes the formula unhealthy.
+// the formula or its dependencies, until such a check in Apply passes or the
+// formula is absent. A failed check makes a selected formula unhealthy and a
+// deselected formula blocked. A passing check makes a selected formula
+// unhealthy until Apply records the result.
 func (d *Brew) Inspect(ctx context.Context, r catalog.Resource, want engine.Want, rec engine.Records) (engine.Finding, error) {
 	s, issue, err := d.session(ctx)
 	if err != nil {
@@ -452,8 +463,8 @@ func brewDropLinkage(st *state.State, id string) {
 // formula. It writes the pending mark, the linkage check of the dependents of
 // a formula, and for a new install the provisional system record, before brew
 // starts. It clears the mark and the linkage check after the package and its
-// dependents pass their checks. For a healthy formula with broken dependents,
-// a repair reinstalls only the recorded dependents.
+// dependents pass their checks. For a healthy formula with a due linkage
+// check, a repair reinstalls only the recorded dependents that fail it.
 func (d *Brew) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	s, issue, err := d.session(ctx)
 	if err != nil {

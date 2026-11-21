@@ -224,3 +224,39 @@ func TestCheckKeepsAV2FolderThatALauncherInPlaceOfARecordedLinkNames(t *testing.
 		t.Fatalf("check must keep the folder that the launcher names:\n%s", check.Message)
 	}
 }
+
+func TestCheckKeepsAV2FolderThatARecordedRelativeLinkResolvesInto(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	packages := v2Folder(t, e, "packages")
+	payload := filepath.Join(packages, "tool.x", "current", "bin", "x")
+	link := filepath.Join(w.home, ".local", "bin", "x")
+	if err := os.MkdirAll(filepath.Dir(link), 0700); err != nil {
+		t.Fatal(err)
+	}
+	relative, err := filepath.Rel(filepath.Dir(link), payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(relative, link); err != nil {
+		t.Skip("links are not available:", err)
+	}
+	store, err := state.Open(e.StateDir, e.Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = store.Update(func(s *state.State) error {
+		s.Targets[link] = state.Record{Resource: "config.editor", Kind: "link", Applied: "link:abc", Before: "absent"}
+		return nil
+	})
+	if err = errors.Join(err, store.Close()); err != nil {
+		t.Fatal(err)
+	}
+	check, err := e.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "Note: " + packages + " is a folder of release v2 still in use by " + link + "; keep it"; !strings.Contains(check.Message, want) || strings.Contains(check.Message, "Owner cleanup: "+packages) {
+		t.Fatalf("check must keep the folder that the relative link %s resolves into:\n%s", relative, check.Message)
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -141,19 +142,23 @@ func (o Options) phases(plan engine.Plan) (blockers []string, builds []engine.Op
 
 func stagingDir(stateDir string) string { return filepath.Join(restoreDir(stateDir), "staging") }
 
-func (o Options) staged() map[string]state.Record {
-	st, err := state.Peek(stagingDir(o.Engine.StateDir), o.Engine.Target)
+func (o Options) staged(mapping Mapping) (map[string]state.Record, error) {
 	records := map[string]state.Record{}
+	closure, err := deferCatalog{o.Engine.Catalog, mapping.Deferred}.Closure(slices.Concat(mapping.State.Selected, mapping.State.Keep), o.Engine.Context)
 	if err != nil {
-		return records
+		return nil, err
+	}
+	st, err := state.Peek(stagingDir(o.Engine.StateDir), o.Engine.Target)
+	if err != nil {
+		return records, nil
 	}
 	tools := filepath.Join(o.Engine.StateDir, "tools")
 	for key, record := range st.Targets {
-		if within(tools, key) {
+		if within(tools, key) && slices.Contains(closure, record.Resource) {
 			records[key] = record
 		}
 	}
-	return records
+	return records, nil
 }
 
 // Preview maps a schema-1 state and plans the import, or plans the
@@ -193,10 +198,12 @@ func Preview(ctx context.Context, o Options, setLegacy func(directories []string
 	if setLegacy != nil {
 		setLegacy(mapping.Legacy)
 	}
-	st := mapping.State.Clone()
-	for key, record := range o.staged() {
-		st.Targets[key] = record
+	staged, err := o.staged(mapping)
+	if err != nil {
+		return nil, err
 	}
+	st := mapping.State.Clone()
+	maps.Copy(st.Targets, staged)
 	preview := *e
 	preview.Catalog, preview.UI = deferCatalog{e.Catalog, mapping.Deferred}, nil
 	plan, err := preview.PreviewState(ctx, st, engine.Request{Mode: "apply"})
@@ -345,10 +352,12 @@ func (p *Proposal) publish(ctx context.Context) (resultErr error) {
 	if len(broken) != 0 {
 		return fmt.Errorf("the import stopped before the switch, and release v2 stays active. These applications of release v2 do not start: %s. Repair them with the setup of %s (%s), or deselect them there, then run this setup again", strings.Join(broken, ", "), SourceCommit, SourceRelease)
 	}
-	st := p.Mapping.State.Clone()
-	for key, record := range p.o.staged() {
-		st.Targets[key] = record
+	staged, err := p.o.staged(p.Mapping)
+	if err != nil {
+		return err
 	}
+	st := p.Mapping.State.Clone()
+	maps.Copy(st.Targets, staged)
 	if err := p.build(ctx, &st); err != nil {
 		return err
 	}

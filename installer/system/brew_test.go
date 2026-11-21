@@ -653,10 +653,83 @@ func TestBrewReportsABrokenDependentUntilALinkageCheckPassesAfterTheMarkIsCleare
 				t.Fatal("the report ended before a linkage check passed", still)
 			}
 			delete(f.broken, "sample/tap/consumer")
+			if err := f.apply(git, engine.Want{Present: true}); err != nil || len(f.runner.commands) != 1 || len(f.rec.State().Linkage) != 0 {
+				t.Fatal("the passing check after the repair was not recorded", err, f.mutations(), f.rec.State().Linkage)
+			}
 		}
 		if healthy := f.inspect(git, engine.Want{Present: true}); healthy.Status != engine.Satisfied || len(healthy.Commands) != 0 {
 			t.Fatal("a healthy dependent still blocks the formula", recorded, healthy)
 		}
+	}
+}
+
+func brewDueFixture(t *testing.T) *brewFixture {
+	t.Helper()
+	f := brewMaintenanceFixture(t, false)
+	f.installed["git"] = brewPackage{Name: "git", Source: "git", Version: "2.50", Healthy: true, Dependencies: []string{"shared"}}
+	if err := f.rec.Update(func(s *state.State) error {
+		s.AddSystem("brew", "git")
+		s.Linkage = []string{"tool.git"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func TestBrewClearsADueLinkageCheckThatPassesWithoutAReinstall(t *testing.T) {
+	git := brewTestFormula("tool.git", "git")
+	f := brewDueFixture(t)
+	f.broken["unrelated"] = true
+	due := f.inspect(git, engine.Want{Present: true})
+	if due.Status != engine.Unhealthy || !strings.Contains(due.Reason, "linkage check of its dependents is due") || len(due.Commands) != 0 {
+		t.Fatal("a due linkage check is not reported", due)
+	}
+	if err := f.d.Apply(context.Background(), git, due, f.rec); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.runner.commands) != 0 {
+		t.Fatal("setup changed a healthy formula to record a passing check", f.mutations())
+	}
+	if st := f.rec.State(); len(st.Linkage) != 0 || len(st.Pending) != 0 {
+		t.Fatal("the passing check stayed due", st.Linkage, st.Pending)
+	}
+	if healthy := f.inspect(git, engine.Want{Present: true}); healthy.Status != engine.Satisfied || len(healthy.Commands) != 0 {
+		t.Fatal("a recorded passing check still makes the formula unhealthy", healthy)
+	}
+	for _, query := range f.queries {
+		if len(query) > 3 && query[1] == "linkage" && slices.Contains(query[3:], "unrelated") {
+			t.Fatal("the linkage check went beyond the formulae that the step could change", query)
+		}
+	}
+}
+
+func TestBrewReportsABrokenDependentOfADeselectedFormulaUntilACheckPasses(t *testing.T) {
+	git := brewTestFormula("tool.git", "git")
+	f := brewDueFixture(t)
+	f.broken["sample/tap/consumer"] = true
+	line := f.line(false, "reinstall", "--formula", "sample/tap/consumer")
+	blocked := f.inspect(git, engine.Want{})
+	if blocked.Status != engine.Blocked || !strings.Contains(blocked.Reason, "consumer") || !slices.Equal(brewTestBlocks(blocked, "you"), []string{line}) {
+		t.Fatal("a deselected formula hides its broken dependent", blocked)
+	}
+	delete(f.broken, "sample/tap/consumer")
+	if kept := f.inspect(git, engine.Want{}); kept.Status != engine.Satisfied {
+		t.Fatal("a repaired dependent still blocks the deselected formula", kept)
+	}
+	delete(f.installed, "git")
+	absent := f.inspect(git, engine.Want{})
+	if absent.Status != engine.Absent {
+		t.Fatal(absent)
+	}
+	if err := f.d.Remove(context.Background(), git, absent, f.rec); err != nil {
+		t.Fatal(err)
+	}
+	if st := f.rec.State(); len(st.Linkage) != 0 || st.HasSystem("brew", "git") {
+		t.Fatal("the release kept the record or the due check", st.Linkage, st.System)
+	}
+	if len(f.runner.commands) != 0 {
+		t.Fatal("setup changed a deselected formula", f.mutations())
 	}
 }
 

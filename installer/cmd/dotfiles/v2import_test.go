@@ -14,6 +14,7 @@ import (
 	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/hooks"
 	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/luisgui1757/dotfiles/installer/v2import"
 )
 
 func importFixture(t *testing.T) (setup, []byte) {
@@ -477,6 +478,43 @@ func TestTheImportCommandsDuringTheSwitchNameEachUnfinishedTarget(t *testing.T) 
 		}
 		if args[0] == "check" && (err == nil || !strings.Contains(reportPart(t, text), "these items need your action")) {
 			t.Fatalf("check must report the unfinished targets as an action:\n%s\n%v", text, err)
+		}
+	}
+}
+
+func TestCheckNamesEachSlotOfAnUnfinishedRestoreOfReleaseV2(t *testing.T) {
+	s, _ := importFixture(t)
+	if _, err := runV2(t, s, importV2, "apply", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	slot := filepath.Join(s.folders.Home, ".config", "shells", "env.sh")
+	path := filepath.Join(s.stateDir, v2import.RestoreFolder, "manifest.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest v2import.Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest.Restoring = map[string]string{slot: "fp:1"}
+	if data, err = json.Marshal(manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	line := "unfinished restore of release v2: " + slot + ". Run restore-v2 again to finish it."
+	check := func(ctx context.Context, s setup) error { return execute(ctx, newEngine(s), s.command, s.output) }
+	for _, v2Restore := range []string{"open", "switching"} {
+		editV2State(t, s, func(st *state.State) { st.V2Restore = v2Restore })
+		run := check
+		if v2Restore == "switching" {
+			run = importV2
+		}
+		text, err := runV2(t, s, run, "check")
+		if err == nil || !strings.Contains(reportPart(t, text), "these items need your action") || !strings.Contains(text, line) {
+			t.Fatalf("check while v2_restore is %s must name the unfinished slot as an action:\n%s\n%v", v2Restore, text, err)
 		}
 	}
 }

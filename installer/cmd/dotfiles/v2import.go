@@ -32,6 +32,18 @@ func legacyCommandDirectories(s setup) []string {
 	return v2import.LegacyCommandDirectories(s.stateDir, st, s.host.Context)
 }
 
+func unfinishedRestoreLines(stateDir string) []string {
+	keys, err := v2import.UnfinishedRestore(stateDir)
+	if err != nil {
+		return []string{"setup could not read the restore set of release v2: " + err.Error()}
+	}
+	lines := []string{}
+	for _, key := range keys {
+		lines = append(lines, "unfinished restore of release v2: "+key+". Run restore-v2 again to finish it.")
+	}
+	return lines
+}
+
 func verifyNvim(s setup) func(context.Context) error {
 	return func(ctx context.Context) error {
 		pins, err := builds.HostPins(s.catalog.Pins, s.host)
@@ -118,7 +130,7 @@ func runImportV2(ctx context.Context, s setup) error {
 			return errors.New("this installation runs release v2; run setup, or apply --yes, to import it. Nothing was changed")
 		}
 		result := engine.Result{Status: "needs-action", Plan: proposal.Plan,
-			Message: strings.Join(append([]string{"The import from release v2 is not complete. Run apply --yes to complete it, or restore-v2 --yes to go back to release v2."}, unfinished...), "\n")}
+			Message: strings.Join(slices.Concat([]string{"The import from release v2 is not complete. Run apply --yes to complete it, or restore-v2 --yes to go back to release v2."}, unfinished, unfinishedRestoreLines(s.stateDir)), "\n")}
 		if _, err := fmt.Fprint(s.output, preview+terminal.ReportText(result)); err != nil {
 			return err
 		}

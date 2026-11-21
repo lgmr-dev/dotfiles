@@ -100,6 +100,17 @@ func loadManifest(stateDir string) (Manifest, error) {
 	return manifest, nil
 }
 
+// UnfinishedRestore returns the sorted target keys that restore-v2 started to
+// give back and did not finish. It only reads the manifest of the restore set
+// in stateDir.
+func UnfinishedRestore(stateDir string) ([]string, error) {
+	manifest, err := loadManifest(stateDir)
+	if err != nil {
+		return nil, err
+	}
+	return slices.Sorted(maps.Keys(manifest.Restoring)), nil
+}
+
 func (s *restoreSet) save() error {
 	data, err := json.MarshalIndent(s.manifest, "", "  ")
 	if err != nil {

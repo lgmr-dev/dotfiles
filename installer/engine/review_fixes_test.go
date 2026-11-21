@@ -451,9 +451,12 @@ func TestDeselectingAResourceKeepsItWhileItsWriteIsUnfinished(t *testing.T) {
 	if got := actions(plan); !slices.Equal(got, []string{"retain:config.editor", "retain:tool.editor", "retain:tool.git"}) {
 		t.Fatal(got)
 	}
-	want := "an unfinished change of " + w.key("config.editor") + " stays until setup finishes it: select Editor configuration again and run setup until its step passes, then deselect it"
+	want := "an unfinished change of " + w.key("config.editor") + " stays until setup finishes it: select Editor (editor) again and run setup until its step passes, then deselect it"
 	if reason := operation(t, plan, "config.editor").Reason; reason != want {
 		t.Fatal(reason)
+	}
+	if _, err := e.Preview(context.Background(), selection("editor")); err != nil {
+		t.Fatal("the reason names a menu entry that the selection refuses", err)
 	}
 	if _, err := e.Apply(context.Background(), request, plan); err != nil || len(w.calls("remove:")) != 0 {
 		t.Fatal("the run removed a resource with an unfinished write", w.calls("remove:"), err)

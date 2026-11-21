@@ -24,10 +24,12 @@ import (
 // resources of a request before its inspections and before the steps of its
 // approved plan, so a provider whose content depends on the selection can use
 // it. Leftovers, when set, returns the paths that setup keeps for the owner
-// and no longer uses: a check lists them as notes. Switch is true only for
-// the run of the import that completes the switch from release v2: that run
-// is permitted while v2_restore is "switching", and it does not close the v2
-// fallback. Each other confirmed apply or update closes an open fallback
+// and no longer uses: a check lists them as notes. V2Unfinished, when set,
+// returns one line for each unfinished step of the restore of release v2: a
+// check while v2_restore is set reports each line as an action. Switch is
+// true only for the run of the import that completes the switch from release
+// v2: that run is permitted while v2_restore is "switching", and it does not
+// close the v2 fallback. Each other confirmed apply or update closes an open fallback
 // immediately before its first step that applies or removes; a run without
 // such a step leaves the fallback open, and a step that fails without a
 // change of the targets, the system records and the pending marks opens it
@@ -45,10 +47,11 @@ type Engine struct {
 	Sweep    func(ctx context.Context, rec Records) error
 	Elevate  func(ctx context.Context) (func() error, error)
 
-	Selection func(wanted []string)
-	Leftovers func(ctx context.Context) ([]string, error)
-	Switch    bool
-	RestoreV2 func(ctx context.Context, ui Interaction) (Result, error)
+	Selection    func(wanted []string)
+	Leftovers    func(ctx context.Context) ([]string, error)
+	V2Unfinished func() []string
+	Switch       bool
+	RestoreV2    func(ctx context.Context, ui Interaction) (Result, error)
 }
 
 type viewRecords struct{ st state.State }
@@ -198,6 +201,9 @@ func (e *Engine) checkResult(ctx context.Context, st state.State, plan Plan) Res
 		reasons = append(reasons, pendingLine(mark))
 	}
 	reasons = append(reasons, UnfinishedLines(st)...)
+	if st.V2Restore != "" && e.V2Unfinished != nil {
+		reasons = append(reasons, e.V2Unfinished()...)
+	}
 	retainedNotes := []string{}
 	for _, op := range plan.Operations {
 		r, _ := e.Catalog.Resource(op.Resource)

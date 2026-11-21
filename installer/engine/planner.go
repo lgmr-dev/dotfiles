@@ -5,6 +5,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/luisgui1757/dotfiles/installer/platform"
 	"github.com/luisgui1757/dotfiles/installer/state"
@@ -138,6 +139,34 @@ func unfinishedWrite(st state.State, id string) string {
 	return ""
 }
 
+func unfinishedReason(c Catalog, ctx platform.Context, saved []string, id, key string) (string, error) {
+	first, preferred := "", []string{}
+	for _, entry := range c.Menu(ctx) {
+		closure, err := c.Closure([]string{entry.ID}, ctx)
+		if err != nil {
+			return "", err
+		}
+		if !slices.Contains(closure, id) {
+			continue
+		}
+		name := entry.Name + " (" + entry.ID + ")"
+		if first == "" {
+			first = name
+		}
+		if slices.Contains(saved, entry.ID) {
+			preferred = append(preferred, name)
+		}
+	}
+	reason := "an unfinished change of " + key + " stays until setup finishes it: "
+	if len(preferred) == 0 && first == "" {
+		return reason + "run setup again with a tool that uses " + id, nil
+	}
+	if len(preferred) == 0 {
+		preferred = []string{first}
+	}
+	return reason + "select " + strings.Join(preferred, " or ") + " again and run setup until its step passes, then deselect it", nil
+}
+
 func withReason(text, reason string) string {
 	if reason == "" {
 		return text
@@ -251,7 +280,10 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 		case request.Mode != "apply":
 			op.Action, op.Reason = "retain", reasonLaterApply
 		case written != "":
-			op.Action, op.Reason = "retain", "an unfinished change of "+written+" stays until setup finishes it: select "+r.Name+" again and run setup until its step passes, then deselect it"
+			op.Action = "retain"
+			if op.Reason, err = unfinishedReason(c, ctx, st.Selected, id, written); err != nil {
+				return plan, err
+			}
 		case f.Status == Unknown || f.Status == Blocked:
 			op.Action, op.Reason = "retain", withReason("setup could not inspect this resource", f.Reason)
 		case f.Status == Changed:

@@ -346,7 +346,7 @@ func (w *wiring) leftovers(ctx context.Context) ([]string, error) {
 func newEngine(s setup) *engine.Engine {
 	w := newWiring(s)
 	e := &engine.Engine{Catalog: s.catalog, Router: w.route, Context: s.host.Context, StateDir: s.stateDir, Target: s.target, Source: s.source,
-		Sweep: w.sweep, Selection: w.selected.set, Leftovers: w.leftovers}
+		Sweep: w.sweep, Selection: w.selected.set, Leftovers: w.leftovers, V2Unfinished: func() []string { return unfinishedRestoreLines(s.stateDir) }}
 	if s.sudo != "" {
 		e.Elevate = sudoSession(s.sudo, s.authenticate)
 	}

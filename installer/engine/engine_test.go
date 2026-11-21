@@ -618,15 +618,15 @@ func TestApplyNumbersEachStepAndWritesTheLog(t *testing.T) {
 	if err != nil || result.Status != "ready" || filepath.Dir(result.Log) != filepath.Join(e.StateDir, "logs") {
 		t.Fatal(result, err)
 	}
-	if len(progress.steps) != 5 || progress.steps[0] != "[1/2] Installing Editor program" || !strings.HasPrefix(progress.steps[1], "[1/2] Editor program done in ") ||
-		progress.steps[2] != "[2/2] Installing Editor configuration" || progress.steps[4] != "Removing unused private builds" {
+	if len(progress.steps) != 6 || progress.steps[0] != "Checking the reviewed plan again" || progress.steps[1] != "[1/2] Installing Editor program" || !strings.HasPrefix(progress.steps[2], "[1/2] Editor program done in ") ||
+		progress.steps[3] != "[2/2] Installing Editor configuration" || progress.steps[5] != "Removing unused private builds" {
 		t.Fatal(progress.steps)
 	}
 	data, err := os.ReadFile(result.Log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, step := range progress.steps {
+	for _, step := range progress.steps[1:] {
 		if !strings.Contains(string(data), " "+step+"\n") {
 			t.Fatalf("log lacks displayed step %q:\n%s", step, data)
 		}

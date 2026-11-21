@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/luisgui1757/dotfiles/installer/catalog"
@@ -143,9 +145,31 @@ type brewFormulaObservation struct {
 	Present, Linked, Held, Recorded bool
 	Checked, Outdated               bool
 	Issue, Current                  string
+	Broken                          []brewBrokenDependent
 }
 
-func (s *brewSession) observeFormula(ctx context.Context, r catalog.Resource, b brewBinding, st state.State, update bool) (brewFormulaObservation, error) {
+type brewBrokenDependent struct {
+	Name, Source string
+	Repair       bool
+}
+
+func (s *brewSession) brokenDependents(ctx context.Context, installed map[string]brewPackage, root string, st state.State) ([]brewBrokenDependent, error) {
+	formulae := []string{}
+	for _, name := range slices.Sorted(maps.Keys(brewRelated(root, installed))) {
+		if !strings.HasPrefix(name, "cask/") {
+			formulae = append(formulae, name)
+		}
+	}
+	failures, err := s.failedLinkage(ctx, installed, formulae)
+	var broken []brewBrokenDependent
+	for _, failure := range failures {
+		pkg := installed[failure.Name]
+		broken = append(broken, brewBrokenDependent{Name: pkg.Name, Source: pkg.Source, Repair: !pkg.Held && brewRecorded(st, pkg)})
+	}
+	return broken, err
+}
+
+func (s *brewSession) observeFormula(ctx context.Context, r catalog.Resource, b brewBinding, st state.State, want engine.Want) (brewFormulaObservation, error) {
 	installed, err := brewInventory(ctx, s.query)
 	if err != nil {
 		return brewFormulaObservation{}, err
@@ -170,7 +194,12 @@ func (s *brewSession) observeFormula(ctx context.Context, r catalog.Resource, b 
 		return o, nil
 	}
 	o.Checked = true
-	if update && o.Recorded {
+	if want.Present && brewLinkageDue(st, r.ID) {
+		if o.Broken, err = s.brokenDependents(ctx, installed, b.name, st); err != nil {
+			return o, err
+		}
+	}
+	if want.Update && want.Present && o.Recorded {
 		o.Current, o.Outdated, err = brewOutdated(ctx, s.query, b.full)
 	}
 	return o, err
@@ -185,7 +214,7 @@ func (o brewFormulaObservation) token(want engine.Want) (string, error) {
 }
 
 func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b brewBinding, want engine.Want, st state.State) (engine.Finding, error) {
-	o, err := s.observeFormula(ctx, r, b, st, want.Update && want.Present)
+	o, err := s.observeFormula(ctx, r, b, st, want)
 	if err != nil {
 		return engine.Finding{}, err
 	}
@@ -229,6 +258,18 @@ func (s *brewSession) inspectFormula(ctx context.Context, r catalog.Resource, b 
 			f.Status, f.Reason = engine.Unhealthy, o.Issue
 			setup("reinstall")
 		}
+	case len(o.Broken) != 0:
+		names := []string{}
+		for _, broken := range o.Broken {
+			names = append(names, broken.Name)
+			by := "you"
+			if broken.Repair {
+				by, f.Pending = "setup", true
+			}
+			f.Commands = append(f.Commands, engine.CommandBlock{Title: "Repair " + broken.Name + " with Homebrew", By: by, Lines: []string{s.line(false, "reinstall", "--formula", broken.Source)}})
+		}
+		f.Status, f.Reason = engine.Unhealthy, "after setup changed "+b.name+", these installed Homebrew formulae fail their linkage check: "+strings.Join(names, ", ")
+		f.Notes = append(f.Notes, "Setup reinstalls only a formula that it installed. Repair each other formula yourself, then run setup again.")
 	case o.Outdated && o.Held:
 		f.Notes = append(f.Notes, fmt.Sprintf("Homebrew has version %s of %s. The package is pinned, and setup keeps the pin.", o.Current, b.name))
 	case o.Outdated && foreign:
@@ -246,7 +287,10 @@ func brewUnavailable(reason string) (engine.Finding, error) {
 }
 
 // Inspect reports the package of the resource. Without Homebrew, or with a
-// Homebrew that setup cannot use, the result is unknown.
+// Homebrew that setup cannot use, the result is unknown. After setup changed
+// a formula, Inspect checks the linkage of the installed formulae that use
+// the formula or its dependencies, until such a check in Apply passes.
+// A failed check makes the formula unhealthy.
 func (d *Brew) Inspect(ctx context.Context, r catalog.Resource, want engine.Want, rec engine.Records) (engine.Finding, error) {
 	s, issue, err := d.session(ctx)
 	if err != nil {
@@ -300,7 +344,8 @@ func (d *Brew) applyFormula(ctx context.Context, s *brewSession, r catalog.Resou
 		return err
 	}
 	pkg, present := before[b.name]
-	recorded := rec.State().HasSystem("brew", b.full)
+	st := rec.State()
+	recorded, due := st.HasSystem("brew", b.full), brewLinkageDue(st, r.ID)
 	verb, action := "", ""
 	switch approved.Status {
 	case engine.Missing:
@@ -310,12 +355,21 @@ func (d *Brew) applyFormula(ctx context.Context, s *brewSession, r catalog.Resou
 		}
 	case engine.Unhealthy:
 		verb, action = "reinstall", "repair"
+		if due && pkg.Healthy {
+			checkErr := s.check(ctx, r)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			if checkErr == nil {
+				verb = ""
+			}
+		}
 	case engine.Outdated:
 		verb, action = "upgrade", "update"
 	default:
 		return errors.New("Homebrew has no approved change for " + b.name)
 	}
-	if verb != "install" {
+	if verb == "reinstall" || verb == "upgrade" {
 		if !present || !recorded {
 			return errors.New("pre-existing Homebrew package cannot be updated or repaired implicitly")
 		}
@@ -330,12 +384,6 @@ func (d *Brew) applyFormula(ctx context.Context, s *brewSession, r catalog.Resou
 	if verb == "install" && !recorded {
 		provisional = b.full
 	}
-	if err := d.begin(rec, mark, "brew", provisional); err != nil {
-		return err
-	}
-	if err := d.run(ctx, rec, s.command(false, verb, "--formula", b.full), mark, "brew", provisional); err != nil {
-		return err
-	}
 	root := func() (bool, error) {
 		installed, err := brewInventory(ctx, s.query)
 		if err != nil {
@@ -347,20 +395,40 @@ func (d *Brew) applyFormula(ctx context.Context, s *brewSession, r catalog.Resou
 		}
 		return pkg.Healthy, nil
 	}
-	healthy, err := root()
-	if err == nil && !healthy && verb == "reinstall" {
-		if err := d.run(ctx, rec, s.command(false, "link", "--formula", b.full), mark, "", ""); err != nil {
+	if verb != "" {
+		if err := rec.Update(func(st *state.State) error {
+			st.Mark(mark)
+			if !due {
+				st.Linkage = append(st.Linkage, r.ID)
+			}
+			if provisional != "" {
+				st.AddSystem("brew", provisional)
+			}
+			return nil
+		}); err != nil {
 			return err
 		}
-		healthy, err = root()
+		if err := d.run(ctx, rec, s.command(false, verb, "--formula", b.full), mark, "brew", provisional); err != nil {
+			if !due && !slices.Contains(rec.State().Pending, mark) {
+				return errors.Join(err, rec.Update(func(st *state.State) error { brewDropLinkage(st, r.ID); return nil }))
+			}
+			return err
+		}
+		healthy, err := root()
+		if err == nil && !healthy && verb == "reinstall" {
+			if err := d.run(ctx, rec, s.command(false, "link", "--formula", b.full), mark, "", ""); err != nil {
+				return err
+			}
+			healthy, err = root()
+		}
+		if err != nil || !healthy {
+			return errors.Join(errors.New("Homebrew formula did not pass native activation checks"), err)
+		}
+		if err := s.check(ctx, r); err != nil {
+			return err
+		}
 	}
-	if err != nil || !healthy {
-		return errors.Join(errors.New("Homebrew formula did not pass native activation checks"), err)
-	}
-	if err := s.check(ctx, r); err != nil {
-		return err
-	}
-	if err := d.maintainDependents(ctx, s, rec, mark, b, before); err != nil {
+	if err := d.maintainDependents(ctx, s, rec, mark, b, before, due); err != nil {
 		return err
 	}
 	if healthy, err := root(); err != nil || !healthy {
@@ -369,13 +437,23 @@ func (d *Brew) applyFormula(ctx context.Context, s *brewSession, r catalog.Resou
 	if err := s.check(ctx, r); err != nil {
 		return err
 	}
-	return macosClearMark(rec, mark)
+	return rec.Update(func(st *state.State) error {
+		st.Clear(mark)
+		brewDropLinkage(st, r.ID)
+		return nil
+	})
+}
+
+func brewDropLinkage(st *state.State, id string) {
+	st.Linkage = slices.DeleteFunc(st.Linkage, func(due string) bool { return due == id })
 }
 
 // Apply installs a missing package, or repairs or updates a recorded
-// formula. It writes the pending mark, and for a new install the provisional
-// system record, before brew starts. It clears the mark after the package
-// passes its checks.
+// formula. It writes the pending mark, the linkage check of the dependents of
+// a formula, and for a new install the provisional system record, before brew
+// starts. It clears the mark and the linkage check after the package and its
+// dependents pass their checks. For a healthy formula with broken dependents,
+// a repair reinstalls only the recorded dependents.
 func (d *Brew) Apply(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	s, issue, err := d.session(ctx)
 	if err != nil {
@@ -420,5 +498,9 @@ func (d *Brew) Remove(ctx context.Context, r catalog.Resource, _ engine.Finding,
 		block, _ := s.removalBlock(b.full, b.cask != nil)
 		return fmt.Errorf("%s is installed, and setup never removes a system package; remove it with `%s` if nothing else needs it", b.full, block.Lines[0])
 	}
-	return rec.Update(func(st *state.State) error { st.RemoveSystem(provider, b.full); return nil })
+	return rec.Update(func(st *state.State) error {
+		st.RemoveSystem(provider, b.full)
+		brewDropLinkage(st, r.ID)
+		return nil
+	})
 }

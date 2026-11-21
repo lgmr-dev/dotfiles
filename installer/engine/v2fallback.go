@@ -1,7 +1,9 @@
 package engine
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"io"
 	"io/fs"
@@ -10,6 +12,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf16"
 
 	"github.com/luisgui1757/dotfiles/installer/state"
 )
@@ -63,6 +67,46 @@ func readBounded(path string) ([]byte, error) {
 	return data, errors.Join(err, file.Close())
 }
 
+var errUTF16 = errors.New("it starts with a UTF-16 byte order mark and does not decode")
+
+func decodeText(data []byte) (string, error) {
+	var order binary.ByteOrder
+	switch {
+	case bytes.HasPrefix(data, []byte{0xFF, 0xFE}):
+		order = binary.LittleEndian
+	case bytes.HasPrefix(data, []byte{0xFE, 0xFF}):
+		order = binary.BigEndian
+	default:
+		return string(data), nil
+	}
+	body := data[2:]
+	if len(body)%2 != 0 {
+		return "", errUTF16
+	}
+	units := make([]uint16, len(body)/2)
+	for i := range units {
+		units[i] = order.Uint16(body[2*i:])
+	}
+	for i := 0; i < len(units); i++ {
+		if !utf16.IsSurrogate(rune(units[i])) {
+			continue
+		}
+		if i+1 == len(units) || utf16.DecodeRune(rune(units[i]), rune(units[i+1])) == unicode.ReplacementChar {
+			return "", errUTF16
+		}
+		i++
+	}
+	return string(utf16.Decode(units)), nil
+}
+
+func readText(path string) (string, error) {
+	data, err := readBounded(path)
+	if err != nil {
+		return "", err
+	}
+	return decodeText(data)
+}
+
 func names(text, folder string) bool {
 	for _, form := range []string{folder, strings.ReplaceAll(folder, `\`, `\\`), filepath.ToSlash(folder)} {
 		if strings.Contains(text, form) {
@@ -85,8 +129,11 @@ func treeTexts(root string) ([]string, error) {
 			texts = append(texts, target)
 			return err
 		}
-		data, err := readBounded(path)
-		texts = append(texts, string(data))
+		text, err := readText(path)
+		texts = append(texts, text)
+		if errors.Is(err, errUTF16) {
+			return errors.New(path + ": " + err.Error())
+		}
 		return err
 	})
 	return texts, err
@@ -99,8 +146,10 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 		texts := []string{}
 		for _, value := range []string{record.Applied, record.Next, record.Before} {
 			if encoded, inline := strings.CutPrefix(value, "value:"); inline {
-				if decoded, err := base64.StdEncoding.DecodeString(encoded); err == nil {
-					value = string(decoded)
+				if data, err := base64.StdEncoding.DecodeString(encoded); err == nil {
+					if value, err = decodeText(data); err != nil && unreadable == "" {
+						unreadable = key + " (its recorded value): " + err.Error()
+					}
 				}
 			}
 			if backup, saved := strings.CutPrefix(value, "backup:"); saved {
@@ -122,9 +171,9 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 		case "link":
 			contents, err = treeTexts(path)
 		case "file", "block", "field":
-			var data []byte
-			data, err = readBounded(path)
-			contents = []string{string(data)}
+			var text string
+			text, err = readText(path)
+			contents = []string{text}
 		}
 		if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
 			unreadable = key + ": " + err.Error()

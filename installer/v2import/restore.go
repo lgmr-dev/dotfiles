@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -147,6 +148,18 @@ func (s *restoreSet) movedAside(key string, record state.Record, candidates []st
 	path := filepath.Join(filepath.Dir(key), name)
 	moved, err := s.writer.InspectRecord(path, &memory{state.State{Targets: map[string]state.Record{path: {Resource: record.Resource, Kind: record.Kind, Before: targets.Absent}}}})
 	return err == nil && moved.State != targets.StateUnreadable && moved.Fingerprint != targets.Absent && slices.Contains(candidates, moved.Fingerprint)
+}
+
+func (s *restoreSet) rollbackHints(message string) []string {
+	hints := []string{}
+	for _, key := range slices.Sorted(maps.Keys(s.manifest.Restoring)) {
+		sum := sha256.Sum256([]byte(key))
+		name := ".dotfiles-" + hex.EncodeToString(sum[:8])
+		if strings.Contains(message, name+".previous has a name that setup reserves") || strings.Contains(message, name+".next has a name that setup reserves") {
+			hints = append(hints, "An earlier run of restore-v2 stopped and left that reserved name. restore-v2 finishes "+key+". Run restore-v2 to complete the rollback first.")
+		}
+	}
+	return hints
 }
 
 func (s *restoreSet) holds(item RestoreItem, slot Slot) error {

@@ -395,6 +395,7 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 	request := engine.Request{Mode: "apply"}
 	plan := p.Plan
 	if !p.Switching {
+		engine.ReportStep(ctx, "Checking the reviewed plan again")
 		if plan, err = e.Preview(ctx, request); err != nil {
 			return result, err
 		}
@@ -408,6 +409,9 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 	result, err = e.Apply(ctx, request, plan)
 	left := []string{}
 	if err != nil {
+		for _, hint := range set.rollbackHints(result.Message) {
+			result.Message += "\n" + hint
+		}
 		if left = o.leftForSetup(ctx, e, set, request); len(left) == 0 {
 			return result, err
 		}

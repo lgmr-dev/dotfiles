@@ -3,6 +3,7 @@ package engine_test
 import (
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"unicode/utf16"
 
 	"github.com/luisgui1757/dotfiles/installer/engine"
 	"github.com/luisgui1757/dotfiles/installer/state"
@@ -429,5 +431,98 @@ func TestTheRetryOfAnInterruptedReplacementAcceptsItsReplaceFlag(t *testing.T) {
 	request.Replace = []string{"tool.editor"}
 	if _, err := e.Preview(context.Background(), request); err == nil {
 		t.Fatal("a replacement without changed content or an unfinished record was accepted")
+	}
+}
+
+func TestDeselectingAResourceKeepsItWhileItsWriteIsUnfinished(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	edit(t, e, func(s *state.State) {
+		if err := s.BeginTarget(w.key("config.editor"), state.Record{Resource: "config.editor", Kind: "file", Next: "fp:2"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	request := selection()
+	request.RemoveShared = []string{"tool.git"}
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := actions(plan); !slices.Equal(got, []string{"retain:config.editor", "retain:tool.editor", "retain:tool.git"}) {
+		t.Fatal(got)
+	}
+	want := "an unfinished change of " + w.key("config.editor") + " stays until setup finishes it; run setup again with the tool selected, or finish it"
+	if reason := operation(t, plan, "config.editor").Reason; reason != want {
+		t.Fatal(reason)
+	}
+	if _, err := e.Apply(context.Background(), request, plan); err != nil || len(w.calls("remove:")) != 0 {
+		t.Fatal("the run removed a resource with an unfinished write", w.calls("remove:"), err)
+	}
+	if record := saved(t, e).Targets[w.key("config.editor")]; record.Next != "fp:2" {
+		t.Fatal("the unfinished write lost its record", record)
+	}
+}
+
+func TestAnInterruptedRemovalOfADeselectedResourceCompletes(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor", "other"))
+	edit(t, e, func(s *state.State) {
+		s.Selected = []string{"editor"}
+		if err := s.BeginRelease(w.key("tool.other")); err != nil {
+			t.Fatal(err)
+		}
+	})
+	request := selection("editor")
+	plan, err := e.Preview(context.Background(), request)
+	if err != nil || operation(t, plan, "tool.other").Action != "remove" {
+		t.Fatal(actions(plan), err)
+	}
+	if _, err := e.Apply(context.Background(), request, plan); err != nil || !slices.Equal(w.calls("remove:"), []string{"tool.other"}) {
+		t.Fatal("the interrupted removal did not complete", w.calls("remove:"), err)
+	}
+	if _, recorded := saved(t, e).Targets[w.key("tool.other")]; recorded {
+		t.Fatal("the completed removal left its record")
+	}
+}
+
+func utf16Profile(order binary.AppendByteOrder, text string) []byte {
+	data := order.AppendUint16(nil, 0xFEFF)
+	for _, unit := range utf16.Encode([]rune(text)) {
+		data = order.AppendUint16(data, unit)
+	}
+	return data
+}
+
+func TestCheckKeepsAV2FolderThatAUTF16ProfileNames(t *testing.T) {
+	for name, order := range map[string]binary.AppendByteOrder{"little endian": binary.LittleEndian, "big endian": binary.BigEndian} {
+		t.Run(name, func(t *testing.T) {
+			e, w := fixture(t)
+			mustApply(t, e, selection("editor"))
+			packages := v2Folder(t, e, "packages")
+			profile := filepath.Join(w.home, "Microsoft.PowerShell_profile.ps1")
+			content := utf16Profile(order, "$env:PATH = '"+filepath.Join(packages, "tool.powershell", "current")+";' + $env:PATH\r\n")
+			if err := errors.Join(os.MkdirAll(w.home, 0700), os.WriteFile(profile, content, 0600)); err != nil {
+				t.Fatal(err)
+			}
+			edit(t, e, func(s *state.State) {
+				s.Targets[profile+"#block"] = state.Record{Resource: "config.editor", Kind: "block", Applied: "fp:abc"}
+			})
+			check, err := e.Check(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(check.Message, "Note: "+packages+" is a folder of release v2 still in use by "+profile+"#block; keep it") || strings.Contains(check.Message, "Owner cleanup: "+packages) {
+				t.Fatal("check missed the v2 folder in a UTF-16 profile", check.Message)
+			}
+			if err := os.WriteFile(profile, append(content, 0), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if check, err = e.Check(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(check.Message, "Owner cleanup") || !strings.Contains(check.Message, "Note: setup cannot say if "+packages+" is still in use, because it could not read "+profile+"#block") {
+				t.Fatal("check gave a cleanup instruction for a UTF-16 profile that does not decode", check.Message)
+			}
+		})
 	}
 }

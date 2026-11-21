@@ -609,6 +609,57 @@ func TestBrewMaintenanceReportsABrokenUnrecordedConsumerAndNeverRepairsIt(t *tes
 	}
 }
 
+func TestBrewReportsABrokenDependentUntilALinkageCheckPassesAfterTheMarkIsCleared(t *testing.T) {
+	git := brewTestFormula("tool.git", "git")
+	for _, recorded := range []bool{false, true} {
+		f := brewMaintenanceFixture(t, recorded)
+		install, repairs := f.onRun, 0
+		f.onRun = func(args []string) error {
+			if args[0] == "reinstall" {
+				if repairs++; repairs == 1 {
+					return nil
+				}
+			}
+			return install(args)
+		}
+		if err := f.apply(git, engine.Want{Present: true}); err == nil || !slices.Equal(f.rec.State().Pending, []string{"tool.git:brew-install"}) {
+			t.Fatal("a broken dependent passed, or the step cleared its mark", recorded, err)
+		}
+		line := f.line(false, "reinstall", "--formula", "sample/tap/consumer")
+		by := map[bool]string{false: "you", true: "setup"}[recorded]
+		var found engine.Finding
+		for _, confirmed := range []bool{false, true} {
+			if confirmed {
+				if err := f.rec.Update(func(s *state.State) error { s.Clear("tool.git:brew-install"); return nil }); err != nil {
+					t.Fatal(err)
+				}
+			}
+			found = f.inspect(git, engine.Want{Present: true})
+			if found.Status != engine.Unhealthy || !strings.Contains(found.Reason, "consumer") || !slices.Equal(brewTestBlocks(found, by), []string{line}) || len(found.Commands) != 1 {
+				t.Fatal("the broken dependent is not reported", recorded, confirmed, found)
+			}
+		}
+		err := f.d.Apply(context.Background(), git, found, f.rec)
+		if recorded {
+			if err != nil || !reflect.DeepEqual(f.mutations(), [][]string{{"install", "--formula", "git"}, {"reinstall", "--formula", "sample/tap/consumer"}, {"reinstall", "--formula", "sample/tap/consumer"}}) || len(f.rec.State().Pending) != 0 {
+				t.Fatal("setup did not repair its broken dependent", err, f.mutations(), f.rec.State().Pending)
+			}
+		} else {
+			var report *BrewDependentError
+			if !errors.As(err, &report) || report.Name != "consumer" || len(f.runner.commands) != 1 {
+				t.Fatal("setup repaired a formula without a record, or lost the report", err, f.mutations())
+			}
+			if still := f.inspect(git, engine.Want{Present: true}); still.Status != engine.Unhealthy || !strings.Contains(still.Reason, "consumer") {
+				t.Fatal("the report ended before a linkage check passed", still)
+			}
+			delete(f.broken, "sample/tap/consumer")
+		}
+		if healthy := f.inspect(git, engine.Want{Present: true}); healthy.Status != engine.Satisfied || len(healthy.Commands) != 0 {
+			t.Fatal("a healthy dependent still blocks the formula", recorded, healthy)
+		}
+	}
+}
+
 func TestBrewWithoutHomebrewIsUnknownAndFindsANewHomebrew(t *testing.T) {
 	f := newBrewFixture(t)
 	git := brewTestFormula("tool.git", "git")

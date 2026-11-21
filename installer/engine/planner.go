@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 
@@ -128,6 +129,15 @@ func unfinished(st state.State, id string) bool {
 	return false
 }
 
+func unfinishedWrite(st state.State, id string) string {
+	for _, key := range slices.Sorted(maps.Keys(st.Targets)) {
+		if record := st.Targets[key]; record.Resource == id && record.Next != "" && !record.Release {
+			return key
+		}
+	}
+	return ""
+}
+
 func withReason(text, reason string) string {
 	if reason == "" {
 		return text
@@ -237,9 +247,11 @@ func PlanChanges(c Catalog, ctx platform.Context, st state.State, request Reques
 			return plan, fmt.Errorf("missing removal inspection for %s", id)
 		}
 		op := Operation{Resource: id, Action: "remove", Reason: "no remaining selected consumer", Privileged: f.Privileged, Commands: f.Commands, Finding: f}
-		switch {
+		switch written := unfinishedWrite(st, id); {
 		case request.Mode != "apply":
 			op.Action, op.Reason = "retain", reasonLaterApply
+		case written != "":
+			op.Action, op.Reason = "retain", "an unfinished change of "+written+" stays until setup finishes it; run setup again with the tool selected, or finish it"
 		case f.Status == Unknown || f.Status == Blocked:
 			op.Action, op.Reason = "retain", withReason("setup could not inspect this resource", f.Reason)
 		case f.Status == Changed:

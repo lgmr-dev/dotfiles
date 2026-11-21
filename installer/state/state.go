@@ -30,8 +30,10 @@ const (
 // the hash of the installer executable that completed the last run. System
 // maps a provider (apt, brew, cask or windows) to the names of the items that
 // setup installed. Pending holds "<resource>:<step>" marks of steps that can
-// continue without setup. A Targets key is a cleaned absolute path, or that
-// path, "#" and a slot.
+// continue without setup. Linkage holds the resources of the Homebrew formulae
+// that setup changed while their dependents have not passed a linkage check
+// since. A Targets key is a cleaned absolute path, or that path, "#" and a
+// slot.
 type State struct {
 	Schema    int                 `json:"schema"`
 	Target    string              `json:"target"`
@@ -40,6 +42,7 @@ type State struct {
 	Keep      []string            `json:"keep"`
 	System    map[string][]string `json:"system"`
 	Pending   []string            `json:"pending,omitempty"`
+	Linkage   []string            `json:"linkage,omitempty"`
 	V2Restore string              `json:"v2_restore,omitempty"`
 	Targets   map[string]Record   `json:"targets"`
 }
@@ -167,6 +170,7 @@ func (s State) Clone() State {
 	s.Selected = slices.Clone(s.Selected)
 	s.Keep = slices.Clone(s.Keep)
 	s.Pending = slices.Clone(s.Pending)
+	s.Linkage = slices.Clone(s.Linkage)
 	system := make(map[string][]string, len(s.System))
 	for provider, names := range s.System {
 		system[provider] = slices.Clone(names)
@@ -191,6 +195,10 @@ func (s *State) normalize() {
 	s.Pending = sortedUnique(s.Pending)
 	if len(s.Pending) == 0 {
 		s.Pending = nil
+	}
+	s.Linkage = sortedUnique(s.Linkage)
+	if len(s.Linkage) == 0 {
+		s.Linkage = nil
 	}
 	if s.System == nil {
 		s.System = map[string][]string{}
@@ -270,6 +278,11 @@ func (s State) Validate() error {
 		resource, step, ok := strings.Cut(mark, ":")
 		if !ok || !resourceID.MatchString(resource) || !plainText(step) {
 			return fmt.Errorf("invalid pending mark %q", mark)
+		}
+	}
+	for _, id := range s.Linkage {
+		if !resourceID.MatchString(id) {
+			return fmt.Errorf("invalid resource ID %q in the linkage checks", id)
 		}
 	}
 	if s.V2Restore != "" && s.V2Restore != "switching" && s.V2Restore != "open" {

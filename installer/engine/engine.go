@@ -284,6 +284,7 @@ func (e *Engine) apply(ctx context.Context, request Request, approved Plan, conf
 		}
 		e.Selection(wanted)
 	}
+	ReportStep(ctx, "Checking the reviewed plan again")
 	for _, op := range approved.Operations {
 		r, known := e.Catalog.Resource(op.Resource)
 		if !known {

@@ -540,6 +540,42 @@ func TestASecondStopInTheRollbackOfASwitchWriteCompletesOnTheNextRun(t *testing.
 	before.restored(t, f)
 }
 
+func TestACompletionAfterAStoppedRollbackPointsToRestore(t *testing.T) {
+	f := linuxFixture(t)
+	before := capture(t, f, f.save())
+	f.mustImport()
+	env := filepath.Join(f.state, "shells", "env.sh")
+	saved := ""
+	editManifest(t, f, func(slots map[string]any) {
+		saved = strings.TrimPrefix(slots[env].(map[string]any)["saved"].(string), "backup:")
+	})
+	v2, v3 := editedFingerprint(t, saved), editedFingerprint(t, env)
+	editState(t, f, func(document map[string]any) {
+		record := document["targets"].(map[string]any)[env].(map[string]any)
+		record["applied"], record["next"] = v2, v3
+		document["v2_restore"] = "switching"
+	})
+	f.extraKinds = map[string]targets.Kind{"file": interruptedKind{targets.FileKind("file")}}
+	restoration, err := v2import.PreviewRestore(context.Background(), f.options())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := restoration.Run(context.Background(), nil); err == nil {
+		t.Fatal("the fixture must stop in the rollback")
+	}
+	f.extraKinds = nil
+	next, err := f.preview()
+	if err != nil || !next.Switching {
+		t.Fatalf("%+v %v", next, err)
+	}
+	result, err := next.Run(context.Background())
+	if err == nil || !strings.Contains(result.Message, "restore-v2 finishes "+env+". Run restore-v2 to complete the rollback first.") {
+		t.Fatalf("the stop must point to restore-v2: %v\n%s", err, result.Message)
+	}
+	mustRestore(t, f)
+	before.restored(t, f)
+}
+
 func TestRestoreStopsWhenTheSavedStateChangedAfterTheReview(t *testing.T) {
 	f := linuxFixture(t)
 	f.save()

@@ -1038,3 +1038,81 @@ func TestRestoreRemovesTheFileAndFolderOfAFieldThatTheSwitchStoppedAfterWriting(
 	mustRestore(t, f)
 	before.restored(t, f)
 }
+
+type registrationKind struct {
+	fontKind
+	registry string
+	changes  *[]string
+}
+
+func (registrationKind) CannotCopy() bool { return true }
+
+func (k registrationKind) Observe(targets.Desired) (string, error) {
+	data, err := os.ReadFile(k.registry)
+	if errors.Is(err, os.ErrNotExist) {
+		return targets.Absent, nil
+	}
+	return string(data), err
+}
+
+func (k registrationKind) Fingerprint(d targets.Desired) (string, error) {
+	return "font:" + string(d.Content), nil
+}
+
+func (k registrationKind) Write(_ context.Context, d targets.Desired, _ string) error {
+	*k.changes = append(*k.changes, d.Key)
+	return os.WriteFile(k.registry, []byte("font:"+string(d.Content)), 0600)
+}
+
+func TestTheSwitchLeavesANativeRegistrationWithoutACopyToSetupAfterTheSwitch(t *testing.T) {
+	f := linuxFixture(t)
+	t.Cleanup(v2import.SetRegistryFonts(true))
+	f.save()
+	registry, changes := filepath.Join(f.root, "registry"), []string{}
+	write(t, registry, "font:registered", 0600)
+	f.extraKinds = map[string]targets.Kind{"font": registrationKind{fontKind{targets.FileKind("font")}, registry, &changes}}
+	files := f.units[hooks.FontResource]
+	key := targets.Key(f.fontPath(), hooks.FontSlot)
+	f.units[hooks.FontResource] = func() []targets.Desired {
+		return append([]targets.Desired{{Kind: "font", Path: f.fontPath(), Slot: hooks.FontSlot, Content: []byte("v3")}}, files()...)
+	}
+	result := f.mustImport()
+	if len(changes) != 0 || read(t, registry) != "font:registered" {
+		t.Fatalf("the switch changed a registration that restore-v2 cannot give back: %v %q", changes, read(t, registry))
+	}
+	if result.Status != "needs-action" || !strings.Contains(result.Message, "Hack Nerd Font (tool.font): ") ||
+		!strings.Contains(result.Message, "Finish this with the v2.3.0 checkout, or run restore-v2; setup repairs it after the switch") {
+		t.Fatalf("the report must name the refused step and the way forward:\n%+v", result)
+	}
+	if st := f.current(); st.V2Restore != "open" || st.Targets[key].Applied != "font:registered" {
+		t.Fatalf("the switch must complete and keep the registration record: %+v", st)
+	}
+	e := f.engine()
+	plan, err := e.Preview(context.Background(), engine.Request{Mode: "apply"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after, err := e.Apply(context.Background(), engine.Request{Mode: "apply"}, plan); err != nil {
+		t.Fatalf("a run after the switch must repair the font: %+v %v", after, err)
+	}
+	if len(changes) != 1 || changes[0] != key || read(t, registry) != "font:v3" || f.current().V2Restore != "" {
+		t.Fatalf("the run after the switch did not repair the registration: %v %q %+v", changes, read(t, registry), f.current())
+	}
+}
+
+func TestTheSwitchRepairsAFontRegistrationThatFollowsItsFiles(t *testing.T) {
+	f := linuxFixture(t)
+	f.save()
+	registry, changes := filepath.Join(f.root, "registry"), []string{}
+	write(t, registry, "font:registered", 0600)
+	f.extraKinds = map[string]targets.Kind{"font": registrationKind{fontKind{targets.FileKind("font")}, registry, &changes}}
+	files := f.units[hooks.FontResource]
+	key := targets.Key(f.fontPath(), hooks.FontSlot)
+	f.units[hooks.FontResource] = func() []targets.Desired {
+		return append([]targets.Desired{{Kind: "font", Path: f.fontPath(), Slot: hooks.FontSlot, Content: []byte("v3")}}, files()...)
+	}
+	f.mustImport()
+	if len(changes) != 1 || changes[0] != key || read(t, registry) != "font:v3" || f.current().V2Restore != "open" {
+		t.Fatalf("on Linux and macOS the font files carry the registration, so the switch repairs it: %v %q %+v", changes, read(t, registry), f.current())
+	}
+}

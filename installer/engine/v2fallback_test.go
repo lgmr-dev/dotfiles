@@ -193,3 +193,34 @@ func TestPreviewStatePlansAStateThatIsNotSaved(t *testing.T) {
 		t.Fatal("a preview of a state in memory must write nothing")
 	}
 }
+
+func TestCheckKeepsAV2FolderThatALauncherInPlaceOfARecordedLinkNames(t *testing.T) {
+	e, w := fixture(t)
+	mustApply(t, e, selection("editor"))
+	packages := v2Folder(t, e, "packages")
+	launcher := filepath.Join(w.home, ".local", "bin", "app")
+	if err := os.MkdirAll(filepath.Dir(launcher), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec "+filepath.Join(packages, "tool.app", "current", "bin", "app")+" \"$@\"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	store, err := state.Open(e.StateDir, e.Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = store.Update(func(s *state.State) error {
+		s.Targets[launcher] = state.Record{Resource: "config.editor", Kind: "link", Applied: "link:abc", Before: "absent"}
+		return nil
+	})
+	if err = errors.Join(err, store.Close()); err != nil {
+		t.Fatal(err)
+	}
+	check, err := e.Check(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "Note: " + packages + " is a folder of release v2 still in use by " + launcher + "; keep it"; !strings.Contains(check.Message, want) || strings.Contains(check.Message, "Owner cleanup: "+packages) {
+		t.Fatalf("check must keep the folder that the launcher names:\n%s", check.Message)
+	}
+}

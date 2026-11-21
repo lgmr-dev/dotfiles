@@ -72,7 +72,13 @@ type restoreSet struct {
 	tools    string
 	writer   *targets.Writer
 	manifest Manifest
+	refused  []string
+	windows  bool
 }
+
+var errNoCopy = errors.New("setup has no copy of it for restore-v2")
+
+var registryFonts = func(ctx platform.Context) bool { return ctx.OS == "windows" }
 
 func restoreDir(stateDir string) string { return filepath.Join(stateDir, RestoreFolder) }
 
@@ -107,7 +113,7 @@ func openRestoreSet(o Options) (*restoreSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read the restore set %s: %w", restoreDir(o.Engine.StateDir), err)
 	}
-	return &restoreSet{dir: restoreDir(o.Engine.StateDir), tools: filepath.Join(o.Engine.StateDir, "tools"), writer: o.writer(), manifest: manifest}, nil
+	return &restoreSet{dir: restoreDir(o.Engine.StateDir), tools: filepath.Join(o.Engine.StateDir, "tools"), writer: o.writer(), manifest: manifest, windows: registryFonts(o.Engine.Context)}, nil
 }
 
 func createRestoreSet(o Options, mapping Mapping, imported state.State) error {
@@ -162,6 +168,9 @@ func (s *restoreSet) capture(ctx context.Context, key string, record state.Recor
 	saved, made, err := s.writer.Capture(ctx, key, record, filepath.Join(s.dir, s.manifest.Folder))
 	if err != nil {
 		return fmt.Errorf("cannot save %s for restore-v2; nothing was changed there: %w", key, err)
+	}
+	if strings.HasPrefix(saved, "fp:") && s.windows && record.Kind == "font" {
+		return fmt.Errorf("%s: %w", key, errNoCopy)
 	}
 	slot := Slot{Resource: record.Resource, Kind: record.Kind, Saved: saved, Made: made}
 	if slot.Fingerprint, err = s.savedFingerprint(key, slot); err != nil {
@@ -229,14 +238,32 @@ func (c captureProvider) Apply(ctx context.Context, r catalog.Resource, approved
 	if err := outsideSwitch(r, c.context); err != nil {
 		return err
 	}
-	return c.Provider.Apply(ctx, r, approved, captureRecords{rec, ctx, c.set})
+	return c.set.refuse(r, c.Provider.Apply(ctx, r, approved, captureRecords{rec, ctx, c.set}))
 }
 
 func (c captureProvider) Remove(ctx context.Context, r catalog.Resource, approved engine.Finding, rec engine.Records) error {
 	if err := outsideSwitch(r, c.context); err != nil {
 		return err
 	}
-	return c.Provider.Remove(ctx, r, approved, captureRecords{rec, ctx, c.set})
+	return c.set.refuse(r, c.Provider.Remove(ctx, r, approved, captureRecords{rec, ctx, c.set}))
+}
+
+func (s *restoreSet) refuse(r catalog.Resource, err error) error {
+	if !errors.Is(err, errNoCopy) {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !slices.Contains(s.refused, r.ID) {
+		s.refused = append(s.refused, r.ID)
+	}
+	return fmt.Errorf("%s changes a native registration that restore-v2 cannot give back, and the switch does not do that while the v2 fallback is open. Finish this with the %s checkout, or run restore-v2; setup repairs it after the switch: %w", r.ID, SourceRelease, err)
+}
+
+func (s *restoreSet) refusedResources() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.refused)
 }
 
 func (s *restoreSet) router(inner engine.Router, ctx platform.Context) engine.Router {

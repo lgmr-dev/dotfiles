@@ -397,8 +397,12 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 		return result, err
 	}
 	result, err = e.Apply(ctx, request, plan)
+	left := []string{}
 	if err != nil {
-		return result, err
+		if left = o.leftForSetup(ctx, e, set, request); len(left) == 0 {
+			return result, err
+		}
+		result.Status = "needs-action"
 	}
 	unfinished := []string{}
 	for _, op := range plan.Operations {
@@ -440,7 +444,33 @@ func (p *Proposal) complete(ctx context.Context) (engine.Result, error) {
 	}
 	result.Plan.V2Restore = "open"
 	result.Message = strings.TrimSpace(result.Message + "\nThe import from release v2 is complete. restore-v2 can give release v2 back until your next confirmed change. Keep the folders of release v2 until then.")
+	if len(left) != 0 {
+		result.Message += "\nThe switch did not change " + strings.Join(left, ", ") + ". Your next confirmed run of setup does this work and closes the v2 fallback."
+	}
 	return result, nil
+}
+
+func (o Options) leftForSetup(ctx context.Context, e *engine.Engine, set *restoreSet, request engine.Request) []string {
+	refused := set.refusedResources()
+	if len(refused) == 0 {
+		return nil
+	}
+	plan, err := e.Preview(ctx, request)
+	if err != nil {
+		return nil
+	}
+	names := []string{}
+	for _, op := range plan.Operations {
+		if !mutating(op.Action) {
+			continue
+		}
+		closure, err := e.Catalog.Closure([]string{op.Resource}, e.Context)
+		if err != nil || !slices.ContainsFunc(closure, func(id string) bool { return slices.Contains(refused, id) }) {
+			return nil
+		}
+		names = append(names, o.name(op.Resource))
+	}
+	return names
 }
 
 func clearConfirmed(stateDir, target string, marks []string) error {
@@ -464,9 +494,12 @@ func clearConfirmed(stateDir, target string, marks []string) error {
 // v2, stops before the switch when a build fails or a system item needs
 // work, saves the restore set, publishes the schema-2 state and switches the
 // targets through the engine. For an unfinished switch it only completes
-// the switch. A failure after the publication leaves v2_restore
-// "switching": a later run completes the switch, or restore-v2 gives
-// release v2 back.
+// the switch. The switch refuses a step that would change a unit that
+// restore-v2 cannot give back, such as a native font registration: when
+// only such steps and their dependents remain, the switch completes, and the
+// next confirmed run of setup does them. Each other failure after the
+// publication leaves v2_restore "switching": a later run completes the
+// switch, or restore-v2 gives release v2 back.
 func (p *Proposal) Run(ctx context.Context) (engine.Result, error) {
 	result := engine.Result{Status: "failed", Plan: p.Plan}
 	if !p.Switching {

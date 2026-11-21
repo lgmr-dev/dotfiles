@@ -434,3 +434,40 @@ func TestSettingsLockStopsAWriteWhileTheApplicationHoldsIt(t *testing.T) {
 		t.Fatal("setup left a lock or changed the personal settings", entries, err)
 	}
 }
+
+func TestSettingsLockKeepsAnEntryThatSetupDidNotMake(t *testing.T) {
+	e := newProfileEnv(t, "linux")
+	path := e.units(kiroID)[0].Path
+	profileWrite(t, path, "{}\n")
+	stage := path + ".dotfiles-lock"
+	profileWrite(t, stage, "personal\n")
+	err := e.apply(kiroID, false)
+	if err == nil || !strings.Contains(err.Error(), stage) {
+		t.Fatal("setup did not stop at an entry that it did not make", err)
+	}
+	if got := profileReadFile(t, stage); got != "personal\n" {
+		t.Fatal("setup changed an entry that it did not make", got)
+	}
+}
+
+func TestSettingsLockCleansItsOwnInterruptedLock(t *testing.T) {
+	e := newProfileEnv(t, "linux")
+	path := e.units(kiroID)[0].Path
+	profileWrite(t, path, "{}\n")
+	stage := path + ".dotfiles-lock"
+	if err := os.Mkdir(stage, 0700); err != nil {
+		t.Fatal(err)
+	}
+	marker, err := json.Marshal(struct{ Directory, Target string }{e.p.StateDir, path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	profileWrite(t, filepath.Join(stage, ".dotfiles-owner.json"), string(marker))
+	e.mustApply(kiroID, false)
+	if _, err := os.Lstat(stage); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("setup did not clean its own interrupted lock", err)
+	}
+	if _, err := os.Lstat(path + ".lock"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("setup left its lock", err)
+	}
+}

@@ -42,8 +42,11 @@ const (
 // intended value before the activation and promotes it after the native
 // font engine selects the face with its Nerd Font glyph, so a failed
 // activation leaves the record unfinished. Faces that are present without a
-// record satisfy the resource and get no file. A destination or a
-// registration value that setup did not record stays and blocks the install.
+// record satisfy the resource and get no file. A destination that setup did
+// not record stays and blocks the install. A registration stays and blocks
+// the install unless its record has an applied or intended value that the
+// live registration matches, or an intended value under the pending
+// activation mark.
 //
 // The files go to ~/Library/Fonts on macOS, to the fonts folder of the data
 // folder on Linux and to %LOCALAPPDATA%\Microsoft\Windows\Fonts on Windows,
@@ -305,9 +308,16 @@ func (p *Fonts) observe(ctx context.Context, r catalog.Resource, rec engine.Reco
 	st := rec.State()
 	o.recorded = desktopRecorded(st, r.ID)
 	faces := fontFaces()
+	activating := slices.Contains(st.Pending, r.ID+":activate")
 	for i, value := range fontRegistrations(o.probe) {
-		_, has := st.Targets[targets.Key(o.paths[i], FontSlot)]
-		if value != "" && (value != o.paths[i] || !has) {
+		if value == "" {
+			continue
+		}
+		record := st.Targets[targets.Key(o.paths[i], FontSlot)]
+		live := p.live(faces[i], o.probe[i])
+		applied := record.Applied != "" && live == record.Applied
+		unfinished := record.Next != "" && !record.Release && (live == record.Next || activating)
+		if value != o.paths[i] || !applied && !unfinished {
 			o.foreign = append(o.foreign, "current-user font registration: "+faces[i].File)
 		}
 	}
@@ -380,15 +390,16 @@ func (p *Fonts) withoutQueryTool(st state.State, id string, paths []string) bool
 // Inspect implements engine.Provider. It only reads: it queries the native
 // font engine for the twelve faces and compares the font files and the
 // registration records. It reports Satisfied without a record when the faces
-// are already present, Blocked for a destination or a registration value
-// that setup did not record, Missing without a record, Changed for an edited
-// font file, and Unhealthy while the activation is unfinished or the engine
-// does not select each face. A failed query is an error, which never proves
-// absence. The one exception is Linux without fc-match, which the same run
-// can install: without a font record and without a managed font file the
-// missing files prove absence, and the result is Missing. The token covers
-// the font files, the records and the registration values, not the selection
-// of the font engine, so it stays the same when fc-match appears.
+// are already present, Blocked for a destination that setup did not record
+// or a registration that setup does not own, Missing without a record,
+// Changed for an edited font file, and Unhealthy while the activation is
+// unfinished or the engine does not select each face. A failed query is an
+// error, which never proves absence. The one exception is Linux without
+// fc-match, which the same run can install: without a font record and
+// without a managed font file the missing files prove absence, and the
+// result is Missing. The token covers the font files, the records and the
+// registration values, not the selection of the font engine, so it stays the
+// same when fc-match appears.
 func (p *Fonts) Inspect(ctx context.Context, r catalog.Resource, want engine.Want, rec engine.Records) (engine.Finding, error) {
 	if err := ctx.Err(); err != nil {
 		return engine.Finding{}, err

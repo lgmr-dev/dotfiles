@@ -72,15 +72,15 @@ func names(text, folder string) bool {
 	return false
 }
 
-func backupTexts(backup string) ([]string, error) {
+func treeTexts(root string) ([]string, error) {
 	texts := []string{}
-	err := filepath.WalkDir(backup, func(path string, entry fs.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
 		switch {
 		case err != nil:
 			return err
 		case entry.IsDir():
 			return nil
-		case entry.Type()&fs.ModeSymlink != 0:
+		case entry.Type()&(fs.ModeSymlink|fs.ModeIrregular) != 0:
 			target, err := os.Readlink(path)
 			texts = append(texts, target)
 			return err
@@ -104,7 +104,7 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 				}
 			}
 			if backup, saved := strings.CutPrefix(value, "backup:"); saved {
-				contents, err := backupTexts(backup)
+				contents, err := treeTexts(backup)
 				if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
 					unreadable = key + " (its backup " + backup + "): " + err.Error()
 				}
@@ -116,18 +116,20 @@ func v2References(st state.State, folders []string) (users map[string]string, un
 		if cut := strings.LastIndex(key, "#"); cut > 0 && (record.Kind == "block" || record.Kind == "field") {
 			path = key[:cut]
 		}
+		var contents []string
+		var err error
 		switch record.Kind {
 		case "link":
-			if target, err := os.Readlink(path); err == nil {
-				texts = append(texts, target)
-			}
+			contents, err = treeTexts(path)
 		case "file", "block", "field":
-			data, err := readBounded(path)
-			if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
-				unreadable = key + ": " + err.Error()
-			}
-			texts = append(texts, string(data))
+			var data []byte
+			data, err = readBounded(path)
+			contents = []string{string(data)}
 		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) && unreadable == "" {
+			unreadable = key + ": " + err.Error()
+		}
+		texts = append(texts, contents...)
 		for _, folder := range folders {
 			if _, found := users[folder]; !found && slices.ContainsFunc(texts, func(text string) bool { return names(text, folder) }) {
 				users[folder] = key

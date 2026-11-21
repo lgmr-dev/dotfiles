@@ -46,9 +46,9 @@ func settingsLock(directory, target string) (func() error, error) {
 	}
 	info, err := os.Lstat(lock)
 	if errors.Is(err, os.ErrNotExist) {
-		if err := os.Remove(stage); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Lstat(stage); !errors.Is(err, os.ErrNotExist) {
 			if _, err := verify(stage); err != nil {
-				return nil, fmt.Errorf("preserve unknown settings lock at %s: %w", stage, err)
+				return nil, fmt.Errorf("setup did not make %s; examine it, then move it away and retry: %w", stage, err)
 			}
 		} else {
 			marker, err := json.Marshal(owner)
@@ -56,7 +56,7 @@ func settingsLock(directory, target string) (func() error, error) {
 				return nil, err
 			}
 			if err := os.Mkdir(stage, 0700); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("cannot make the settings lock %s; examine that path and retry: %w", stage, err)
 			}
 			if err := platform.SaveDocument(filepath.Join(stage, settingsLockMarker), marker); err != nil {
 				return nil, fmt.Errorf("preserve incomplete settings lock at %s: %w", stage, err)

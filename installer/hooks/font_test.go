@@ -590,7 +590,15 @@ func TestFontRecordsAnnounceTheNativeChangeBeforeTheNativeCommand(t *testing.T) 
 	f.archive()
 	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
 	face := fontFixtureFaces()[0]
-	if err := os.Remove(f.path(face)); err != nil {
+	update := filepath.Join(f.state, "tools", hooks.FontArchive, "3.5.1-bbbbbbbbbbbb-2")
+	for _, item := range fontFixtureFaces() {
+		sentinelWrite(t, filepath.Join(update, item.file), "updated font bytes of "+item.file, 0644)
+	}
+	current := filepath.Join(f.state, "tools", hooks.FontArchive, "current")
+	if err := os.Remove(current); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(update, current); err != nil {
 		t.Fatal(err)
 	}
 	records := &fontCountedRecords{Records: f.sentinelEnv}
@@ -662,5 +670,32 @@ func TestFontRemovalKeepsARegistrationThatSetupDoesNotOwn(t *testing.T) {
 	}
 	if _, ok := f.State().Targets[key]; ok {
 		t.Fatal("the record of the unowned registration stays")
+	}
+}
+
+func TestFontRepairKeepsARegistrationWithABaselineOnlyRecord(t *testing.T) {
+	f := newFontFixture(t, "windows")
+	f.archive()
+	desktopApply(t, f.provider, f.sentinelEnv, hooks.FontResource)
+	face := fontFixtureFaces()[0]
+	name, key := "Dotfiles "+face.file+" (TrueType)", targets.Key(f.path(face), hooks.FontSlot)
+	writer := &targets.Writer{StateDir: f.state, Kinds: f.provider.Kinds()}
+	live, err := writer.InspectRecord(key, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Update(func(s *state.State) error {
+		s.Targets[key] = state.Record{Resource: hooks.FontResource, Kind: "font", Before: "fp:" + live.Fingerprint}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	changes := len(f.engine.changes)
+	finding := desktopInspect(t, f.provider, f.sentinelEnv, hooks.FontResource, true)
+	if err := f.provider.Apply(context.Background(), fontResource, finding, f); err == nil || len(f.engine.changes) != changes || f.engine.registry[name] != f.path(face) {
+		t.Fatal("the repair changed a registration that setup does not own", err, len(f.engine.changes)-changes)
+	}
+	if finding.Status != engine.Blocked || !slices.Equal(finding.Preserved, []string{"current-user font registration: " + face.file}) {
+		t.Fatal("a registration without an applied record is not kept", finding)
 	}
 }

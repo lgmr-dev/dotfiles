@@ -2803,9 +2803,9 @@
     },
     "tool.vscode": {
       "darwin/arm64": {
-        "version": "1.146.0",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-darwin-arm64.zip",
-        "sha256": "6e8d27ee0c5a8f2aa3c43e373407eecd11c270c3fe7f46100ef682aac14bb648",
+        "version": "1.147.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/8a14f0cc1b08d531eb83255ea3764ae22aa932b5/VSCode-darwin-arm64.zip",
+        "sha256": "149d944feb599b076b48406b174e1c3cd1d510e9d673854777a20a6f4116a59a",
         "format": "zip",
         "commands": {
           "code": "Visual Studio Code.app/Contents/Resources/app/bin/code"
@@ -2820,9 +2820,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "1.146.0",
-        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/69047191fc427f2f92828279aae1d90d8eeda7ab/VSCode-win32-x64-1.146.0.zip",
-        "sha256": "0d47f5bbff72499c6a4a92f6d72dd8cc5ba4606185f624465032626614119d61",
+        "version": "1.147.0",
+        "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/8a14f0cc1b08d531eb83255ea3764ae22aa932b5/VSCode-win32-x64-1.147.0.zip",
+        "sha256": "42d65f18009959964d7cff8ca6f33149a195d52c08622821c8c681a08469c26e",
         "format": "zip",
         "commands": {
           "code": "bin/code.cmd"
@@ -2832,11 +2832,11 @@
         ],
         "required_files": [
           "Code.exe",
-          "69047191fc/resources/app/product.json",
-          "69047191fc/resources/app/out/cli.js",
-          "69047191fc/ffmpeg.dll",
-          "69047191fc/libEGL.dll",
-          "69047191fc/icudtl.dat"
+          "8a14f0cc1b/resources/app/product.json",
+          "8a14f0cc1b/resources/app/out/cli.js",
+          "8a14f0cc1b/ffmpeg.dll",
+          "8a14f0cc1b/libEGL.dll",
+          "8a14f0cc1b/icudtl.dat"
         ]
       }
     },

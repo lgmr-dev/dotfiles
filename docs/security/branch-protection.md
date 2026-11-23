@@ -15,8 +15,8 @@ in the [pre-retirement guide at an immutable commit](https://github.com/luisgui1
 | Layer | Bypass | Purpose |
 | --- | --- | --- |
 | `Protect main: integrity` | None | Strict required checks, PRs, squash-only merges, linear history, no deletion or force pushes, and CodeQL error/high-security protection. |
-| `Protect main: review` | Owner, on pull requests only | One approval, CODEOWNER review, stale-review dismissal, last-push approval and resolved threads. |
-| `Protect main: owner updates` | Owner, on pull requests only | Only the owner can update `main`; branch/PR automation cannot merge. |
+| `Protect main: review` | Organization admin (the owner), on pull requests only | One approval, CODEOWNER review, stale-review dismissal, last-push approval and resolved threads. |
+| `Protect main: owner updates` | Organization admin (the owner), on pull requests only | Only the owner can update `main`; branch/PR automation cannot merge. |
 
 Live state: since 2026-11-03 only `Protect main: integrity` is active. The
 review and owner-updates layers are disabled on GitHub. The files in
@@ -29,7 +29,7 @@ owner's scheduled maintenance agent. It merges bot PRs, the PRs that replace
 them and the PRs for the Renovate dashboard items, with the owner's credentials
 only while the review and owner-updates
 layers are disabled. It never uses an administration action, `--admin` or a
-bypass. Branch protection does not prevent the personal-account owner from
+bypass. Branch protection does not prevent the organization owner from
 deleting the repository.
 
 The integrity and review payloads explicitly preserve the live API's

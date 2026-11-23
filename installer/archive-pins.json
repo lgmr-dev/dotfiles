@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.24.8",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "1c33bb672cf09eecf595578ad3136e415a3e54eb34de92247f637d1fa9eae688",
+        "version": "18.25.0",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "fbd4f848a1620c9bcd51fd7a4292a2b1ad9a8b400967f0f7d7745b7234b3b3a3",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.24.8",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "f8dfc3f9d27cadc2e2c9d489394ef7c568291e2382a4d184865701bf1a4ac30a",
+        "version": "18.25.0",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "9ebfb49d9f5cc5fb03588315f8f54277fe9e3648bd98de7666a350000670cd19",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.24.8",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "e058ab045e9a694e709a23fb87bb55a8737e98dfda9752cb33ea5e9f70c32a13",
+        "version": "18.25.0",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "1dc0cb006252cb4f0b4441fc885f7cba9798af0ed0c4df28c99f13cdacc15613",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.24.8",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.8/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "f6ff4e13feed0e49853618ab5f1ec849ccbb34dcab2df711c85d5f0333d8e717",
+        "version": "18.25.0",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "31360ba9fedb9de4ec819e9c853a67cb45b7f567ca580e7b80b2505b6fe13619",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -1337,9 +1337,9 @@
     },
     "tool.cmake": {
       "darwin/arm64": {
-        "version": "4.5.0",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-macos-universal.tar.gz",
-        "sha256": "a645d69fd21e521759cc0c64e7c60462d43faf0c7214ac05f75c80f7c5037dde",
+        "version": "4.5.1",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.1/cmake-4.5.1-macos-universal.tar.gz",
+        "sha256": "e1fb288543e4eb2a410e385ecebc64323bda51f0205782f2b094ccd5d572ca2d",
         "format": "tar.gz",
         "commands": {
           "cmake": "CMake.app/Contents/bin/cmake",
@@ -1355,9 +1355,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "4.5.0",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-x86_64.tar.gz",
-        "sha256": "81f0d5b0960fb6adc8197030ffc827fba937640d51e73e39e0e9e40d88c66f6f",
+        "version": "4.5.1",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.1/cmake-4.5.1-linux-x86_64.tar.gz",
+        "sha256": "83b71181fb62b4fe8f26067a9321448572e7a43bd04ff6c7f54a24c33698f16d",
         "format": "tar.gz",
         "commands": {
           "cmake": "bin/cmake",
@@ -1374,9 +1374,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "4.5.0",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-linux-aarch64.tar.gz",
-        "sha256": "0c8447e7bba9701467b5ac6155d157aa9e309e71af4981f78bd4b9176107f553",
+        "version": "4.5.1",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.1/cmake-4.5.1-linux-aarch64.tar.gz",
+        "sha256": "3bec208f11ed96c173032eeaf97937c54dd246acefee22acd7794a6b4e70d536",
         "format": "tar.gz",
         "commands": {
           "cmake": "bin/cmake",
@@ -1393,9 +1393,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "4.5.0",
-        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.0/cmake-4.5.0-windows-x86_64.zip",
-        "sha256": "301b1728317ccd84e984b02e366a8293735bc5ac618757d3d8f58b578f062411",
+        "version": "4.5.1",
+        "url": "https://github.com/Kitware/CMake/releases/download/v4.5.1/cmake-4.5.1-windows-x86_64.zip",
+        "sha256": "bfe6eadb245dc8213e0d3feea316b520cb2aae92f5667ffd76059ba6b05c430c",
         "format": "zip",
         "commands": {
           "cmake": "bin/cmake.exe",
@@ -3258,9 +3258,9 @@
     },
     "tool.pi": {
       "darwin/arm64": {
-        "version": "1.5.2",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-darwin-arm64.tar.gz",
-        "sha256": "56b5e194d485ced555667b8ba3276157a8272e9ecde9e001e428af80985bdd9b",
+        "version": "1.6.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-darwin-arm64.tar.gz",
+        "sha256": "6429287b7ae98d726ec577815d14fd680e7c587e89ecc5153b4a145dc4adba33",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3271,9 +3271,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "1.5.2",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-linux-x64.tar.gz",
-        "sha256": "811c6f2c9e7aaee252b5404252e556fb713aa209c1f7f924226aa77d4ef70cb5",
+        "version": "1.6.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-linux-x64.tar.gz",
+        "sha256": "ef77dbe4379b3bdeb425a1e1b862fa3c915c255000dfe4965c98eee96a5765d1",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3285,9 +3285,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.5.2",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-linux-arm64.tar.gz",
-        "sha256": "42805cd5615952fcbbfc9c56b04f8feb84395134952e169a6cdc8d7676975666",
+        "version": "1.6.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-linux-arm64.tar.gz",
+        "sha256": "5404547b9739be596d50ae7142c52535899e8e7dd37a7bace9be593e0355b468",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3299,9 +3299,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.5.2",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-windows-x64.zip",
-        "sha256": "e6adb8cb8c84eca14391ad24b363de9d2be98a89ca3ba3fdee1fa4de32b7f2e8",
+        "version": "1.6.0",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-windows-x64.zip",
+        "sha256": "f5defb6c403ee698f5b3f8886db473e55b78aac670a8ce03620a47f5f0aec57c",
         "format": "zip",
         "commands": {
           "pi": "pi.exe"
@@ -3548,9 +3548,9 @@
     },
     "tool.t3": {
       "darwin/arm64": {
-        "version": "0.1.10",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.10/t3-0.1.10-darwin-arm64.tar.gz",
-        "sha256": "771e5a209ffa881e409ab3b3d39500dbd57e1176aaa49de81ce07bb3e62d5ee8",
+        "version": "0.1.11",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-darwin-arm64.tar.gz",
+        "sha256": "4bc22e16a2e48d868ad8c4b9d6c8e031be1c566ce31c28267955c2986a70e95f",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3565,9 +3565,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.1.10",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.10/t3-0.1.10-linux-x64.tar.gz",
-        "sha256": "9bea9d36a217299a0af880e8c347b536ed6a9a2f5bf328a695d174d63628c5e8",
+        "version": "0.1.11",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-linux-x64.tar.gz",
+        "sha256": "2b691c07f5bcb5adea4a863d5324aae7db21bd6d82280cec7787836dcaa013e1",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3583,9 +3583,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "0.1.10",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.10/t3-0.1.10-linux-arm64.tar.gz",
-        "sha256": "5ffbd224f53d0f827279825347a7ebf5a7ac98ad5c1347d47409f30aa2a1e425",
+        "version": "0.1.11",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-linux-arm64.tar.gz",
+        "sha256": "7d90a5af032fe0988a616403e0f51a6cb68eff7ed7a84bc40999cc3997dffd71",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3601,9 +3601,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.1.10",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.10/t3-0.1.10-win32-x64.zip",
-        "sha256": "d9ef50470996a7eacd3bc8cea6122d3cb44e546107e4daf44cfb896b0c3bc7eb",
+        "version": "0.1.11",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-win32-x64.zip",
+        "sha256": "02c92be05c4007339119c39cfc7db06335ee17563dd17c4ada72bcc43cba9d34",
         "format": "zip",
         "strip_components": 1,
         "commands": {

@@ -79,7 +79,7 @@ if integrity.get("bypass_actors") != []:
 
 review_bypass = review.get("bypass_actors", [])
 expected_bypass = [
-    {"actor_id": 139752288, "actor_type": "User", "bypass_mode": "pull_request"}
+    {"actor_id": None, "actor_type": "OrganizationAdmin", "bypass_mode": "pull_request"}
 ]
 if review_bypass != expected_bypass:
     fail("review ruleset must have only the owner pull_request bypass")

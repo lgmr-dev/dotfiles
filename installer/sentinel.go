@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// Sentinel (https://github.com/luisgui1757/sentinel) installs its own rules and
+// Sentinel (https://github.com/lgmr-dev/sentinel) installs its own rules and
 // skills. Install and update take the latest Sentinel release: GitHub must
 // report it as published and immutable, and git gives the commit of its tag.
 // Setup fetches that commit with git and runs the installer of that commit.
@@ -27,8 +27,8 @@ import (
 // against it, and setup compares each checkout file with it. Check, repair,
 // removal and resume use the commit in the record.
 const (
-	sentinelRepository = "https://github.com/luisgui1757/sentinel.git"
-	sentinelReleases   = "https://api.github.com/repos/luisgui1757/sentinel/releases/latest"
+	sentinelRepository = "https://github.com/lgmr-dev/sentinel.git"
+	sentinelReleases   = "https://api.github.com/repos/lgmr-dev/sentinel/releases/latest"
 	sentinelResource   = "integration.sentinel-installer"
 )
 

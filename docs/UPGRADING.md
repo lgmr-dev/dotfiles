@@ -18,7 +18,7 @@ From v0.4.x (Nix and chezmoi):
 
 1. Preserve your local changes. Check out `v1.0.1` and run `./migrate.sh` or
    `.\migrate.ps1`. Finish all phases, also the runtime retirement and the final
-   Check. The [v1.0.1 upgrade guide](https://github.com/luisgui1757/dotfiles/blob/v1.0.1/docs/UPGRADING.md)
+   Check. The [v1.0.1 upgrade guide](https://github.com/lgmr-dev/dotfiles/blob/v1.0.1/docs/UPGRADING.md)
    describes each phase.
 2. Continue with step 2 above.
 
@@ -183,7 +183,7 @@ Both launchers isolate the compiler's module/build caches; personal Go settings
 remain intact when the installer starts.
 
 For historical v0.1.0-to-v0.4.4 procedures, read
-[the immutable former guide](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/UPGRADING.md).
+[the immutable former guide](https://github.com/lgmr-dev/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/UPGRADING.md).
 Those commands belong to their corresponding release, not this installer.
 
 Desktop app additions (2026-10-13 candidate): select each independently through

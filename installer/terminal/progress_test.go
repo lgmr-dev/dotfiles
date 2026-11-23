@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	engine "github.com/luisgui1757/dotfiles/installer"
+	engine "github.com/lgmr-dev/dotfiles/installer"
 )
 
 func TestProgressOutputRemovesWholeEscapeSequences(t *testing.T) {

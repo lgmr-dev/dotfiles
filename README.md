@@ -30,7 +30,7 @@ elevated recovery. Follow [the ownership recovery steps](docs/UPGRADING.md#windo
 then return to your normal terminal for remaining work.
 
 ```bash
-git clone https://github.com/luisgui1757/dotfiles.git ~/dotfiles
+git clone https://github.com/lgmr-dev/dotfiles.git ~/dotfiles
 cd ~/dotfiles
 ./setup.sh
 ```
@@ -38,7 +38,7 @@ cd ~/dotfiles
 On Windows, use PowerShell from the checkout:
 
 ```powershell
-git clone https://github.com/luisgui1757/dotfiles.git $HOME\dotfiles
+git clone https://github.com/lgmr-dev/dotfiles.git $HOME\dotfiles
 Set-Location $HOME\dotfiles
 .\setup.ps1
 ```
@@ -445,7 +445,7 @@ update itself, so use Update for new Pi releases. Sign in with `/login` inside
 T3 Code has its own Pi provider, which starts `pi` from `PATH`.
 
 **Sentinel rules and skills** installs
-[Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
+[Sentinel](https://github.com/lgmr-dev/sentinel), the shared rules and
 skills for coding agents. Setup gets the latest Sentinel release, never one
 older than v0.4.0, and runs the Sentinel installer of that release. That installer writes the rules
 into a managed block in the instruction file of each agent. Text outside the

@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/fetch"
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 const pythonResource = "tool.python"

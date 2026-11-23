@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 func (p *Provider) prepareRust(ctx context.Context, pin catalog.ArchivePin, payload string) error {

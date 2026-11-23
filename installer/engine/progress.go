@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // Progress displays approved work while it runs. Step receives the installer

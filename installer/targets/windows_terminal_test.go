@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/builds"
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/hooks"
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/targets"
-	"github.com/luisgui1757/dotfiles/installer/tools"
+	"github.com/lgmr-dev/dotfiles/installer/builds"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/hooks"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/tools"
 )
 
 var terminalPersonal = map[string]string{

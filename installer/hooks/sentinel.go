@@ -17,18 +17,18 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 // SentinelRepository and SentinelReleases are the Sentinel source
-// (https://github.com/luisgui1757/sentinel) and its latest-release API.
+// (https://github.com/lgmr-dev/sentinel) and its latest-release API.
 // SentinelResource is the resource of the Sentinel provider.
 const (
-	SentinelRepository = "https://github.com/luisgui1757/sentinel.git"
-	SentinelReleases   = "https://api.github.com/repos/luisgui1757/sentinel/releases/latest"
+	SentinelRepository = "https://github.com/lgmr-dev/sentinel.git"
+	SentinelReleases   = "https://api.github.com/repos/lgmr-dev/sentinel/releases/latest"
 	SentinelResource   = "integration.sentinel-installer"
 )
 

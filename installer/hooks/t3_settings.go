@@ -5,8 +5,8 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 func (p *Profiles) t3Units() []targets.Desired {

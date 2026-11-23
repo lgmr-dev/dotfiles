@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
 )
 
 func replaceText(root *os.Root, replacement catalog.ArchiveReplacement) error {

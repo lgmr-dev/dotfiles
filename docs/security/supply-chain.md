@@ -88,7 +88,7 @@ Update hashes together with extraction/layout and native-consumption evidence.
 ## Sentinel release
 
 Install and update ask the GitHub API for the latest release of the
-[Sentinel](https://github.com/luisgui1757/sentinel) repository. GitHub must
+[Sentinel](https://github.com/lgmr-dev/sentinel) repository. GitHub must
 report it as published and immutable, and its tag must be `vX.Y.Z`. A second
 request gives the commit of that tag. When `GITHUB_TOKEN` is set and not empty,
 setup sends it as a bearer token only to `https://api.github.com`. A redirect
@@ -100,7 +100,7 @@ commands in `<state>/sentinel/checkout`:
 
 ```sh
 git init
-git fetch --depth 1 https://github.com/luisgui1757/sentinel.git <commit>
+git fetch --depth 1 https://github.com/lgmr-dev/sentinel.git <commit>
 git checkout --detach FETCH_HEAD
 ```
 
@@ -220,6 +220,6 @@ jobs of the pull request give the native proof of a pin change. The required
 checks and their live settings are in
 [branch protection](branch-protection.md).
 
-The [previous supply-chain guide](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/supply-chain.md)
+The [previous supply-chain guide](https://github.com/lgmr-dev/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/supply-chain.md)
 preserves Nix/chezmoi-era identities and enforcement for historical releases.
 Those installers and their fallback package-manager chains are retired.

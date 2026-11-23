@@ -411,7 +411,7 @@ in the evidence.
       by explicit owner direction, so this append-only historical result is not
       a current support claim or an open package-plane migration.
 - [x] **Cache-free exact behavior-head full setup proof**: workflow-dispatch run
-      [`29096335827`](https://github.com/luisgui1757/dotfiles/actions/runs/29096335827)
+      [`29096335827`](https://github.com/lgmr-dev/dotfiles/actions/runs/29096335827)
       on merged-main SHA `5e3e7c6d93c400d67f6160c6f8f09be56aac10d3`
       skipped the broad install/plugin caches in every setup job. Attempt 1
       passed the Ubuntu container, public Ubuntu setup, and native Windows
@@ -423,41 +423,41 @@ in the evidence.
       client did not attach within 45 seconds, even though the later formatter
       CMake fixture did attach. Rerun this exact cache-free workflow after the
       waitable-update repair merges. Branch-head cache-free run
-      [`29100106370`](https://github.com/luisgui1757/dotfiles/actions/runs/29100106370)
+      [`29100106370`](https://github.com/lgmr-dev/dotfiles/actions/runs/29100106370)
       proved the first repair incomplete: Apple Silicon passed, while Ubuntu
       lost Astro captures and Intel lost GraphQL captures because ordinary
       headless plugin config still started an interactive asynchronous install.
       That path is now blocked outside a UI or the explicit synchronous phase.
       Exact behavior head `e5cf3e23299cbb42a157c307f2a7259979fcada0`
       then passed
-      [`29103732329`](https://github.com/luisgui1757/dotfiles/actions/runs/29103732329)
+      [`29103732329`](https://github.com/lgmr-dev/dotfiles/actions/runs/29103732329)
       with caches skipped: Ubuntu container `86399025475`, public Ubuntu
       `86399025519`, Apple Silicon `86399025503`, Intel `86399025491`, native
       Windows `86399025722`, and all four setup logical proofs were green.
       This checks the exact branch behavior; it is not WSL, redirected Windows,
       divergent stable packaged/Preview/Canary/portable Terminal, or desktop/TCC
       evidence. Merged-main run
-      [`29114125798`](https://github.com/luisgui1757/dotfiles/actions/runs/29114125798)
+      [`29114125798`](https://github.com/lgmr-dev/dotfiles/actions/runs/29114125798)
       on PR #48 merge SHA `f104bf066e4af7d4d707fe22ba36600711f1ae14`
       passed Ubuntu container, public Ubuntu, historical Intel, and Windows but
       failed Apple Silicon because the initial CMake LSP fixture shared a large
       project root and neocmakelsp timed out before attach; the later isolated
       CMake formatter fixture attached and validated gersemi in the same process.
       PR-head run
-      [`29180481941`](https://github.com/luisgui1757/dotfiles/actions/runs/29180481941)
+      [`29180481941`](https://github.com/lgmr-dev/dotfiles/actions/runs/29180481941)
       later proved that two separate client lifecycles remained timing-dependent
       even after project isolation: the initial CMake client attached, but the
       formatter-only restart did not. Strict smoke now formats and checks the
       realistic CMake sample on the already-attached isolated client. Three
       repeated strict Apple-Silicon runs passed 257/257 checks. Exact repaired
       head `d744948cdccc51f3d79e45aa78f82c46445df0c6` then passed hosted E2E
-      [`29181215803`](https://github.com/luisgui1757/dotfiles/actions/runs/29181215803),
+      [`29181215803`](https://github.com/lgmr-dev/dotfiles/actions/runs/29181215803),
       including all four producers and all four logical proof jobs. This PR run
       restored ordinary caches and is not the pending merged-main cache-free row.
 - [ ] **Cache-free merged-main safeguard confirmation**: run
       `e2e-install.yml` again after this PR merges. Exact behavior head
       `f097995b49a2189db327903a20743e7cb69ba665` passed cache-free run
-      [`29120109175`](https://github.com/luisgui1757/dotfiles/actions/runs/29120109175):
+      [`29120109175`](https://github.com/lgmr-dev/dotfiles/actions/runs/29120109175):
       all four current producers and all four setup logical proofs were green.
       On merged `main`, require those same producers (Ubuntu container, public
       Ubuntu, Apple Silicon, Windows), the four setup logical proofs, and the

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/hooks"
+	"github.com/lgmr-dev/dotfiles/installer/hooks"
 )
 
 const terminalV2Fingerprint = "cfdd459b3d918e7b86e1724f30e6008662155b16c9173b797774a4ea3b02a553"

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
 )
 
 const azureCLIPackages = "libexec/lib/python3.14/site-packages"

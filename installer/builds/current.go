@@ -6,9 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 // Publish makes the current link of a resource point at build and records

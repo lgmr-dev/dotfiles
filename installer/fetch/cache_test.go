@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
 )
 
 func cachedPin(url string, data []byte) catalog.ArchivePin {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 func TestDecodeIsStrict(t *testing.T) {

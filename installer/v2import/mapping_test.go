@@ -14,12 +14,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/hooks"
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
-	"github.com/luisgui1757/dotfiles/installer/system"
-	"github.com/luisgui1757/dotfiles/installer/targets"
-	"github.com/luisgui1757/dotfiles/installer/v2import"
+	"github.com/lgmr-dev/dotfiles/installer/hooks"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/system"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/v2import"
 )
 
 func value(text string) string {

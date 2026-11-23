@@ -20,7 +20,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 const windowsBuildToolsQueryFixtureArgument = "--buildtools-query-fixture"

@@ -12,7 +12,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 var homebrewBootstrapSource = regexp.MustCompile(`^https://raw\.githubusercontent\.com/Homebrew/install/[a-f0-9]{40}/install\.sh$`)

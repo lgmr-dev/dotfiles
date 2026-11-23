@@ -13,9 +13,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/fetch"
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // The fixed upstream self-extractor needs its documented post-install step:

@@ -15,7 +15,7 @@ import (
 	"unicode"
 	"unicode/utf16"
 
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 const switchingLine = "The import from release v2 is not complete. Run setup to complete it, or run restore-v2 to go back to release v2."

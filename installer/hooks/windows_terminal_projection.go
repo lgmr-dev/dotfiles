@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 // TerminalSlot is the slot of the Windows Terminal settings projection: the

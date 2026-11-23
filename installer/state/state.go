@@ -15,7 +15,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // File and LockFile are the names of the state document and the installer

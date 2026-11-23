@@ -13,8 +13,8 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 func edit(t *testing.T, e *engine.Engine, change func(*state.State)) {

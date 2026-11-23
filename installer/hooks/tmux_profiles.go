@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 func (p *Profiles) tmuxUnits() ([]targets.Desired, error) {

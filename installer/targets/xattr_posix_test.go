@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 	"golang.org/x/sys/unix"
 )
 

@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 const keptApplyLogs = 20

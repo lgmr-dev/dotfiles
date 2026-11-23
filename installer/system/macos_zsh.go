@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
 )
 
 // MacZsh is the provider of tool.zsh on macOS. The system supplies /bin/zsh.

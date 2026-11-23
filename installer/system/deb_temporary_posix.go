@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 	"golang.org/x/sys/unix"
 )
 

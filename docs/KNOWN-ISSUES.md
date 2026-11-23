@@ -19,6 +19,6 @@ release is immutable and keeps that Homebrew version.
 
 Do not use v0.4.4 for a new macOS installation or for a v0.1.0 migration. Use a
 later release that contains the
-[Homebrew compatibility fix](https://github.com/luisgui1757/dotfiles/pull/85).
+[Homebrew compatibility fix](https://github.com/lgmr-dev/dotfiles/pull/85).
 
 Linux, WSL and Windows do not use the affected Homebrew runtime.

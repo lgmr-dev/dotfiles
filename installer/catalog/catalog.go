@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // Catalog is the validated content of every tool folder. Resources holds the

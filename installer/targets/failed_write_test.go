@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 func readOnlyParent(t *testing.T, path string) {

@@ -67,10 +67,10 @@ checks.
 2. Save the two live lists to files outside the checkout, for a rollback:
 
    ```bash
-   gh api repos/luisgui1757/dotfiles/rulesets \
+   gh api repos/lgmr-dev/dotfiles/rulesets \
      --jq '.[] | {id,name,enforcement}'
-   gh api repos/luisgui1757/dotfiles/rulesets/INTEGRITY_ID > integrity-before.json
-   gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks \
+   gh api repos/lgmr-dev/dotfiles/rulesets/INTEGRITY_ID > integrity-before.json
+   gh api repos/lgmr-dev/dotfiles/branches/main/protection/required_status_checks \
      > classic-before.json
    ```
 
@@ -83,7 +83,7 @@ checks.
    `bypass_actors` in the file. Then write the ruleset:
 
    ```bash
-   gh api -X PUT repos/luisgui1757/dotfiles/rulesets/INTEGRITY_ID \
+   gh api -X PUT repos/lgmr-dev/dotfiles/rulesets/INTEGRITY_ID \
      --input integrity-after.json
    ```
 
@@ -94,7 +94,7 @@ checks.
 
    ```bash
    gh api -X PATCH \
-     repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks \
+     repos/lgmr-dev/dotfiles/branches/main/protection/required_status_checks \
      --input classic-after.json
    ```
 
@@ -128,16 +128,16 @@ Run `make test-static` for the local policy checks. An authorized maintainer
 can inspect the live settings without changing them:
 
 ```bash
-gh api repos/luisgui1757/dotfiles/rulesets \
+gh api repos/lgmr-dev/dotfiles/rulesets \
   --jq '.[] | {id,name,enforcement}'
 # Use the unique integrity ID returned above.
-gh api repos/luisgui1757/dotfiles/rulesets/INTEGRITY_ID
-gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks
-gh api repos/luisgui1757/dotfiles/actions/permissions
-gh api repos/luisgui1757/dotfiles/private-vulnerability-reporting
-gh api repos/luisgui1757/dotfiles/immutable-releases
-gh api repos/luisgui1757/dotfiles/code-scanning/default-setup
-gh api 'repos/luisgui1757/dotfiles/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL'
+gh api repos/lgmr-dev/dotfiles/rulesets/INTEGRITY_ID
+gh api repos/lgmr-dev/dotfiles/branches/main/protection/required_status_checks
+gh api repos/lgmr-dev/dotfiles/actions/permissions
+gh api repos/lgmr-dev/dotfiles/private-vulnerability-reporting
+gh api repos/lgmr-dev/dotfiles/immutable-releases
+gh api repos/lgmr-dev/dotfiles/code-scanning/default-setup
+gh api 'repos/lgmr-dev/dotfiles/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL'
 ```
 
 Compare exact names and app IDs in both required-check layers, strict mode,
@@ -148,4 +148,4 @@ delete duplicates or overwrite unfamiliar policy to make the lists match.
 
 Historical rollout evidence, the 23-check and 25-check cutovers and the former
 Nix/chezmoi procedure remain in the
-[guide at the last v2 commit](https://github.com/luisgui1757/dotfiles/blob/fb15ce5/docs/security/branch-protection.md).
+[guide at the last v2 commit](https://github.com/lgmr-dev/dotfiles/blob/fb15ce5/docs/security/branch-protection.md).

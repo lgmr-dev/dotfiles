@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // https://github.com/Homebrew/install/blob/35da6871c4be7d7fdab2fd505fb7fa667926a2a5/install.sh#L827-L846

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 const target = "linux/amd64:/home/fixture"

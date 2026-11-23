@@ -12,8 +12,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 type pathKind struct{ name string }

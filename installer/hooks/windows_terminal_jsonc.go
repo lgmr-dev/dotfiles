@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 func terminalSorted(values []string) []string {

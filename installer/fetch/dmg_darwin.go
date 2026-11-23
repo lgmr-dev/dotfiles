@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 func readDMGArchive(ctx context.Context, file *os.File, bundle string, readTar func(io.Reader) error) (result error) {

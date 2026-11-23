@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/fetch"
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 func archiveLinkZIP(t *testing.T, entries []archiveFixtureEntry) []byte {

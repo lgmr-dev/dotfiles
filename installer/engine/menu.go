@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 const inspectionReuse = 5 * time.Minute

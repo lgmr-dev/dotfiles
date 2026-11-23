@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
 )
 
 func TestXZArchiveRetainsTarSafetyAndDecoderIntegrity(t *testing.T) {

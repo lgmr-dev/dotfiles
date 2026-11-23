@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 // Findings holds the inspections that a plan needs. Wanted has the resources

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
 )
 
 const gitID = "integration.git"

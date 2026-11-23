@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // NvimRuntimeDirectory returns the folder of the public runtime link of

@@ -16,10 +16,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 // SentinelCheckoutSlot is the slot of the target record of the Sentinel

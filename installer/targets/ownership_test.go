@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/luisgui1757/dotfiles/installer/state"
-	"github.com/luisgui1757/dotfiles/installer/targets"
+	"github.com/lgmr-dev/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/targets"
 )
 
 func ownerWrites(e *env, d targets.Desired, value string) {

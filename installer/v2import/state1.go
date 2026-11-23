@@ -18,7 +18,7 @@ import (
 	"regexp"
 	"slices"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // SourceCommit and SourceRelease name the last release v2: the import reads

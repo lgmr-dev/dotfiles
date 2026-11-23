@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/engine"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/engine"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 type menuCall struct {

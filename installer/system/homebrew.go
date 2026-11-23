@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // HomebrewLocation holds the Homebrew executable and the prefix and Cellar

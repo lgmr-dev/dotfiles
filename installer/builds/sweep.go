@@ -13,9 +13,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/fetch"
-	"github.com/luisgui1757/dotfiles/installer/platform"
-	"github.com/luisgui1757/dotfiles/installer/state"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/state"
 )
 
 // Sweep removes the unused private builds. The roots are the targets of the

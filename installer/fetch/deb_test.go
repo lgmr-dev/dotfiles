@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/luisgui1757/dotfiles/installer/fetch"
+	"github.com/lgmr-dev/dotfiles/installer/fetch"
 )
 
 func debDecoderFixture(t *testing.T, script string) string {

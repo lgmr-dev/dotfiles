@@ -13,7 +13,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 type configBaselineTarget struct {

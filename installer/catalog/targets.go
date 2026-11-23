@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // ResolvedTarget is one configuration target with absolute paths. Mode is

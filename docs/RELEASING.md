@@ -52,7 +52,7 @@ Release publication is an owner action.
    version=v3.0.0
    commit=MERGED_COMMIT_SHA
    notes="docs/releases/$version.md"
-   gh release create "$version" --repo luisgui1757/dotfiles --target "$commit" \
+   gh release create "$version" --repo lgmr-dev/dotfiles --target "$commit" \
      --title "$(sed -n '1s/^# //p' "$notes")" \
      --notes "$(sed -n '/^## Highlights/,$p' "$notes")"
    ```
@@ -63,7 +63,7 @@ Release publication is an owner action.
    not a prerelease:
 
    ```bash
-   gh api "repos/luisgui1757/dotfiles/releases/tags/$version" \
+   gh api "repos/lgmr-dev/dotfiles/releases/tags/$version" \
      --jq '{tag_name, target_commitish, immutable, draft, prerelease}'
    ```
 

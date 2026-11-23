@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 type debPin struct {

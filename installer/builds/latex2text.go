@@ -5,7 +5,7 @@ import (
 	"errors"
 	"path/filepath"
 
-	"github.com/luisgui1757/dotfiles/installer/catalog"
+	"github.com/lgmr-dev/dotfiles/installer/catalog"
 )
 
 func (p *Provider) prepareLatex2text(ctx context.Context, pin catalog.ArchivePin, payload string, uses []string) error {

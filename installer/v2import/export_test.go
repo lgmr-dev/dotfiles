@@ -1,6 +1,6 @@
 package v2import
 
-import "github.com/luisgui1757/dotfiles/installer/platform"
+import "github.com/lgmr-dev/dotfiles/installer/platform"
 
 func SetFault(f func(point string) error) { fault = f }
 

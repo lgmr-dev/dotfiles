@@ -10,7 +10,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 // ErrNoArchive reports that a family has no archive pin for a host.

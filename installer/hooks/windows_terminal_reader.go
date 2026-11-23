@@ -1,6 +1,6 @@
 package hooks
 
-import "github.com/luisgui1757/dotfiles/installer/targets"
+import "github.com/lgmr-dev/dotfiles/installer/targets"
 
 type terminalReadKey struct {
 	start  *byte

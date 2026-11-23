@@ -5,7 +5,7 @@ package system
 import (
 	"os"
 
-	"github.com/luisgui1757/dotfiles/installer/platform"
+	"github.com/lgmr-dev/dotfiles/installer/platform"
 )
 
 func homebrewDirectoryIdentity(file *os.File) (string, error) {

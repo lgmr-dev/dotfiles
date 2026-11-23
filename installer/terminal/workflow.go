@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	engine "github.com/luisgui1757/dotfiles/installer"
+	engine "github.com/lgmr-dev/dotfiles/installer"
 	"golang.org/x/term"
 )
 

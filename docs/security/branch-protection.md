@@ -10,7 +10,7 @@ owner gives the merge of bot PRs, of the PRs that replace them and of the PRs
 for the Renovate dashboard items to the scheduled maintenance agent in
 [archive pin proposals](supply-chain.md#archive-pin-proposals).
 Historical rollout evidence and the former Nix/chezmoi procedure remain
-in the [pre-retirement guide at an immutable commit](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/branch-protection.md).
+in the [pre-retirement guide at an immutable commit](https://github.com/lgmr-dev/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/branch-protection.md).
 
 | Layer | Bypass | Purpose |
 | --- | --- | --- |
@@ -100,8 +100,8 @@ From a clean checkout of exact live `main`, first run the read-only preflight.
 Run apply only when separately authorized:
 
 ```bash
-scripts/apply-repo-safeguards.sh --preflight-only luisgui1757/dotfiles
-scripts/apply-repo-safeguards.sh luisgui1757/dotfiles
+scripts/apply-repo-safeguards.sh --preflight-only lgmr-dev/dotfiles
+scripts/apply-repo-safeguards.sh lgmr-dev/dotfiles
 ```
 
 The helper requires the matching GitHub origin, public repository, three unique
@@ -130,7 +130,7 @@ successful apply's snapshot until independent readback is complete. For manual
 recovery, use the exact path printed by the command:
 
 ```bash
-scripts/apply-repo-safeguards.sh --restore '/exact/snapshot/path' luisgui1757/dotfiles
+scripts/apply-repo-safeguards.sh --restore '/exact/snapshot/path' lgmr-dev/dotfiles
 ```
 
 Restore freezes every consumed snapshot file before validation or publication.
@@ -152,8 +152,8 @@ static guard parses YAML, including aliases, inline forms and `null`.
 Security configuration has a separate fail-closed path:
 
 ```bash
-scripts/apply-github-security.sh --preflight-only luisgui1757/dotfiles
-scripts/apply-github-security.sh luisgui1757/dotfiles
+scripts/apply-github-security.sh --preflight-only lgmr-dev/dotfiles
+scripts/apply-github-security.sh lgmr-dev/dotfiles
 ```
 
 The desired posture enables private vulnerability reporting and immutable releases.
@@ -177,16 +177,16 @@ inspect the live boundary without changing it:
 
 ```bash
 jq '.stage, .required' .github/check-identities.json
-gh api repos/luisgui1757/dotfiles/rulesets \
+gh api repos/lgmr-dev/dotfiles/rulesets \
   --jq '.[] | {id,name,enforcement}'
 # Use the unique integrity ID returned above.
-gh api repos/luisgui1757/dotfiles/rulesets/INTEGRITY_ID
-gh api repos/luisgui1757/dotfiles/branches/main/protection/required_status_checks
-gh api repos/luisgui1757/dotfiles/actions/permissions
-gh api repos/luisgui1757/dotfiles/private-vulnerability-reporting
-gh api repos/luisgui1757/dotfiles/immutable-releases
-gh api repos/luisgui1757/dotfiles/code-scanning/default-setup
-gh api 'repos/luisgui1757/dotfiles/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL'
+gh api repos/lgmr-dev/dotfiles/rulesets/INTEGRITY_ID
+gh api repos/lgmr-dev/dotfiles/branches/main/protection/required_status_checks
+gh api repos/lgmr-dev/dotfiles/actions/permissions
+gh api repos/lgmr-dev/dotfiles/private-vulnerability-reporting
+gh api repos/lgmr-dev/dotfiles/immutable-releases
+gh api repos/lgmr-dev/dotfiles/code-scanning/default-setup
+gh api 'repos/lgmr-dev/dotfiles/code-scanning/analyses?ref=refs/heads/main&tool_name=CodeQL'
 ```
 
 Compare exact names and app IDs in both required-check layers, strict mode,

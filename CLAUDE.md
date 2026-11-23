@@ -159,7 +159,7 @@ of each step. All of these checks must pass on the final head.
 
 ## Sentinel
 
-[Sentinel](https://github.com/luisgui1757/sentinel) holds the shared rules
+[Sentinel](https://github.com/lgmr-dev/sentinel) holds the shared rules
 and skills for coding agents.
 
 - The `sentinel` capability needs the hidden `integration.sentinel-installer`

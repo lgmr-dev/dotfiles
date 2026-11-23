@@ -22,8 +22,8 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 MANIFEST_PATH = pathlib.Path("release/manifest.json")
 HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 SEMVER = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
-REPOSITORY = "luisgui1757/dotfiles"
-OFFICIAL_REMOTE = "https://github.com/luisgui1757/dotfiles.git"
+REPOSITORY = "lgmr-dev/dotfiles"
+OFFICIAL_REMOTE = "https://github.com/lgmr-dev/dotfiles.git"
 RESIDUAL_EVIDENCE = [
     "redirected Windows",
     "divergent Windows Terminal targets",

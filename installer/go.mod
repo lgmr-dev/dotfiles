@@ -1,4 +1,4 @@
-module github.com/luisgui1757/dotfiles/installer
+module github.com/lgmr-dev/dotfiles/installer
 
 go 1.27.4
 

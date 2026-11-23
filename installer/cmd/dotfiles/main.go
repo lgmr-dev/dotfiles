@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	engine "github.com/luisgui1757/dotfiles/installer"
-	"github.com/luisgui1757/dotfiles/installer/terminal"
+	engine "github.com/lgmr-dev/dotfiles/installer"
+	"github.com/lgmr-dev/dotfiles/installer/terminal"
 )
 
 func main() {

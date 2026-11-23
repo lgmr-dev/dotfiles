@@ -37,8 +37,8 @@ for banned in (
 
 for path, text in (("README.md", readme), ("CLAUDE.md", claude)):
     for banned in (
-        "curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash",
-        "iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1",
+        "curl -fsSL https://raw.githubusercontent.com/lgmr-dev/dotfiles/main/setup.sh | bash",
+        "iwr https://raw.githubusercontent.com/lgmr-dev/dotfiles/main/setup.ps1",
         "setup.sh (remote, dry-run)",
         "setup.ps1 (remote, dry-run)",
     ):

@@ -264,8 +264,8 @@ setup_doc_files = [
 for path in setup_doc_files:
     text = path.read_text(encoding="utf-8")
     for banned in (
-        "curl -fsSL https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.sh | bash",
-        "iwr https://raw.githubusercontent.com/luisgui1757/dotfiles/main/setup.ps1",
+        "curl -fsSL https://raw.githubusercontent.com/lgmr-dev/dotfiles/main/setup.sh | bash",
+        "iwr https://raw.githubusercontent.com/lgmr-dev/dotfiles/main/setup.ps1",
     ):
         if banned in text:
             failures.append(f"{path} still recommends raw remote setup execution: {banned}")

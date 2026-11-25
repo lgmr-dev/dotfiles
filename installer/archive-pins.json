@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.25.0",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "fbd4f848a1620c9bcd51fd7a4292a2b1ad9a8b400967f0f7d7745b7234b3b3a3",
+        "version": "18.25.1",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.1/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "c2d94ae74da55c644de08ce3eedb0abd5f4a32340f3e9b8e2dade29764ac524c",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.25.0",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "9ebfb49d9f5cc5fb03588315f8f54277fe9e3648bd98de7666a350000670cd19",
+        "version": "18.25.1",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.1/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "f2bc97588d5aa91f49b992298544e13776df044cb4baf606875c7cc8444e9e00",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.25.0",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "1dc0cb006252cb4f0b4441fc885f7cba9798af0ed0c4df28c99f13cdacc15613",
+        "version": "18.25.1",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.1/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "a76aff915be408f15eca033dfbd555bb8d1237e83b09562f7481636f7894555f",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.25.0",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.0/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "31360ba9fedb9de4ec819e9c853a67cb45b7f567ca580e7b80b2505b6fe13619",
+        "version": "18.25.1",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.25.1/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "8c1a4c51251fd79f93551dcb66d23e8e34b3d49df56e47dbf853418cfadc167a",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -314,9 +314,9 @@
     },
     "tool.superfile": {
       "darwin/arm64": {
-        "version": "1.6.0",
-        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-darwin-v1.6.0-arm64.tar.gz",
-        "sha256": "131f654e7f8366fd37dbe9363739f8d82e57ff3f632f45963cd233c049cfad2a",
+        "version": "1.6.1",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.1/superfile-darwin-v1.6.1-arm64.tar.gz",
+        "sha256": "4d2e4c028b5cc870d0b3afcef88dd501fcf0d4d982ea3301f687ffd446821cb9",
         "format": "tar.gz",
         "commands": {
           "spf": "spf"
@@ -327,9 +327,9 @@
         "strip_components": 2
       },
       "linux/amd64": {
-        "version": "1.6.0",
-        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-linux-v1.6.0-amd64.tar.gz",
-        "sha256": "d45b0e95072629a6aa7983a84eedca9cd7a98861e67ef91be1415496e3dda309",
+        "version": "1.6.1",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.1/superfile-linux-v1.6.1-amd64.tar.gz",
+        "sha256": "2ab6872fee8fb2d6d120503f964cc693cf5ce328afedbe3988729593870c570e",
         "format": "tar.gz",
         "commands": {
           "spf": "spf"
@@ -340,9 +340,9 @@
         "strip_components": 2
       },
       "linux/arm64": {
-        "version": "1.6.0",
-        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-linux-v1.6.0-arm64.tar.gz",
-        "sha256": "2e8150dab1a139e3a081bd74a9c775155e8d0241c34ae3f8d30817a3df1b8f06",
+        "version": "1.6.1",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.1/superfile-linux-v1.6.1-arm64.tar.gz",
+        "sha256": "643d123cc957b23f871cf9fca873e7bf22452640b8dc0fb87d2bd51722ddf5ed",
         "format": "tar.gz",
         "commands": {
           "spf": "spf"
@@ -353,9 +353,9 @@
         "strip_components": 2
       },
       "windows/amd64": {
-        "version": "1.6.0",
-        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.0/superfile-windows-v1.6.0-amd64.zip",
-        "sha256": "4264a84d38c5d13804960a5da9ea8dedb8a00439e2612d6b8a28699836ed0143",
+        "version": "1.6.1",
+        "url": "https://github.com/yorukot/superfile/releases/download/v1.6.1/superfile-windows-v1.6.1-amd64.zip",
+        "sha256": "dd7156c51bbbba7a0a0d1fcb10ebf60560762c4917729c40450641e27e2cb7c5",
         "format": "zip",
         "commands": {
           "spf": "spf.exe"
@@ -2944,9 +2944,9 @@
     },
     "tool.claude": {
       "darwin/arm64": {
-        "version": "2.1.330",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.330.tgz",
-        "sha256": "b8c91d706567b670e4f2b6112199c5db3125ca237ac214e6143e7094bd0cb33b",
+        "version": "2.1.331",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.331.tgz",
+        "sha256": "17154cb399700e76b7bbc74af4948b75a7c716843773a5a5eb4b502366c7fbbf",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2957,9 +2957,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "2.1.330",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.330.tgz",
-        "sha256": "40ff30c5768723958032132065e6fcdd1e2dc3a2b3ff9a0bf36c6620ef1c40ef",
+        "version": "2.1.331",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.331.tgz",
+        "sha256": "29aadf516e6d2779ee18e728d88499e89863c82aa12ab0372e472a22e6da2a26",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2971,9 +2971,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.1.330",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.330.tgz",
-        "sha256": "5460d42c696670f4fd2a7ec619719edda14a576b28ee3c289b348ade96efbf6d",
+        "version": "2.1.331",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.331.tgz",
+        "sha256": "9e8036c849972477264dc46409143f5c0746be59716221fc1a58314af0e02f4b",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2985,9 +2985,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.1.330",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.330.tgz",
-        "sha256": "3ab01299048000588d144fe0be9348441b931c224a5e87d51eaa78e7e0075577",
+        "version": "2.1.331",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.331.tgz",
+        "sha256": "a0f561a243a729a6c25e8ac0c55487654e299ef6ad46c900a74251fc1438b0a6",
         "format": "tar.gz",
         "commands": {
           "claude": "claude.exe"
@@ -3000,9 +3000,9 @@
     },
     "tool.codex": {
       "darwin/arm64": {
-        "version": "0.171.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.171.0-darwin-arm64.tgz",
-        "sha256": "185e1c789e5fd528390c1a89a6968dca791e9aa3138db830d53afffdc9079ae3",
+        "version": "0.172.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.172.0-darwin-arm64.tgz",
+        "sha256": "49db4f169ecb69222b4bc20748e3b71eb8d8310dc497560b4ee3262cb076de51",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-apple-darwin/bin/codex",
@@ -3020,9 +3020,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "0.171.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.171.0-linux-x64.tgz",
-        "sha256": "e13d67afb0533cc6160b5f4140e4ad07e2acd87adbaa081bbf69b82e90cf4e55",
+        "version": "0.172.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.172.0-linux-x64.tgz",
+        "sha256": "48a5ee5dba98c7745a48b8d72af84f91880fec5856269627328fd564f60d41a7",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-unknown-linux-musl/bin/codex",
@@ -3041,9 +3041,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "0.171.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.171.0-linux-arm64.tgz",
-        "sha256": "26ae27788c7d962ae64321aba4673f918b99b40c4655246930bf962fa5b81b01",
+        "version": "0.172.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.172.0-linux-arm64.tgz",
+        "sha256": "426f39a5b6200ae6706a137a141912c8ebbdbdfc62021999d681c1fd39928a2a",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-unknown-linux-musl/bin/codex",
@@ -3062,9 +3062,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "0.171.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.171.0-win32-x64.tgz",
-        "sha256": "a58fc449075317821ac2895cd9b525af9c77c14585fe4e4f9bb5c18b475eaf99",
+        "version": "0.172.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.172.0-win32-x64.tgz",
+        "sha256": "4e45a12e8711a35ba9de65b45c49dc400e67a8bd0e2c18a7793673bddbe67b0d",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-pc-windows-msvc/bin/codex.exe",

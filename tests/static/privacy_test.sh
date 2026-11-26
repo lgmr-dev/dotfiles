@@ -64,6 +64,7 @@ git reset -q --hard origin/main
 file_case stop "a file URL with an encoded name" "file:///$h/%C3%A9lise/x"
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
+file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"
 
 push_case() {
@@ -112,6 +113,15 @@ for pair in public:public_address email:email ssh_remote:ssh_remote not_address:
     failures=$((failures + 1))
   fi
 done
+
+git checkout -q -b topic origin/main
+as "$personal" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m "published personal"
+git -c core.hooksPath=/dev/null push -q origin topic
+git clone -q --branch topic "$work/remote.git" "$work/other" 2>/dev/null
+as "$noreply" "" git -C "$work/other" commit -q --allow-empty -m moved
+git -C "$work/other" -c core.hooksPath=/dev/null push -q origin topic
+as "$noreply" "" git commit -q --allow-empty -m "clean child"
+expect pass "a clean child of a stale published topic branch" git push -q origin HEAD:refs/heads/child
 
 if ((failures > 0)); then
   exit 1

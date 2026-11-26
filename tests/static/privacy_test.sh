@@ -55,11 +55,12 @@ file_case stop "a Windows home path without a drive" "\\$u\\alice\\secret"
 file_case stop "a home path after a URL in a table" "|https://a.example/x|/$h/alice/k|"
 file_case stop "a home folder in a WSL share" "\\\\wsl\$\\Ubuntu\\$h\\alice"
 file_case pass "an upper-case web URL with a home-like path" "HTTPS://github.com/o/r/blob/main/root/README"
-printf '\xff\xfe' > utf16.txt
-printf 'p=/%s/alice/x\r\n' "$h" | iconv -f UTF-8 -t UTF-16LE >> utf16.txt
-git add utf16.txt
+printf '\xff\xfe' > größe.txt
+printf 'p=/%s/alice/x\r\n' "$h" | iconv -f UTF-8 -t UTF-16LE >> größe.txt
+git add größe.txt
 expect stop "a UTF-16 file with a home path" as "$noreply" "" git commit -q -m utf16
 git reset -q --hard origin/main
+file_case stop "a file URL with an encoded name" "file:///$h/%C3%A9lise/x"
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"
@@ -84,6 +85,7 @@ push_case stop "a personal address after an SSH remote and a comma" "$noreply" "
 push_case pass "a generic type in a trailer" "$noreply" $'x\n\nCaused-by: List<String> change'
 push_case stop "a personal address that ends in -git before a colon" "$noreply" "Ask team-git${at}corp-mail.net: now"
 push_case stop "two angle values in a sign-off" "$noreply" $'x\n\nSigned-off-by: A <alice'"${at}"'myhost> <'"$noreply"'>'
+push_case pass "an image size and a systemd unit" "$noreply" "Add logo@2x.png and enable wg-quick@wg0.service"
 push_case pass "a pre-release package version" "$noreply" "bump pkg${at}v1.0.0-rc.alpha"
 push_case stop "a personal address in a ref name" "$noreply" x "refs/heads/$personal"
 

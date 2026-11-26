@@ -6,13 +6,14 @@ shift
 public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
 email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
 ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
+not_address='@(v?[0-9]+\.[0-9]|[0-9]+x\.|[A-Za-z0-9_.-]+\.(service|socket|timer|target|mount|path|slice|scope|device|swap|automount)$)'
 zero=0000000000000000000000000000000000000000
 hint=
 
 refuse() {
   echo "Git privacy guard: $1.$hint" >&2
   echo "To allow other addresses in one repository, for example a work repository or a fork, run in it:" >&2
-  echo "  git config core.hooksPath \"$(git rev-parse --path-format=absolute --git-common-dir)/hooks\"" >&2
+  printf '  git config core.hooksPath "%s(git rev-parse --path-format=absolute --git-common-dir)/hooks"\n' '$' >&2
   exit 1
 }
 
@@ -24,7 +25,7 @@ check_address() {
 
 check_text() {
   text=$(printf '%s\n' "$2" | sed -E "s#$ssh_remote##g")
-  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -vE '@v?[0-9]+\.[0-9]' || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]+:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
+  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -vE "$not_address" || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
     check_address "$1" "$word"
   done
 }
@@ -74,6 +75,11 @@ case "$hook" in
         check_address "the author of commit $short" "$(git log -1 --format=%ae "$commit")"
         check_address "the committer of commit $short" "$(git log -1 --format=%ce "$commit")"
         check_text "commit $short" "$(git log -1 --format='%an%n%cn%n%B' "$commit")"
+        mergetag=$(git cat-file commit "$commit" | sed -n '/^$/q; /^mergetag /,/^[^ ]/{ /^mergetag /s/^mergetag //p; /^ /s/^ //p; }')
+        if [ -n "$mergetag" ]; then
+          check_address "the merged tag of commit $short" "$(printf '%s\n' "$mergetag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
+          check_text "the merged tag of commit $short" "$mergetag"
+        fi
       done
     done <<INPUT
 $input

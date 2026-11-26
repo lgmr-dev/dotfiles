@@ -326,6 +326,21 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	gitSettingsCommand(t, c.Home, clone, "tag", "-a", personal, "-m", "release")
 	gitSettingsCommand(t, c.Home, clone, "tag", "renamed", personal)
 	refused("a renamed tag with a personal name", "push", "origin", "renamed")
+	if keygen, err := exec.LookPath("ssh-keygen"); err == nil {
+		key := filepath.Join(c.Home, "signing-key")
+		if output, err := exec.Command(keygen, "-q", "-t", "ed25519", "-N", "", "-f", key).CombinedOutput(); err != nil {
+			t.Fatal(string(output), err)
+		}
+		gitSettingsCommand(t, c.Home, clone, "checkout", "-q", "-b", "side")
+		gitSettingsCommand(t, c.Home, clone, "commit", "--allow-empty", "-m", "side")
+		if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "gpg.format=ssh", "-c", "user.signingkey="+key, "tag", "-s", "signed", "-m", "signed"); err != nil {
+			t.Fatal(output, err)
+		}
+		gitSettingsCommand(t, c.Home, clone, "checkout", "-q", "main")
+		gitSettingsCommand(t, c.Home, clone, "merge", "-q", "--no-ff", "--no-edit", "signed")
+		refused("a merged signed tag with a personal tagger", "push", "origin", "HEAD:refs/heads/merged")
+		gitSettingsCommand(t, c.Home, clone, "reset", "--hard", "origin/main")
+	}
 	gitSettingsCommand(t, c.Home, clone, "tag", "tree", "HEAD^{tree}")
 	refused("a tag of a tree", "push", "origin", "tree")
 	if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "replaced"); err != nil {

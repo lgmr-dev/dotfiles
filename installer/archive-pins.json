@@ -2944,9 +2944,9 @@
     },
     "tool.claude": {
       "darwin/arm64": {
-        "version": "2.1.331",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.331.tgz",
-        "sha256": "17154cb399700e76b7bbc74af4948b75a7c716843773a5a5eb4b502366c7fbbf",
+        "version": "2.1.332",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.332.tgz",
+        "sha256": "5595da3b4ae283732a85a8588c5f8c6bc50ad39d0dd3de678c4d6307dd9a079d",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2957,9 +2957,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "2.1.331",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.331.tgz",
-        "sha256": "29aadf516e6d2779ee18e728d88499e89863c82aa12ab0372e472a22e6da2a26",
+        "version": "2.1.332",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.332.tgz",
+        "sha256": "1c89f2f1e0bee93742cff8de9181fc07c702ce0651f1492bb3b97487d3a84af1",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2971,9 +2971,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.1.331",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.331.tgz",
-        "sha256": "9e8036c849972477264dc46409143f5c0746be59716221fc1a58314af0e02f4b",
+        "version": "2.1.332",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.332.tgz",
+        "sha256": "171a15f1192f411094f606a6602d11617e20d69984733ded2a79e85d9f5cc236",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2985,9 +2985,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.1.331",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.331.tgz",
-        "sha256": "a0f561a243a729a6c25e8ac0c55487654e299ef6ad46c900a74251fc1438b0a6",
+        "version": "2.1.332",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.332.tgz",
+        "sha256": "69362d15b1d9817a1b346b65be57e901ce581a1119a2cf1cf9ca448b62ed1f66",
         "format": "tar.gz",
         "commands": {
           "claude": "claude.exe"

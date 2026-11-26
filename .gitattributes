@@ -17,6 +17,8 @@ zshrc   text eol=lf
 *.ps1   text eol=lf
 *.bat   text eol=lf
 *.cmd   text eol=lf
+git/hooks/*     text eol=lf
+scripts/hooks/* text eol=lf
 
 # gofmt and embedded manifest bytes must be identical on Windows checkouts.
 installer/** text=auto eol=lf

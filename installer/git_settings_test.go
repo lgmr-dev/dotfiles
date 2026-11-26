@@ -253,15 +253,17 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	if setting("user.useConfigOnly") != "true" || setting("core.hooksPath") == "unset" || !ready() {
 		t.Fatal("the selection did not set a ready identity rule and hooks path")
 	}
-	guard := filepath.Join(filepath.Dir(source), "hooks", "guard")
-	if err := os.Rename(guard, guard+".moved"); err != nil {
-		t.Fatal(err)
-	}
-	if ready() {
-		t.Fatal("check accepted a guard whose hooks are missing")
-	}
-	if err := os.Rename(guard+".moved", guard); err != nil {
-		t.Fatal(err)
+	for _, name := range []string{"guard", "pre-commit", "pre-push"} {
+		hook := filepath.Join(filepath.Dir(source), "hooks", name)
+		if err := os.Rename(hook, hook+".moved"); err != nil {
+			t.Fatal(err)
+		}
+		if ready() {
+			t.Fatal("check accepted a guard without its hook", name)
+		}
+		if err := os.Rename(hook+".moved", hook); err != nil {
+			t.Fatal(err)
+		}
 	}
 	remote, clone := filepath.Join(c.Home, "remote.git"), filepath.Join(c.Home, "clone")
 	gitSettingsCommand(t, c.Home, c.Home, "init", "--bare", "--initial-branch=main", remote)
@@ -283,21 +285,35 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	if input, err := os.ReadFile(pushed); err != nil || !strings.Contains(string(input), "refs/heads/main") {
 		t.Fatal("the own pre-push hook did not get the pushed refs", string(input), err)
 	}
-	for name, args := range map[string][]string{
-		"personal author":  {"-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "personal"},
-		"personal trailer": {"commit", "--allow-empty", "-m", "public\n\nSigned-off-by: A <" + personal + ">"},
+	for _, step := range []struct {
+		name, address string
+		args          []string
+	}{
+		{"personal author", personal, []string{"-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "personal"}},
+		{"personal trailer", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nSigned-off-by: A <" + personal + ">"}},
+		{"bare upper-case trailer", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nSIGNED-OFF-BY: " + personal}},
+		{"trailer with two addresses", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nSigned-off-by: A <" + personal + "> <noreply@anthropic.com>"}},
+		{"personal author name", "fixture@example.invalid", []string{"commit", "--allow-empty", "--author", "A " + personal + " <fixture@example.invalid>", "-m", "public"}},
 	} {
-		address := "fixture@example.invalid"
-		if name == "personal author" {
-			address = personal
-		}
-		if output, err := gitSettingsRun(c.Home, clone, address, args...); err != nil {
-			t.Fatal("a commit before the push failed", name, output, err)
+		if output, err := gitSettingsRun(c.Home, clone, step.address, step.args...); err != nil {
+			t.Fatal("a commit before the push failed", step.name, output, err)
 		}
 		if output, err := gitSettingsRun(c.Home, clone, "fixture@example.invalid", "push", "origin", "main"); err == nil || !strings.Contains(output, "Git privacy guard") {
-			t.Fatal("the guard pushed a commit with a", name, output)
+			t.Fatal("the guard pushed a commit with a", step.name, output)
 		}
 		gitSettingsCommand(t, c.Home, clone, "reset", "--hard", "origin/main")
+	}
+	if output, err := gitSettingsRun(c.Home, clone, personal, "tag", "-a", "inner", "-m", "inner"); err != nil {
+		t.Fatal(output, err)
+	}
+	gitSettingsCommand(t, c.Home, clone, "tag", "-a", "outer", "inner", "-m", "outer")
+	if output, err := gitSettingsRun(c.Home, clone, "fixture@example.invalid", "push", "origin", "outer"); err == nil || !strings.Contains(output, "Git privacy guard") {
+		t.Fatal("the guard pushed a tag of a tag", output)
+	}
+	scratch := filepath.Join(c.Home, "scratch")
+	gitSettingsCommand(t, c.Home, c.Home, "init", scratch)
+	if output, err := gitSettingsRun(c.Home, scratch, personal, "commit", "--allow-empty", "-m", "local"); err != nil {
+		t.Fatal("the guard stopped a commit in a clone without a remote", output, err)
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
 	if setting("user.useConfigOnly") != "unset" || setting("core.hooksPath") != "unset" {

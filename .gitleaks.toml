@@ -4,7 +4,7 @@ useDefault = true
 [[rules]]
 id = "home-folder-path"
 description = "A path in a user home folder"
-regex = '''([a-zA-Z][a-zA-Z0-9+.-]*://[^/\s]+\S*)?(/(?i:users)/|/home/|/root/|[a-zA-Z]:\\{1,2}(?i:users)\\{1,2})[\p{L}\p{N}._-]+'''
+regex = '''(https?://[^/\s"',;<>()\\]+[^\s"',;<>()\\]*)?(/(?i:users)/|/home/|/root/|([a-zA-Z]:)?\\{1,2}(?i:users)\\{1,2})[\p{L}\p{N}._-]+'''
 
 [[rules.allowlists]]
 description = "The synthetic home folders of tests, fixtures and CI runners"
@@ -14,4 +14,4 @@ regexes = ['''(?i)[/\\](user|bob|runner|dotfiles-migration)$''']
 [[rules.allowlists]]
 description = "A web URL with a home-like path"
 regexTarget = "match"
-regexes = ['''^[A-Za-z][A-Za-z0-9+.-]*://[^/]''']
+regexes = ['''^https?://[^/]''']

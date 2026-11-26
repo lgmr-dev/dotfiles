@@ -2,33 +2,45 @@
 set -eu
 hook=$1
 shift
-public='^([^@[:space:]]+@users\.noreply\.github\.com|git@[A-Za-z0-9.-]+|(noreply|support)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([A-Za-z0-9-]+\.)*(example|invalid|test|localhost))$'
+public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
+email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
 zero=0000000000000000000000000000000000000000
 hint=
 
+refuse() {
+  echo "Git privacy guard: $1.$hint" >&2
+  echo "To allow other addresses in one repository, for example a work repository or a fork, run: git config core.hooksPath .git/hooks" >&2
+  exit 1
+}
+
 check_address() {
-  if ! printf '%s\n' "$2" | grep -qE "$public"; then
-    echo "Git privacy guard: $1 uses an address that is not public. Set user.email to your GitHub noreply address.$hint" >&2
-    echo "To allow other addresses in one repository, for example a work repository or a fork, run: git config core.hooksPath .git/hooks" >&2
-    exit 1
+  if ! printf '%s\n' "$2" | tr '[:upper:]' '[:lower:]' | grep -qE "$public"; then
+    refuse "$1 uses an address that is not public. Set user.email to your GitHub noreply address"
   fi
+}
+
+check_words() {
+  for word in $(printf '%s\n' "$2" | grep -oE "$email" || true); do
+    check_address "$1" "$word"
+  done
 }
 
 input=
 case "$hook" in
   pre-commit)
-    for ident in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
-      value=$(git var "$ident")
-      check_address "$ident" "$(printf '%s\n' "$value" | sed -n 's/.*<\(.*\)>.*/\1/p')"
-    done
+    if [ -n "$(git remote)" ]; then
+      for ident in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+        value=$(git var "$ident")
+        check_address "$ident" "$(printf '%s\n' "$value" | sed -n 's/.*<\(.*\)>.*/\1/p')"
+      done
+    fi
     ;;
   pre-push)
     input=$(cat)
     remote=$(git ls-remote "$2" 'refs/heads/*' 'refs/tags/*')
     found=$(printf '%s\n' "$remote" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)')
-    published=$(printf '%s\n' "$found" | grep -v ' missing$' || true)
     if printf '%s\n' "$found" | grep -q ' missing$'; then
-      hint=" If the remote has commits that this clone lacks, run git fetch first."
+      hint=" If the remote has commits that this clone lacks, run git fetch first"
     fi
     while read -r _ local_sha _ _; do
       if [ -z "$local_sha" ] || [ "$local_sha" = "$zero" ]; then
@@ -36,18 +48,27 @@ case "$hook" in
       fi
       if [ "$(git cat-file -t "$local_sha")" = tag ]; then
         header=$(git cat-file tag "$local_sha" | sed '/^$/q')
+        if [ "$(printf '%s\n' "$header" | sed -n 's/^type //p')" != commit ]; then
+          refuse "tag $local_sha does not point to a commit"
+        fi
         check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
+        check_words "the tagger name of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger \(.*\) <.*/\1/p')"
       fi
-      # shellcheck disable=SC2086
-      people=$(git log --format='@ %h%n= %ae%n= %ce%n%(trailers:only,unfold)' "$local_sha" --not $published)
+      people=$({
+        echo "$local_sha"
+        printf '%s\n' "$found" | sed -n '/ missing$/d; s/^\(.\)/^\1/p'
+      } | git log --stdin --format='@ %h%n= %ae%n= %ce%n+ %an%n+ %cn%n%(trailers:only,unfold)')
       commit=
       while read -r first rest; do
         case "$first" in
           @) commit=$rest ;;
           =) check_address "commit $commit" "$rest" ;;
-          *-[Bb]y:)
-            address=$(printf '%s\n' "$rest" | sed -n 's/.*<\(.*\)>.*/\1/p')
-            [ -z "$address" ] || check_address "a trailer of commit $commit" "$address"
+          +) check_words "an identity name of commit $commit" "$rest" ;;
+          *-[Bb][Yy]:)
+            for address in $(printf '%s\n' "$rest" | sed -n 's/.*<\(.*\)>.*/\1/p'); do
+              check_address "a trailer of commit $commit" "$address"
+            done
+            check_words "a trailer of commit $commit" "$rest"
             ;;
         esac
       done <<PEOPLE

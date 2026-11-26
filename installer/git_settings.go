@@ -69,8 +69,16 @@ func gitPrivacyGuardReady(d *ProfileDriver) error {
 	if !d.GitPrivacyGuard {
 		return nil
 	}
-	_, err := os.Stat(filepath.Join(filepath.Dir(d.GitDefaults), "hooks", "guard"))
-	return err
+	for _, name := range []string{"guard", "pre-commit", "pre-push"} {
+		info, err := os.Stat(filepath.Join(filepath.Dir(d.GitDefaults), "hooks", name))
+		if err != nil {
+			return err
+		}
+		if !d.Windows && info.Mode().Perm()&0o111 == 0 {
+			return errors.New(name + " is not executable")
+		}
+	}
+	return nil
 }
 
 func blockGitCheckoutOverlap(d *ProfileDriver, target string) {

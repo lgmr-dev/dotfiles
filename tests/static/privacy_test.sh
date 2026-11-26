@@ -55,6 +55,11 @@ file_case stop "a Windows home path without a drive" "\\$u\\alice\\secret"
 file_case stop "a home path after a URL in a table" "|https://a.example/x|/$h/alice/k|"
 file_case stop "a home folder in a WSL share" "\\\\wsl\$\\Ubuntu\\$h\\alice"
 file_case pass "an upper-case web URL with a home-like path" "HTTPS://github.com/o/r/blob/main/root/README"
+printf '\xff\xfe' > utf16.txt
+printf 'p=/%s/alice/x\r\n' "$h" | iconv -f UTF-8 -t UTF-16LE >> utf16.txt
+git add utf16.txt
+expect stop "a UTF-16 file with a home path" as "$noreply" "" git commit -q -m utf16
+git reset -q --hard origin/main
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"

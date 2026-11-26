@@ -293,7 +293,9 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 		{"personal trailer", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nSigned-off-by: A <" + personal + ">"}},
 		{"bare upper-case trailer", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nSIGNED-OFF-BY: " + personal}},
 		{"trailer with two addresses", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nSigned-off-by: A <" + personal + "> <noreply@anthropic.com>"}},
-		{"personal author name", "fixture@example.invalid", []string{"commit", "--allow-empty", "--author", "A " + personal + " <fixture@example.invalid>", "-m", "public"}},
+		{"personal author name", "fixture@example.invalid", []string{"-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "--author", "A " + personal + " <fixture@example.invalid>", "-m", "public"}},
+		{"personal Cc trailer", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nCc: A <" + personal + ">"}},
+		{"personal address in the body", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nAsk " + personal + " for details."}},
 	} {
 		if output, err := gitSettingsRun(c.Home, clone, step.address, step.args...); err != nil {
 			t.Fatal("a commit before the push failed", step.name, output, err)
@@ -303,6 +305,25 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 		}
 		gitSettingsCommand(t, c.Home, clone, "reset", "--hard", "origin/main")
 	}
+	refused := func(name string, args ...string) {
+		t.Helper()
+		if output, err := gitSettingsRun(c.Home, clone, "fixture@example.invalid", args...); err == nil || !strings.Contains(output, "Git privacy guard") {
+			t.Fatal("the guard pushed", name, output)
+		}
+	}
+	refused("a personal ref name", "push", "origin", "HEAD:refs/heads/"+personal)
+	gitSettingsCommand(t, c.Home, clone, "tag", "-a", "noted", "-m", "Ask "+personal)
+	refused("a personal tag message", "push", "origin", "noted")
+	gitSettingsCommand(t, c.Home, clone, "tag", "tree", "HEAD^{tree}")
+	refused("a tag of a tree", "push", "origin", "tree")
+	if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "replaced"); err != nil {
+		t.Fatal(output, err)
+	}
+	clean := gitSettingsCommand(t, c.Home, clone, "commit-tree", "HEAD^{tree}", "-p", "HEAD~1", "-m", "replaced")
+	gitSettingsCommand(t, c.Home, clone, "replace", "HEAD", clean)
+	refused("a commit behind a replacement object", "push", "origin", "HEAD:refs/heads/replaced")
+	gitSettingsCommand(t, c.Home, clone, "replace", "-d", "HEAD")
+	gitSettingsCommand(t, c.Home, clone, "reset", "--hard", "origin/main")
 	if output, err := gitSettingsRun(c.Home, clone, personal, "tag", "-a", "inner", "-m", "inner"); err != nil {
 		t.Fatal(output, err)
 	}

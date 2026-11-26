@@ -1,26 +1,30 @@
 #!/bin/sh
 set -eu
+export GIT_NO_REPLACE_OBJECTS=1
 hook=$1
 shift
-public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
+public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
 email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
+ssh_remote='git@[A-Za-z0-9.-]+[:/][^][:space:]"'"'"',;<>()|`{}[]*'
 zero=0000000000000000000000000000000000000000
 hint=
 
 refuse() {
   echo "Git privacy guard: $1.$hint" >&2
-  echo "To allow other addresses in one repository, for example a work repository or a fork, run: git config core.hooksPath .git/hooks" >&2
+  echo "To allow other addresses in one repository, for example a work repository or a fork, run in it:" >&2
+  echo "  git config core.hooksPath \"$(git rev-parse --path-format=absolute --git-common-dir)/hooks\"" >&2
   exit 1
 }
 
 check_address() {
   if ! printf '%s\n' "$2" | tr '[:upper:]' '[:lower:]' | grep -qE "$public"; then
-    refuse "$1 uses an address that is not public. Set user.email to your GitHub noreply address"
+    refuse "$1 holds an address that is not public. Use your GitHub noreply address"
   fi
 }
 
-check_words() {
-  for word in $(printf '%s\n' "$2" | grep -oE "$email" || true); do
+check_text() {
+  text=$(printf '%s\n' "$2" | sed -E "s#$ssh_remote##g")
+  for word in $(printf '%s\n' "$text" | grep -oE "$email" || true) $(printf '%s\n' "$text" | sed -n 's/^[A-Za-z-]*:.*<\([^>]*@[^>]*\)>.*/\1/p'); do
     check_address "$1" "$word"
   done
 }
@@ -32,6 +36,7 @@ case "$hook" in
       for ident in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
         value=$(git var "$ident")
         check_address "$ident" "$(printf '%s\n' "$value" | sed -n 's/.*<\(.*\)>.*/\1/p')"
+        check_text "the name of $ident" "$(printf '%s\n' "$value" | sed -n 's/ <.*//p')"
       done
     fi
     ;;
@@ -42,38 +47,34 @@ case "$hook" in
     if printf '%s\n' "$found" | grep -q ' missing$'; then
       hint=" If the remote has commits that this clone lacks, run git fetch first"
     fi
-    while read -r _ local_sha _ _; do
+    while read -r _ local_sha remote_ref _; do
       if [ -z "$local_sha" ] || [ "$local_sha" = "$zero" ]; then
         continue
       fi
-      if [ "$(git cat-file -t "$local_sha")" = tag ]; then
-        header=$(git cat-file tag "$local_sha" | sed '/^$/q')
-        if [ "$(printf '%s\n' "$header" | sed -n 's/^type //p')" != commit ]; then
-          refuse "tag $local_sha does not point to a commit"
-        fi
-        check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
-        check_words "the tagger name of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger \(.*\) <.*/\1/p')"
-      fi
-      people=$({
+      check_text "the ref name $remote_ref" "$remote_ref"
+      case "$(git cat-file -t "$local_sha")" in
+        commit) ;;
+        tag)
+          tag=$(git cat-file tag "$local_sha")
+          header=$(printf '%s\n' "$tag" | sed '/^$/q')
+          if [ "$(printf '%s\n' "$header" | sed -n 's/^type //p')" != commit ]; then
+            refuse "tag $local_sha does not point to a commit"
+          fi
+          check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
+          check_text "tag $local_sha" "$(printf '%s\n' "$tag" | sed -n 's/^tagger \(.*\) <.*/\1/p'; printf '%s\n' "$tag" | sed '1,/^$/d')"
+          ;;
+        *) refuse "$remote_ref does not point to a commit" ;;
+      esac
+      commits=$({
         echo "$local_sha"
         printf '%s\n' "$found" | sed -n '/ missing$/d; s/^\(.\)/^\1/p'
-      } | git log --stdin --format='@ %h%n= %ae%n= %ce%n+ %an%n+ %cn%n%(trailers:only,unfold)')
-      commit=
-      while read -r first rest; do
-        case "$first" in
-          @) commit=$rest ;;
-          =) check_address "commit $commit" "$rest" ;;
-          +) check_words "an identity name of commit $commit" "$rest" ;;
-          *-[Bb][Yy]:)
-            for address in $(printf '%s\n' "$rest" | sed -n 's/.*<\(.*\)>.*/\1/p'); do
-              check_address "a trailer of commit $commit" "$address"
-            done
-            check_words "a trailer of commit $commit" "$rest"
-            ;;
-        esac
-      done <<PEOPLE
-$people
-PEOPLE
+      } | git rev-list --stdin)
+      for commit in $commits; do
+        short=$(git rev-parse --short "$commit")
+        check_address "the author of commit $short" "$(git log -1 --format=%ae "$commit")"
+        check_address "the committer of commit $short" "$(git log -1 --format=%ce "$commit")"
+        check_text "commit $short" "$(git log -1 --format='%an%n%cn%n%B' "$commit")"
+      done
     done <<INPUT
 $input
 INPUT

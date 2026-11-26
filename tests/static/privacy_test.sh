@@ -52,6 +52,9 @@ file_case stop "a personal mailbox" "Alice${at}Gmail.com"
 file_case stop "a home path after a URL in minified JSON" "{\"u\":\"https://a.example/x\",\"p\":\"/$h/alice/.ssh\"}"
 file_case stop "a file URL with a host" "file://localhost/$h/alice/x"
 file_case stop "a Windows home path without a drive" "\\$u\\alice\\secret"
+file_case stop "a home path after a URL in a table" "|https://a.example/x|/$h/alice/k|"
+file_case stop "a home folder in a WSL share" "\\\\wsl\$\\Ubuntu\\$h\\alice"
+file_case pass "an upper-case web URL with a home-like path" "HTTPS://github.com/o/r/blob/main/root/README"
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"
@@ -71,6 +74,9 @@ push_case pass "an SSH remote in a message" "$noreply" "Push to git${at}github.c
 push_case pass "an upper-case noreply domain" "1+a${at}USERS.NOREPLY.GITHUB.COM" x
 push_case stop "a git author on a private domain" "git${at}corp-mail.net" x
 push_case stop "a bare upper-case sign-off" "$noreply" $'x\n\nSIGNED-OFF-BY: '"$personal"
+push_case pass "an ssh URL in a message" "$noreply" "Clone ssh://git${at}github.com/o/r.git"
+push_case stop "a personal address after an SSH remote and a comma" "$noreply" "See git${at}github.com:o/r.git,$personal"
+push_case pass "a generic type in a trailer" "$noreply" $'x\n\nCaused-by: List<String> change'
 push_case stop "a personal address in a ref name" "$noreply" x "refs/heads/$personal"
 
 as "$noreply" "" git tag -a v1 -m $'notes\ntype tree'

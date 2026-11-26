@@ -199,19 +199,21 @@ immediately.
 = true` and a global `core.hooksPath` to the `git/hooks` folder of the
 checkout. Git then never guesses a name or address from your account and host
 name. In a clone with a remote, the guard stops a commit when the author or
-committer address is not public. Before a push, it checks the addresses and
-names of the author, committer, `-by:` trailers and tagger of each commit and
-tag that the remote does not have yet. Public addresses are GitHub noreply
-addresses, the noreply addresses of GitHub, Anthropic and OpenAI, and the
-reserved example domains. Check reports the guard as broken when a hook file
-in `git/hooks` is missing.
+committer is not public. Before a push, it checks each commit and tag that the
+remote does not have yet: the author, committer and tagger, their names, the
+whole message and the branch or tag name. Public addresses are GitHub noreply
+addresses, the noreply addresses of GitHub, Anthropic and OpenAI, the GitHub
+web-flow committer and the reserved example domains.
 
 After its check, the guard runs the hook of the same name in `.git/hooks`.
-Git does not run `.git/hooks/reference-transaction` or `post-index-change`
-while the guard is on. A repository that sets its own `core.hooksPath`, for
-example with `make hooks`, uses only its own hooks. To allow other addresses in
-one repository, for example a work repository or a fork with commits of other
-people, run `git config core.hooksPath .git/hooks` in it.
+Git does not run `.git/hooks/reference-transaction`, `post-index-change` or
+`fsmonitor-watchman` while the guard is on. Check reports the guard as broken
+when `guard`, `pre-commit` or `pre-push` is missing from `git/hooks`. A
+repository that sets its own `core.hooksPath`, for example with `make hooks`,
+uses only its own hooks. To allow other addresses in one repository, for
+example a work repository or a fork with commits of other people, run the
+command that the guard prints. It sets `core.hooksPath` to the absolute path
+of the `hooks` folder of that repository, so linked worktrees keep their hooks.
 
 `git lfs install` cannot write its hooks while the guard is on. In a
 repository with Git LFS, run `git -c core.hooksPath=.git/hooks lfs install

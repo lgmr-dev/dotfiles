@@ -261,6 +261,15 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 		if ready() {
 			t.Fatal("check accepted a guard without its hook", name)
 		}
+		if err := os.Mkdir(hook, 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if ready() {
+			t.Fatal("check accepted a folder in place of the hook", name)
+		}
+		if err := os.Remove(hook); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.Rename(hook+".moved", hook); err != nil {
 			t.Fatal(err)
 		}
@@ -314,6 +323,9 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	refused("a personal ref name", "push", "origin", "HEAD:refs/heads/"+personal)
 	gitSettingsCommand(t, c.Home, clone, "tag", "-a", "noted", "-m", "Ask "+personal)
 	refused("a personal tag message", "push", "origin", "noted")
+	gitSettingsCommand(t, c.Home, clone, "tag", "-a", personal, "-m", "release")
+	gitSettingsCommand(t, c.Home, clone, "tag", "renamed", personal)
+	refused("a renamed tag with a personal name", "push", "origin", "renamed")
 	gitSettingsCommand(t, c.Home, clone, "tag", "tree", "HEAD^{tree}")
 	refused("a tag of a tree", "push", "origin", "tree")
 	if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "replaced"); err != nil {

@@ -74,6 +74,9 @@ func gitPrivacyGuardReady(d *ProfileDriver) error {
 		if err != nil {
 			return err
 		}
+		if !info.Mode().IsRegular() {
+			return errors.New(name + " is not a regular file")
+		}
 		if !d.Windows && info.Mode().Perm()&0o111 == 0 {
 			return errors.New(name + " is not executable")
 		}

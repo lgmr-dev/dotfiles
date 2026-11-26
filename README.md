@@ -206,8 +206,8 @@ addresses, the noreply addresses of GitHub, Anthropic and OpenAI, the GitHub
 web-flow committer and the reserved example domains.
 
 After its check, the guard runs the hook of the same name in `.git/hooks`.
-Git does not run `.git/hooks/reference-transaction`, `post-index-change` or
-`fsmonitor-watchman` while the guard is on. Check reports the guard as broken
+Git does not run `.git/hooks/reference-transaction`, `post-index-change`,
+`fsmonitor-watchman` or `push-to-checkout` while the guard is on. Check reports the guard as broken
 when `guard`, `pre-commit` or `pre-push` is missing from `git/hooks`. A
 repository that sets its own `core.hooksPath`, for example with `make hooks`,
 uses only its own hooks. To allow other addresses in one repository, for
@@ -216,8 +216,13 @@ command that the guard prints. It sets `core.hooksPath` to the absolute path
 of the `hooks` folder of that repository, so linked worktrees keep their hooks.
 
 `git lfs install` cannot write its hooks while the guard is on. In a
-repository with Git LFS, run `git -c core.hooksPath=.git/hooks lfs install
---local` one time. The guard then runs the LFS hooks after its check.
+repository with Git LFS, run this command one time. The guard then runs the LFS
+hooks after its check.
+
+```sh
+git -c core.hooksPath="$(git rev-parse --path-format=absolute --git-common-dir)/hooks" lfs install --local
+```
+
 `pre-commit install` refuses to work while a `core.hooksPath` is set.
 
 **Lint and benchmark tools** is optional for contributors to this dotfiles

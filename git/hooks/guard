@@ -3,9 +3,9 @@ set -eu
 export GIT_NO_REPLACE_OBJECTS=1
 hook=$1
 shift
-public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
+public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
 email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
-ssh_remote='git@[A-Za-z0-9.-]+[:/][^][:space:]"'"'"',;<>()|`{}[]*'
+ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
 zero=0000000000000000000000000000000000000000
 hint=
 
@@ -24,7 +24,7 @@ check_address() {
 
 check_text() {
   text=$(printf '%s\n' "$2" | sed -E "s#$ssh_remote##g")
-  for word in $(printf '%s\n' "$text" | grep -oE "$email" || true) $(printf '%s\n' "$text" | sed -n 's/^[A-Za-z-]*:.*<\([^>]*@[^>]*\)>.*/\1/p'); do
+  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -vE '@v?[0-9]+\.[0-9]' || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]+:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
     check_address "$1" "$word"
   done
 }
@@ -51,7 +51,7 @@ case "$hook" in
       if [ -z "$local_sha" ] || [ "$local_sha" = "$zero" ]; then
         continue
       fi
-      check_text "the ref name $remote_ref" "$remote_ref"
+      check_text "a pushed ref name" "$remote_ref"
       case "$(git cat-file -t "$local_sha")" in
         commit) ;;
         tag)
@@ -61,9 +61,9 @@ case "$hook" in
             refuse "tag $local_sha does not point to a commit"
           fi
           check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
-          check_text "tag $local_sha" "$(printf '%s\n' "$tag" | sed -n 's/^tagger \(.*\) <.*/\1/p'; printf '%s\n' "$tag" | sed '1,/^$/d')"
+          check_text "tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tag //p; s/^tagger \(.*\) <.*/\1/p'; printf '%s\n' "$tag" | sed '1,/^$/d')"
           ;;
-        *) refuse "$remote_ref does not point to a commit" ;;
+        *) refuse "a pushed ref does not point to a commit" ;;
       esac
       commits=$({
         echo "$local_sha"

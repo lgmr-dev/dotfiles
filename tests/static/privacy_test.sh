@@ -77,7 +77,19 @@ push_case stop "a bare upper-case sign-off" "$noreply" $'x\n\nSIGNED-OFF-BY: '"$
 push_case pass "an ssh URL in a message" "$noreply" "Clone ssh://git${at}github.com/o/r.git"
 push_case stop "a personal address after an SSH remote and a comma" "$noreply" "See git${at}github.com:o/r.git,$personal"
 push_case pass "a generic type in a trailer" "$noreply" $'x\n\nCaused-by: List<String> change'
+push_case stop "a personal address that ends in -git before a colon" "$noreply" "Ask team-git${at}corp-mail.net: now"
+push_case stop "two angle values in a sign-off" "$noreply" $'x\n\nSigned-off-by: A <alice'"${at}"'myhost> <'"$noreply"'>'
+push_case pass "a pre-release package version" "$noreply" "bump pkg${at}v1.0.0-rc.alpha"
 push_case stop "a personal address in a ref name" "$noreply" x "refs/heads/$personal"
+
+printf '%s\n' "/$h/alice" > f.txt
+git add f.txt
+listing="$({ scripts/privacy.sh index 2>&1 || true; } | sed -n 's/.*list them with //p' | head -1)"
+if [[ "$(bash -c "$listing" 2>&1)" != f.txt:1:* ]]; then
+  echo "FAIL: the printed list command must run and name the file" >&2
+  failures=$((failures + 1))
+fi
+git reset -q --hard origin/main
 
 as "$noreply" "" git tag -a v1 -m $'notes\ntype tree'
 expect pass "a tag message with a header-like line" git push -q origin v1

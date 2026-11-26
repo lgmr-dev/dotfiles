@@ -2,13 +2,14 @@
 set -eu
 hook=$1
 shift
-public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|no-reply)@[A-Za-z0-9.-]+|[^@[:space:]]+@github\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([A-Za-z0-9-]+\.)*(example|invalid|test|localhost))$'
+public='^([^@[:space:]]+@users\.noreply\.github\.com|git@[A-Za-z0-9.-]+|(noreply|support)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([A-Za-z0-9-]+\.)*(example|invalid|test|localhost))$'
 zero=0000000000000000000000000000000000000000
+hint=
 
 check_address() {
   if ! printf '%s\n' "$2" | grep -qE "$public"; then
-    echo "Git privacy guard: $1 uses <$2>, which is not a public address." >&2
-    echo "Set user.email to your GitHub noreply address. To allow other addresses in one repository, run: git config core.hooksPath .git/hooks" >&2
+    echo "Git privacy guard: $1 uses an address that is not public. Set user.email to your GitHub noreply address.$hint" >&2
+    echo "To allow other addresses in one repository, for example a work repository or a fork, run: git config core.hooksPath .git/hooks" >&2
     exit 1
   fi
 }
@@ -24,24 +25,31 @@ case "$hook" in
   pre-push)
     input=$(cat)
     remote=$(git ls-remote "$2" 'refs/heads/*' 'refs/tags/*')
-    published=
-    for sha in $(printf '%s\n' "$remote" | cut -f1); do
-      if git cat-file -e "$sha^{commit}" 2>/dev/null; then
-        published="$published $sha"
-      fi
-    done
+    found=$(printf '%s\n' "$remote" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)')
+    published=$(printf '%s\n' "$found" | grep -v ' missing$' || true)
+    if printf '%s\n' "$found" | grep -q ' missing$'; then
+      hint=" If the remote has commits that this clone lacks, run git fetch first."
+    fi
     while read -r _ local_sha _ _; do
       if [ -z "$local_sha" ] || [ "$local_sha" = "$zero" ]; then
         continue
       fi
       if [ "$(git cat-file -t "$local_sha")" = tag ]; then
-        tag=$(git cat-file tag "$local_sha")
-        check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$tag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
+        header=$(git cat-file tag "$local_sha" | sed '/^$/q')
+        check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
       fi
       # shellcheck disable=SC2086
-      people=$(git log --format='%h %ae%n%h %ce' "$local_sha" --not $published)
-      while read -r commit address; do
-        [ -z "$commit" ] || check_address "commit $commit" "$address"
+      people=$(git log --format='@ %h%n= %ae%n= %ce%n%(trailers:only,unfold)' "$local_sha" --not $published)
+      commit=
+      while read -r first rest; do
+        case "$first" in
+          @) commit=$rest ;;
+          =) check_address "commit $commit" "$rest" ;;
+          *-[Bb]y:)
+            address=$(printf '%s\n' "$rest" | sed -n 's/.*<\(.*\)>.*/\1/p')
+            [ -z "$address" ] || check_address "a trailer of commit $commit" "$address"
+            ;;
+        esac
       done <<PEOPLE
 $people
 PEOPLE

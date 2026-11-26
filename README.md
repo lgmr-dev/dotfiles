@@ -199,15 +199,24 @@ immediately.
 = true` and a global `core.hooksPath` to the `git/hooks` folder of the
 checkout. Git then never guesses a name or address from your account and host
 name. Before a commit, the guard stops when the author or committer address is
-not public. Before a push, it does the same for each commit and tag that the
-remote does not have yet. Public addresses are GitHub noreply addresses,
-`noreply@` addresses, `@github.com` and the reserved example domains. After its
-check, the guard runs the hook of the same name in `.git/hooks`, so Git LFS and
-other local hooks keep working. A repository that sets its own
-`core.hooksPath`, for example with `make hooks`, uses only its own hooks.
-To allow another address in one repository, run
-`git config core.hooksPath .git/hooks` in it. `pre-commit install` refuses to
-work while a global `core.hooksPath` exists.
+not public. Before a push, it checks the author, committer, `-by:` trailers and
+tagger of each commit and tag that the remote does not have yet. Public
+addresses are GitHub noreply addresses, the noreply addresses of GitHub,
+Anthropic and OpenAI, `git@` SSH users and the reserved example domains.
+Check reports the guard as broken when the checkout has no `git/hooks`.
+
+After its check, the guard runs the hook of the same name in `.git/hooks`.
+Git does not run `.git/hooks/reference-transaction`, `post-index-change` or
+server hooks while the guard is on. A repository that sets its own
+`core.hooksPath`, for example with `make hooks`, uses only its own hooks. To
+allow other addresses in one repository, for example a work repository or a
+fork with commits of other people, run `git config core.hooksPath .git/hooks`
+in it.
+
+`git lfs install` cannot write its hooks while the guard is on. In a
+repository with Git LFS, run `git -c core.hooksPath=.git/hooks lfs install
+--local` one time. The guard then runs the LFS hooks after its check.
+`pre-commit install` refuses to work while a `core.hooksPath` is set.
 
 **Lint and benchmark tools** is optional for contributors to this dotfiles
 repository. It supplies ShellCheck, jq, Hyperfine, Taplo, yamllint and
@@ -1177,9 +1186,11 @@ recovery. A local unit pass is not proof of a fresh machine installation.
 Do not enable destructive native package fixtures on an everyday workstation.
 
 Run `make hooks` once in each clone. Before a commit, `scripts/privacy.sh`
-stops on a home folder path or a symbolic link. Before a push, it also stops on
-a personal address in an author, committer, trailer or tag, and on history with
-another root commit. CI runs the same check on the commits of each pull request.
+stops on a home folder path, a symbolic link or the address of a personal
+mailbox in a file. Before a push, it checks only the commits that the remote
+does not have. It stops on a personal address in an author, committer, trailer,
+tag or branch name, and on history with another root commit. CI runs the same
+check on the commits of each pull request.
 
 [CLAUDE.md](CLAUDE.md) is the coding guide. [Release maintenance](docs/RELEASING.md) defines
 publication evidence and review gates. The machine JSON entrypoint exists for

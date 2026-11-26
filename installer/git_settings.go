@@ -65,6 +65,14 @@ func gitIncludeScript(source string, attributionOff, privacyGuard bool) string {
 	return script
 }
 
+func gitPrivacyGuardReady(d *ProfileDriver) error {
+	if !d.GitPrivacyGuard {
+		return nil
+	}
+	_, err := os.Stat(filepath.Join(filepath.Dir(d.GitDefaults), "hooks", "guard"))
+	return err
+}
+
 func blockGitCheckoutOverlap(d *ProfileDriver, target string) {
 	repository := filepath.Dir(filepath.Dir(d.GitDefaults))
 	if relative, err := filepath.Rel(repository, target); err == nil && (relative == "." || filepath.IsLocal(relative)) {

@@ -59,6 +59,7 @@ printf '\xff\xfe' > größe.txt
 printf 'p=/%s/alice/x\r\n' "$h" | iconv -f UTF-8 -t UTF-16LE >> größe.txt
 git add größe.txt
 expect stop "a UTF-16 file with a home path" as "$noreply" "" git commit -q -m utf16
+expect stop "a UTF-16 file under a fixed-string grep setting" as "$noreply" "" git -c grep.patternType=fixed commit -q -m utf16
 git reset -q --hard origin/main
 file_case stop "a file URL with an encoded name" "file:///$h/%C3%A9lise/x"
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"

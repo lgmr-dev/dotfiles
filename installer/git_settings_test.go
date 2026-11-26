@@ -360,6 +360,18 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	if output, err := gitSettingsRun(c.Home, clone, "fixture@example.invalid", "push", "origin", "outer"); err == nil || !strings.Contains(output, "Git privacy guard") {
 		t.Fatal("the guard pushed a tag of a tag", output)
 	}
+	gitSettingsCommand(t, c.Home, clone, "checkout", "-q", "main")
+	if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "published personal"); err != nil {
+		t.Fatal(output, err)
+	}
+	gitSettingsCommand(t, c.Home, clone, "-c", "core.hooksPath=.git/hooks", "push", "origin", "main")
+	other := filepath.Join(c.Home, "other")
+	gitSettingsCommand(t, c.Home, c.Home, "clone", remote, other)
+	gitSettingsCommand(t, c.Home, other, "commit", "--allow-empty", "-m", "moved")
+	gitSettingsCommand(t, c.Home, other, "push", "origin", "main")
+	gitSettingsCommand(t, c.Home, clone, "checkout", "-q", "-b", "stale", "main")
+	gitSettingsCommand(t, c.Home, clone, "commit", "--allow-empty", "-m", "stale")
+	gitSettingsCommand(t, c.Home, clone, "push", "origin", "HEAD:refs/heads/stale")
 	scratch := filepath.Join(c.Home, "scratch")
 	gitSettingsCommand(t, c.Home, c.Home, "init", scratch)
 	if output, err := gitSettingsRun(c.Home, scratch, personal, "commit", "--allow-empty", "-m", "local"); err != nil {

@@ -46,6 +46,10 @@ case "$hook" in
     remote=$(git ls-remote "$2" 'refs/heads/*' 'refs/tags/*')
     found=$(printf '%s\n' "$remote" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)')
     if printf '%s\n' "$found" | grep -q ' missing$'; then
+      default=$(git ls-remote --symref "$2" HEAD | sed -n 's#^ref: \(refs/heads/[^[:space:]]*\)[[:space:]]*HEAD$#\1#p')
+      if [ -n "$default" ] && git fetch -q --no-write-fetch-head "$2" "$default"; then
+        found=$(printf '%s\n' "$remote" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)')
+      fi
       hint=" If the remote has commits that this clone lacks, run git fetch first"
     fi
     while read -r _ local_sha remote_ref _; do

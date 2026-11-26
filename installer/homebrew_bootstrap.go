@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const homebrewBootstrapCommit = "c9c975046f78e6e6d662deb801bd461ebd6a54ed"
+const homebrewBootstrapCommit = "870ddff5dbe61d293a8b4a763090d125e59048a1"
 const homebrewBootstrapSHA256 = "8fd2f1a5287a7c2e3d7362924c677edcc04c5a0e16448c77132d056bc88cf1ed"
 const homebrewBootstrapURL = "https://raw.githubusercontent.com/Homebrew/install/" + homebrewBootstrapCommit + "/install.sh"
 

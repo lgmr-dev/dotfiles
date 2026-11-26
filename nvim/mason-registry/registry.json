@@ -561,7 +561,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.12.0",
+      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.14.1",
       "asset": {
         "file": "salesforcedx-vscode-apex-{{ version | strip_prefix \"v\" }}.vsix"
       }
@@ -1494,7 +1494,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/kitagry/bqls@v0.8.7",
+      "id": "pkg:github/kitagry/bqls@v0.8.8",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -2275,7 +2275,7 @@
     "languages": [],
     "categories": [],
     "source": {
-      "id": "pkg:npm/@agentclientprotocol/claude-agent-acp@0.109.0"
+      "id": "pkg:npm/@agentclientprotocol/claude-agent-acp@0.109.1"
     },
     "bin": {
       "claude-agent-acp": "npm:claude-agent-acp"
@@ -2789,7 +2789,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/github/codeql-cli-binaries@v2.27.5",
+      "id": "pkg:github/github/codeql-cli-binaries@v2.27.6",
       "asset": [
         {
           "target": [
@@ -2846,7 +2846,7 @@
     "languages": [],
     "categories": [],
     "source": {
-      "id": "pkg:npm/@agentclientprotocol/codex-acp@2.8.0"
+      "id": "pkg:npm/@agentclientprotocol/codex-acp@2.9.0"
     },
     "bin": {
       "codex-acp": "npm:codex-acp"
@@ -3593,7 +3593,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:golang/cuelang.org/go@v0.17.1#cmd/cue"
+      "id": "pkg:golang/cuelang.org/go@v0.18.0#cmd/cue"
     },
     "bin": {
       "cue": "golang:cue"
@@ -4009,7 +4009,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:npm/devsense-php-ls@1.0.19523"
+      "id": "pkg:npm/devsense-php-ls@1.0.19556"
     },
     "bin": {
       "devsense-php-ls": "npm:devsense-php-ls"
@@ -4696,7 +4696,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:composer/symplify/easy-coding-standard@13.3.23"
+      "id": "pkg:composer/symplify/easy-coding-standard@13.3.25"
     },
     "bin": {
       "ecs": "composer:ecs"
@@ -9055,7 +9055,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:pypi/jupytext@1.19.6"
+      "id": "pkg:pypi/jupytext@1.19.7"
     },
     "bin": {
       "jupytext": "pypi:jupytext"
@@ -9075,7 +9075,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/terror/just-lsp@0.11.2",
+      "id": "pkg:github/terror/just-lsp@0.12.0",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -10141,7 +10141,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/ltex-plus/ltex-ls-plus@18.7.0",
+      "id": "pkg:github/ltex-plus/ltex-ls-plus@19.0.0",
       "asset": [
         {
           "target": "linux_arm64_gnu",
@@ -10747,7 +10747,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:npm/markdownlint-cli2@0.24.1"
+      "id": "pkg:npm/markdownlint-cli2@0.24.2"
     },
     "bin": {
       "markdownlint-cli2": "npm:markdownlint-cli2"
@@ -10768,7 +10768,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:npm/markdownlint-cli@0.50.0"
+      "id": "pkg:npm/markdownlint-cli@0.50.1"
     },
     "bin": {
       "markdownlint": "npm:markdownlint"
@@ -10806,7 +10806,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:npm/%40marko/language-server@3.6.0"
+      "id": "pkg:npm/%40marko/language-server@3.7.0"
     },
     "bin": {
       "marko-language-server": "npm:marko-language-server"
@@ -11323,7 +11323,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/mhersson/mpls@v0.23.0",
+      "id": "pkg:github/mhersson/mpls@v0.24.0",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -11762,7 +11762,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:golang/go.uber.org/nilaway@v0.0.0-20261112030514-ccd005690d1e#cmd/nilaway"
+      "id": "pkg:golang/go.uber.org/nilaway@v0.0.0-20261124161746-91ad9bf5d8e6#cmd/nilaway"
     },
     "bin": {
       "nilaway": "golang:nilaway"
@@ -13010,7 +13010,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/phpactor/phpactor@2026.10.07.0",
+      "id": "pkg:github/phpactor/phpactor@2026.11.22.0",
       "asset": {
         "file": "phpactor.phar"
       }
@@ -13036,7 +13036,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/PHPantom-dev/phpantom_lsp@0.11.1",
+      "id": "pkg:github/PHPantom-dev/phpantom_lsp@1.1.0",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -13539,7 +13539,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/jamesnvc/lsp_server@v3.18.1",
+      "id": "pkg:github/jamesnvc/lsp_server@v3.18.2",
       "supported_platforms": [
         "darwin",
         "linux"
@@ -13868,7 +13868,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:composer/vimeo/psalm@7.15.0"
+      "id": "pkg:composer/vimeo/psalm@7.18.0"
     },
     "bin": {
       "psalm": "composer:psalm",
@@ -14240,7 +14240,7 @@
       "Runtime"
     ],
     "source": {
-      "id": "pkg:pypi/pymobiledevice3@11.61.1"
+      "id": "pkg:pypi/pymobiledevice3@11.63.1"
     },
     "bin": {
       "pymobiledevice3": "pypi:pymobiledevice3"
@@ -15459,7 +15459,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/rvben/rumdl@v0.3.5",
+      "id": "pkg:github/rvben/rumdl@v0.3.6",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -15520,7 +15520,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/rust-lang/rust-analyzer@2026-11-16",
+      "id": "pkg:github/rust-lang/rust-analyzer@2026-11-23",
       "asset": [
         {
           "target": "linux_x64_gnu",
@@ -15584,7 +15584,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/rust-glancer/rust-glancer@v0.4.0",
+      "id": "pkg:github/rust-glancer/rust-glancer@v0.5.1",
       "asset": [
         {
           "target": "linux_x64_gnu",
@@ -16320,7 +16320,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/slint-ui/slint@v1.19.0",
+      "id": "pkg:github/slint-ui/slint@v1.19.1",
       "asset": [
         {
           "target": "linux_x64",
@@ -16943,7 +16943,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:gem/sorbet@0.6.13715",
+      "id": "pkg:gem/sorbet@0.6.13724",
       "supported_platforms": [
         "unix"
       ]
@@ -17074,7 +17074,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:npm/%40spyglassmc/language-server@0.4.70"
+      "id": "pkg:npm/%40spyglassmc/language-server@0.4.73"
     },
     "bin": {
       "spyglassmc-language-server": "npm:spyglassmc-language-server"
@@ -17097,7 +17097,7 @@
       "Formatter"
     ],
     "source": {
-      "id": "pkg:npm/sql-formatter@15.9.1"
+      "id": "pkg:npm/sql-formatter@15.10.0"
     },
     "bin": {
       "sql-formatter": "npm:sql-formatter"
@@ -17261,7 +17261,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:github/sbdchd/squawk@v2.73.0",
+      "id": "pkg:github/sbdchd/squawk@v2.74.0",
       "asset": [
         {
           "target": "darwin_x64",
@@ -17610,7 +17610,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:npm/stylelint@18.0.0"
+      "id": "pkg:npm/stylelint@18.1.0"
     },
     "bin": {
       "stylelint": "npm:stylelint"
@@ -18768,7 +18768,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:npm/textlint@16.1.1"
+      "id": "pkg:npm/textlint@16.1.2"
     },
     "bin": {
       "textlint": "npm:textlint"
@@ -19415,7 +19415,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:github/trufflesecurity/trufflehog@v3.100.0",
+      "id": "pkg:github/trufflesecurity/trufflehog@v3.100.1",
       "asset": [
         {
           "target": "darwin_x64",
@@ -19706,7 +19706,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:pypi/ty@0.0.107"
+      "id": "pkg:pypi/ty@0.0.109"
     },
     "bin": {
       "ty": "pypi:ty"
@@ -20084,7 +20084,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:github/daveshanley/vacuum@v0.42.2",
+      "id": "pkg:github/daveshanley/vacuum@v0.42.3",
       "asset": [
         {
           "target": "darwin_arm64",
@@ -20576,7 +20576,7 @@
       "LSP"
     ],
     "source": {
-      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.12.0",
+      "id": "pkg:github/forcedotcom/salesforcedx-vscode@v68.14.1",
       "asset": {
         "file": "salesforcedx-vscode-visualforce-{{ version | strip_prefix \"v\" }}.vsix"
       }
@@ -21611,7 +21611,7 @@
       "Linter"
     ],
     "source": {
-      "id": "pkg:pypi/zizmor@1.32.0"
+      "id": "pkg:pypi/zizmor@1.33.1"
     },
     "bin": {
       "zizmor": "pypi:zizmor"

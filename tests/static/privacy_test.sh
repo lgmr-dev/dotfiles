@@ -103,6 +103,15 @@ expect pass "a tag message with a header-like line" git push -q origin v1
 as "$noreply" "$personal" git tag -a v2 -m release
 expect stop "a personal tagger" git push -q origin v2
 
+for pair in public:public_address email:email ssh_remote:ssh_remote not_address:not_address; do
+  guard_value="$(sed -n "s/^${pair%%:*}=//p" "$REPO_ROOT/git/hooks/guard")"
+  script_value="$(sed -n "s/^${pair##*:}=//p" "$REPO_ROOT/scripts/privacy.sh")"
+  if [[ -z "$guard_value" || "$guard_value" != "$script_value" ]]; then
+    echo "FAIL: git/hooks/guard and scripts/privacy.sh must use the same ${pair##*:} pattern" >&2
+    failures=$((failures + 1))
+  fi
+done
+
 if ((failures > 0)); then
   exit 1
 fi

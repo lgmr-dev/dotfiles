@@ -3,7 +3,7 @@ set -eu
 export GIT_NO_REPLACE_OBJECTS=1
 hook=$1
 shift
-public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
+public='^([^@[:space:]]+@users\.noreply\.(github|gitlab)\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
 email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
 ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
 not_address='@(v?[0-9]+\.[0-9]|[0-9]+x\.|[A-Za-z0-9_.-]+\.(service|socket|timer|target|mount|path|slice|scope|device|swap|automount)$)'
@@ -25,7 +25,7 @@ check_address() {
 
 check_text() {
   text=$(printf '%s\n' "$2" | sed -E "s#$ssh_remote##g")
-  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -vE "$not_address" || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
+  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -viE "$not_address" || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
     check_address "$1" "$word"
   done
 }
@@ -72,14 +72,14 @@ case "$hook" in
       } | git rev-list --stdin)
       for commit in $commits; do
         short=$(git rev-parse --short "$commit")
-        check_address "the author of commit $short" "$(git log -1 --format=%ae "$commit")"
-        check_address "the committer of commit $short" "$(git log -1 --format=%ce "$commit")"
-        check_text "commit $short" "$(git log -1 --format='%an%n%cn%n%B' "$commit")"
-        mergetag=$(git cat-file commit "$commit" | sed -n '/^$/q; /^mergetag /,/^[^ ]/{ /^mergetag /s/^mergetag //p; /^ /s/^ //p; }')
-        if [ -n "$mergetag" ]; then
-          check_address "the merged tag of commit $short" "$(printf '%s\n' "$mergetag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
-          check_text "the merged tag of commit $short" "$mergetag"
-        fi
+        check_address "the author of commit $short" "$(git log -1 --no-show-signature --format=%ae "$commit")"
+        check_address "the committer of commit $short" "$(git log -1 --no-show-signature --format=%ce "$commit")"
+        check_text "commit $short" "$(git log -1 --no-show-signature --format='%an%n%cn%n%B' "$commit")"
+        mergetag=$(git cat-file commit "$commit" | awk '/^$/ { exit } /^mergetag / { tag = 1; sub(/^mergetag /, ""); print; next } /^ / { if (tag) { sub(/^ /, ""); print }; next } { tag = 0 }')
+        for tagger in $(printf '%s\n' "$mergetag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p'); do
+          check_address "a merged tag of commit $short" "$tagger"
+        done
+        check_text "a merged tag of commit $short" "$mergetag"
       done
     done <<INPUT
 $input
@@ -88,6 +88,7 @@ INPUT
 esac
 
 own=$(git rev-parse --git-common-dir)/hooks/$hook
+unset GIT_NO_REPLACE_OBJECTS
 if [ -x "$own" ]; then
   if [ "$hook" != pre-push ]; then
     exec "$own" "$@"

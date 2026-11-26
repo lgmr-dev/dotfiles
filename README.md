@@ -201,15 +201,17 @@ checkout. Git then never guesses a name or address from your account and host
 name. In a clone with a remote, the guard stops a commit when the author or
 committer is not public. Before a push, it checks each commit and tag that the
 remote does not have yet: the author, committer and tagger, their names, the
-whole message and the branch or tag name. Public addresses are GitHub noreply
-addresses, the noreply addresses of GitHub, Anthropic and OpenAI, the GitHub
+whole message and the branch or tag name. Public addresses are GitHub and GitLab
+noreply addresses, the noreply addresses of GitHub, Anthropic and OpenAI, the GitHub
 web-flow committer and the reserved example domains.
 
 After its check, the guard runs the hook of the same name in `.git/hooks`.
 Git does not run `.git/hooks/reference-transaction`, `post-index-change`,
-`fsmonitor-watchman` or `push-to-checkout` while the guard is on. The guard
-runs the other hooks of `githooks(5)` after its check, also the server hooks
-`pre-receive`, `update`, `proc-receive`, `post-receive` and `post-update`. Check reports the guard as broken
+`fsmonitor-watchman`, `push-to-checkout` or the `p4-*` hooks while the guard
+is on. The guard runs the other hooks of `githooks(5)` after its check, also
+the server hooks `pre-receive`, `update`, `proc-receive`, `post-receive` and
+`post-update`. A repository that sets `receive.procReceiveRefs` needs its own
+`proc-receive` hook. Check reports the guard as broken
 when `guard`, `pre-commit` or `pre-push` is missing from `git/hooks`. A
 repository that sets its own `core.hooksPath`, for example with `make hooks`,
 uses only its own hooks. To allow other addresses in one repository, for

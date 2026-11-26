@@ -28,6 +28,7 @@ type ProfileDriver struct {
 	GitDefaults       string
 	GitIssue          string
 	GitAttributionOff bool
+	GitPrivacyGuard   bool
 	Issues            map[string]string
 }
 

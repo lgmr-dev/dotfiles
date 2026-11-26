@@ -1,0 +1,64 @@
+#!/bin/sh
+set -eu
+hook=$1
+shift
+public='^([^@[:space:]]+@users\.noreply\.github\.com|(noreply|no-reply)@[A-Za-z0-9.-]+|[^@[:space:]]+@github\.com|[^@[:space:]]+@example\.(com|net|org)|[^@[:space:]]+@([A-Za-z0-9-]+\.)*(example|invalid|test|localhost))$'
+zero=0000000000000000000000000000000000000000
+
+check_address() {
+  if ! printf '%s\n' "$2" | grep -qE "$public"; then
+    echo "Git privacy guard: $1 uses <$2>, which is not a public address." >&2
+    echo "Set user.email to your GitHub noreply address. To allow other addresses in one repository, run: git config core.hooksPath .git/hooks" >&2
+    exit 1
+  fi
+}
+
+input=
+case "$hook" in
+  pre-commit)
+    for ident in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+      value=$(git var "$ident")
+      check_address "$ident" "$(printf '%s\n' "$value" | sed -n 's/.*<\(.*\)>.*/\1/p')"
+    done
+    ;;
+  pre-push)
+    input=$(cat)
+    remote=$(git ls-remote "$2" 'refs/heads/*' 'refs/tags/*')
+    published=
+    for sha in $(printf '%s\n' "$remote" | cut -f1); do
+      if git cat-file -e "$sha^{commit}" 2>/dev/null; then
+        published="$published $sha"
+      fi
+    done
+    while read -r _ local_sha _ _; do
+      if [ -z "$local_sha" ] || [ "$local_sha" = "$zero" ]; then
+        continue
+      fi
+      if [ "$(git cat-file -t "$local_sha")" = tag ]; then
+        tag=$(git cat-file tag "$local_sha")
+        check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$tag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
+      fi
+      # shellcheck disable=SC2086
+      people=$(git log --format='%h %ae%n%h %ce' "$local_sha" --not $published)
+      while read -r commit address; do
+        [ -z "$commit" ] || check_address "commit $commit" "$address"
+      done <<PEOPLE
+$people
+PEOPLE
+    done <<INPUT
+$input
+INPUT
+    ;;
+esac
+
+own=$(git rev-parse --git-common-dir)/hooks/$hook
+if [ -x "$own" ]; then
+  if [ "$hook" != pre-push ]; then
+    exec "$own" "$@"
+  elif [ -z "$input" ]; then
+    exec "$own" "$@" </dev/null
+  fi
+  exec "$own" "$@" <<INPUT
+$input
+INPUT
+fi

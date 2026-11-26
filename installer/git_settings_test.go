@@ -25,6 +25,21 @@ func gitSettingsFixture(t *testing.T) (Controller, string, string) {
 	}
 	source := filepath.Join(repository, "git", "config")
 	writeConfigFixture(t, source, string(defaults))
+	hooks, err := os.ReadDir(filepath.Join("..", "git", "hooks"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, hook := range hooks {
+		script, err := os.ReadFile(filepath.Join("..", "git", "hooks", hook.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(repository, "git", "hooks", hook.Name())
+		writeConfigFixture(t, path, string(script))
+		if err := os.Chmod(path, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if runtime.GOOS == "windows" {
 		fragment, err := os.ReadFile(filepath.Join("..", "windows-terminal", "settings.fragment.jsonc"))
 		if err != nil {
@@ -42,7 +57,7 @@ func gitSettingsFixture(t *testing.T) (Controller, string, string) {
 	}
 	catalog := &Catalog{Schema: 1}
 	for _, resource := range c.Catalog.Resources {
-		if slices.Contains([]string{"git", "sentinel-no-attribution", "integration.git"}, resource.ID) {
+		if slices.Contains([]string{"git", "sentinel-no-attribution", "git-privacy-guard", "integration.git"}, resource.ID) {
 			resource.Requires = slices.DeleteFunc(slices.Clone(resource.Requires), func(id string) bool { return id != "integration.git" })
 			catalog.Resources = append(catalog.Resources, resource)
 		}
@@ -53,6 +68,14 @@ func gitSettingsFixture(t *testing.T) (Controller, string, string) {
 
 func gitSettingsCommand(t *testing.T, home, directory string, args ...string) string {
 	t.Helper()
+	output, err := gitSettingsRun(home, directory, "fixture@example.invalid", args...)
+	if err != nil {
+		t.Fatalf("git %v: %s: %v", args, output, err)
+	}
+	return output
+}
+
+func gitSettingsRun(home, directory, address string, args ...string) (string, error) {
 	command := exec.Command("git", args...)
 	command.Dir = directory
 	for _, entry := range os.Environ() {
@@ -61,12 +84,9 @@ func gitSettingsCommand(t *testing.T, home, directory string, args ...string) st
 			command.Env = append(command.Env, entry)
 		}
 	}
-	command.Env = append(command.Env, "HOME="+home, "USERPROFILE="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0", "GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid")
+	command.Env = append(command.Env, "HOME="+home, "USERPROFILE="+home, "XDG_CONFIG_HOME="+filepath.Join(home, ".config"), "GIT_CONFIG_NOSYSTEM=1", "GIT_TERMINAL_PROMPT=0", "GIT_AUTHOR_NAME=Fixture", "GIT_AUTHOR_EMAIL="+address, "GIT_COMMITTER_NAME=Fixture", "GIT_COMMITTER_EMAIL="+address)
 	output, err := command.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %s: %v", args, output, err)
-	}
-	return strings.TrimSpace(string(output))
+	return strings.TrimSpace(string(output)), err
 }
 
 func TestGitGlobalWritesNeverModifyTheCheckout(t *testing.T) {
@@ -210,6 +230,51 @@ func TestGitSentinelAttributionFollowsTheSelection(t *testing.T) {
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	if got := attribution(); got != "unset" {
 		t.Fatal("removal kept Sentinel attribution off", got)
+	}
+}
+
+func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
+	c, _, _ := gitSettingsFixture(t)
+	setting := func(key string) string {
+		return gitSettingsCommand(t, c.Home, c.Home, "config", "--global", "--default", "unset", "--get", key)
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git", "git-privacy-guard"}})
+	if setting("user.useConfigOnly") != "true" || setting("core.hooksPath") == "unset" {
+		t.Fatal("the selection did not set the identity rule and the hooks path")
+	}
+	check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
+	if err != nil || check.Status != "ready" {
+		t.Fatal("check rejected the applied privacy guard", check, err)
+	}
+	remote, clone := filepath.Join(c.Home, "remote.git"), filepath.Join(c.Home, "clone")
+	gitSettingsCommand(t, c.Home, c.Home, "init", "--bare", "--initial-branch=main", remote)
+	gitSettingsCommand(t, c.Home, c.Home, "clone", remote, clone)
+	marker := filepath.Join(c.Home, "own-hook-ran")
+	own := filepath.Join(clone, ".git", "hooks", "pre-commit")
+	writeConfigFixture(t, own, "#!/bin/sh\necho ran > '"+filepath.ToSlash(marker)+"'\n")
+	if err := os.Chmod(own, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if output, err := gitSettingsRun(c.Home, clone, "alice@mail.example-isp.net", "commit", "--allow-empty", "-m", "personal"); err == nil || !strings.Contains(output, "Git privacy guard") {
+		t.Fatal("the guard accepted a commit with a personal address", output)
+	}
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("the own hook ran after the guard refused the commit")
+	}
+	gitSettingsCommand(t, c.Home, clone, "commit", "--allow-empty", "-m", "public")
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatal("the guard did not run the own hook of the repository", err)
+	}
+	gitSettingsCommand(t, c.Home, clone, "push", "origin", "main")
+	if output, err := gitSettingsRun(c.Home, clone, "alice@mail.example-isp.net", "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "personal"); err != nil {
+		t.Fatal("a commit without the guard failed", output, err)
+	}
+	if output, err := gitSettingsRun(c.Home, clone, "fixture@example.invalid", "push", "origin", "main"); err == nil || !strings.Contains(output, "Git privacy guard") {
+		t.Fatal("the guard pushed a commit with a personal address", output)
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
+	if setting("user.useConfigOnly") != "unset" || setting("core.hooksPath") != "unset" {
+		t.Fatal("unticking kept the privacy guard")
 	}
 }
 

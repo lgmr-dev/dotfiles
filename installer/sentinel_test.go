@@ -91,7 +91,7 @@ func (f *sentinelProcesses) run(_ context.Context, command nativeCommand) ([]byt
 	case "--check", "-Check":
 		if f.check != 0 {
 			code := f.check
-			return []byte("ok:        /home/AGENTS.md\nDRIFT:     /home/.agents/skills/council\n"), &nativeCommandError{Message: "check failed", ExitCode: &code}
+			return []byte("ok:        /home/user/AGENTS.md\nDRIFT:     /home/user/.agents/skills/council\n"), &nativeCommandError{Message: "check failed", ExitCode: &code}
 		}
 	case "--remove", "-Remove":
 	default:

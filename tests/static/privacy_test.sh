@@ -88,14 +88,21 @@ expect pass "a bot address before an em dash and more text in the C locale" env 
 git reset -q --hard origin/main
 c_locale_case() {
   as "$noreply" "" git commit -q --allow-empty -m "$3"
+  expect "$1" "$2 in the C locale, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q --dry-run origin "HEAD:refs/heads/g-$failures-$RANDOM"
   expect "$1" "$2 in the C locale" env LC_ALL=C git push -q origin "HEAD:refs/heads/c-$failures-$RANDOM"
-  expect "$1" "$2 in the C locale, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q origin "HEAD:refs/heads/g-$failures-$RANDOM"
   git reset -q --hard origin/main
 }
 c_locale_case pass "a bot address before a no-break space and more text" "by noreply${at}anthropic.com$(printf '\302\240')CI"
 c_locale_case pass "a bot address in full-width parentheses after a word" "by$(printf '\357\274\210')noreply${at}anthropic.com$(printf '\357\274\211')CI and by$(printf '\357\274\232')noreply${at}anthropic.com"
 c_locale_case stop "a personal address with an ideographic full stop in the domain" "Ask alice${at}personal-isp$(printf '\343\200\202')co.uk"
 c_locale_case stop "a personal address after a bot address and an em dash" "by noreply${at}anthropic.com$(printf '\342\200\224')alice${at}personal-isp.de"
+c_locale_case stop "a personal domain that starts with a bot domain" "Ask noreply${at}anthropic.com$(printf '\303\274').personal-isp.de"
+for identity in "noreply${at}anthropic.com$(printf '\303\274').personal-isp.de" "$noreply $personal"; do
+  as "$identity" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m identity
+  expect stop "a personal author address that holds a public address, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q --dry-run origin HEAD:refs/heads/identity
+  expect stop "a personal author address that holds a public address" env LC_ALL=C git push -q origin HEAD:refs/heads/identity
+  git reset -q --hard origin/main
+done
 git init -q -b main "$work/module"
 printf '%s\n' "/$h/alice/notes" > "$work/module/README"
 git -C "$work/module" add README

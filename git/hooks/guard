@@ -17,17 +17,24 @@ refuse() {
 }
 
 check_address() {
-  address=$(printf '%s\n' "$2" | tr '[:upper:]' '[:lower:]')
-  ascii=$(printf '%s\n' "$address" | LC_ALL=C tr -c '@!-~' '\n' | grep @ || true)
-  if ! printf '%s\n' "$address" | grep -qE "$public" && ! printf '%s\n' "$ascii" | grep -qE "$public"; then
+  if ! printf '%s\n' "$2" | tr '[:upper:]' '[:lower:]' | grep -qE "$public"; then
     refuse "$1 holds an address that is not public. Use your GitHub noreply address"
   fi
+}
+
+check_text_address() {
+  ascii=$(printf '%s\n' "$2" | LC_ALL=C tr -c '@!-~' '\n' | grep @ || true)
+  case ${2#*"$ascii"} in
+    *.*) ;;
+    *) printf '%s\n' "$ascii" | tr '[:upper:]' '[:lower:]' | grep -qE "$public" && return 0 ;;
+  esac
+  check_address "$1" "$2"
 }
 
 check_text() {
   text=$(printf '%s\n' "$2" | sed -E -e "s#$ssh_remote##g" -e "s#$url_user##g")
   for word in $({ printf '%s\n' "$text" | grep -oE "$email"; printf '%s\n' "$text" | LC_ALL=C tr -c '\n -~' ' ' | grep -oE "$email"; } | grep -viE "$not_address" || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
-    check_address "$1" "$word"
+    check_text_address "$1" "$word"
   done
 }
 

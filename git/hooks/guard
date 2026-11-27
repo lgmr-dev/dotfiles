@@ -30,12 +30,12 @@ check_text() {
 }
 
 check_signature() {
-  block=$(printf '%s\n' "$2" | sed -n -E '/-----BEGIN (SIGNED MESSAGE|PKCS7)-----/,/-----END (SIGNED MESSAGE|PKCS7)-----/p' | grep -v '^-----' | tr -d ' ' || true)
+  block=$(printf '%s\n' "$2" | sed -n -E '/-----BEGIN (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/,/-----END (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/p' | grep -v -e '^-----' -e '^=' -e ':' | tr -d ' ' || true)
   [ -n "$block" ] || return 0
-  if ! printf '%s\n' "$block" | base64 -d >/dev/null 2>&1; then
+  if ! printf '%s\n' "$block" | base64 --decode >/dev/null 2>&1; then
     refuse "$1 cannot be read"
   fi
-  for word in $(printf '%s\n' "$block" | base64 -d | LC_ALL=C tr -c '[:print:]' '\n' | grep -oE "$email" | sort -u || true); do
+  for word in $(printf '%s\n' "$block" | base64 --decode | LC_ALL=C tr -c '[:print:]' '\n' | grep -oE "$email" | sort -u || true); do
     check_address "$1" "$word"
   done
 }
@@ -78,6 +78,7 @@ check_ref() {
       check_address "a merged tag of commit $short" "$tagger"
     done
     check_text "a merged tag of commit $short" "$mergetag"
+    check_signature "the signature of a merged tag of commit $short" "$mergetag"
   done
 }
 

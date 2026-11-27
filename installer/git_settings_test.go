@@ -348,17 +348,23 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	}
 	certificate := base64.StdEncoding.EncodeToString([]byte("\x00subject emailAddress\x16" + personal + "\x00"))
 	now := fmt.Sprintf("%d +0000", time.Now().Unix())
-	signed := strings.Join([]string{
-		"tree " + gitSettingsCommand(t, c.Home, clone, "rev-parse", "HEAD^{tree}"),
-		"parent " + gitSettingsCommand(t, c.Home, clone, "rev-parse", "HEAD"),
-		"author Fixture <fixture@example.invalid> " + now,
-		"committer Fixture <fixture@example.invalid> " + now,
-		"gpgsig -----BEGIN SIGNED MESSAGE-----", " " + certificate, " -----END SIGNED MESSAGE-----", "", "signed", "",
-	}, "\n")
-	object := filepath.Join(c.Home, "signed-commit")
-	writeConfigFixture(t, object, signed)
-	commit := gitSettingsCommand(t, c.Home, clone, "hash-object", "-t", "commit", "-w", object)
-	refused("an S/MIME signature with a personal address", "push", "origin", commit+":refs/heads/smime")
+	parent := gitSettingsCommand(t, c.Home, clone, "rev-parse", "HEAD")
+	for name, header := range map[string][]string{
+		"an S/MIME signature":         {"gpgsig -----BEGIN SIGNED MESSAGE-----", " " + certificate, " -----END SIGNED MESSAGE-----"},
+		"a PGP signature":             {"gpgsig -----BEGIN PGP SIGNATURE-----", " ", " " + certificate, " =AbCd", " -----END PGP SIGNATURE-----"},
+		"a signature of a merged tag": {"mergetag object " + parent, " type commit", " tag v1", " tagger Fixture <fixture@example.invalid> " + now, " ", " release", " -----BEGIN SIGNED MESSAGE-----", " " + certificate, " -----END SIGNED MESSAGE-----"},
+	} {
+		lines := append([]string{
+			"tree " + gitSettingsCommand(t, c.Home, clone, "rev-parse", "HEAD^{tree}"),
+			"parent " + parent,
+			"author Fixture <fixture@example.invalid> " + now,
+			"committer Fixture <fixture@example.invalid> " + now,
+		}, header...)
+		object := filepath.Join(c.Home, "signed-commit")
+		writeConfigFixture(t, object, strings.Join(append(lines, "", "signed", ""), "\n"))
+		commit := gitSettingsCommand(t, c.Home, clone, "hash-object", "-t", "commit", "-w", object)
+		refused(name+" with a personal address", "push", "origin", commit+":refs/heads/signed")
+	}
 	gitSettingsCommand(t, c.Home, clone, "tag", "tree", "HEAD^{tree}")
 	refused("a tag of a tree", "push", "origin", "tree")
 	if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "replaced"); err != nil {

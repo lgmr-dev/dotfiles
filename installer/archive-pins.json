@@ -3206,9 +3206,9 @@
     },
     "tool.opencode": {
       "darwin/arm64": {
-        "version": "2.4.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.0/opencode-darwin-arm64.zip",
-        "sha256": "aa3d5929140008fd5ed88e5cd0f35c624b0f25c8679c196fc99c277415bc80ad",
+        "version": "2.4.1",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.1/opencode-darwin-arm64.zip",
+        "sha256": "95a101eda95108478f1db43cff8fcbd4811f6c0e79af1e167301843c6a48d731",
         "format": "zip",
         "commands": {
           "opencode": "opencode"
@@ -3218,9 +3218,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.4.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.0/opencode-linux-x64-baseline.tar.gz",
-        "sha256": "66cf6adeb02fbfe9ccbb1f6497fcf46cecf2d299a1dc3a7a32e01ea30ff20201",
+        "version": "2.4.1",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.1/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "9ddd18e3faf64eaeccf6a0fcbc96a5c7a14520ae5fd5b61e5be51d894f478b47",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3231,9 +3231,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "2.4.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.0/opencode-linux-arm64.tar.gz",
-        "sha256": "fed468566215fd38b26abab99018240c0d30772d3f45aee25621664ceff7e360",
+        "version": "2.4.1",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.1/opencode-linux-arm64.tar.gz",
+        "sha256": "cb28cf94541aeb62a4b2ea5997a99b5dd6bae595a772f36fbe279299f2032a4f",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3244,9 +3244,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "2.4.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.0/opencode-windows-x64-baseline.zip",
-        "sha256": "4d5e9f48fc8b80ef26151e330674ad73bf355e1deb80bc5ee383048a0ff724f9",
+        "version": "2.4.1",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.4.1/opencode-windows-x64-baseline.zip",
+        "sha256": "40c4f842398abcba3837d554a2b0ddd9a11c5fae667f198e0bb716d101a2aab4",
         "format": "zip",
         "commands": {
           "opencode": "opencode.exe"
@@ -3313,9 +3313,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.114",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-darwin-arm64.tar.gz",
-        "sha256": "35e8165a6ca811fb907b5afb7892e53d1bb85426bb77fe3f83b7f0b4e955249a",
+        "version": "1.0.115",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.115/copilot-darwin-arm64.tar.gz",
+        "sha256": "f0858bbff5e35c4fe92d97a0061cb4a2a12b06defacf5512b77ca294175a12cf",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3325,9 +3325,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.114",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-linux-x64.tar.gz",
-        "sha256": "b91a96f2257297cfb67ed6784a2a658609a6b8c2ee2ded18af9c9abe8cc790ae",
+        "version": "1.0.115",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.115/copilot-linux-x64.tar.gz",
+        "sha256": "e01975bf3a73791b0c0adfdf0d7093b8616186db61b78b33604b124806808816",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3338,9 +3338,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.114",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-linux-arm64.tar.gz",
-        "sha256": "a204154d4522a7c3aa73a65ba598e432f6aafe37d5fa31cf853163a27d98018e",
+        "version": "1.0.115",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.115/copilot-linux-arm64.tar.gz",
+        "sha256": "889b423ce7e0dd41a298b95716d3d8fe80dc30f1fd9cf5419a95b6fb8d4e1bc8",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3351,9 +3351,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.114",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-win32-x64.zip",
-        "sha256": "be5af88c044842949560535b083c47e0c2b41904769cca599ee2cbf937dc9eed",
+        "version": "1.0.115",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.115/copilot-win32-x64.zip",
+        "sha256": "256de3c3b8c00cbe5f738c9830f30b1d790d6693563689baade984295606af2c",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"
@@ -3365,9 +3365,9 @@
     },
     "tool.openwhispr": {
       "darwin/arm64": {
-        "version": "1.12.0",
-        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.0/OpenWhispr-1.12.0-arm64-mac.zip",
-        "sha256": "815bed4edd78d21651370f6a2797c3853176a5e87879d1d94fa22eeba87543bc",
+        "version": "1.12.1",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.1/OpenWhispr-1.12.1-arm64-mac.zip",
+        "sha256": "e3b526f2ee73c8e00f27eb065ea5dcb99bccd88c7104266582f3ac7f11e3fee8",
         "format": "zip",
         "commands": {},
         "bin_dirs": [],
@@ -3377,9 +3377,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.12.0",
-        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.0/OpenWhispr-1.12.0-linux-x64.tar.gz",
-        "sha256": "d455f71cec4428410ea2237f91c3abc9664807a46bc04cce40bda4b80b942d64",
+        "version": "1.12.1",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.1/OpenWhispr-1.12.1-linux-x64.tar.gz",
+        "sha256": "3f833aba6099f474403bfa6c5d097a2bcc9be8a8a19c99965a33a9da30fa192d",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3522,9 +3522,9 @@
     },
     "tool.xremap": {
       "linux/amd64": {
-        "version": "0.15.18",
-        "url": "https://github.com/xremap/xremap/releases/download/v0.15.18/xremap-linux-x86_64-full.zip",
-        "sha256": "7500554a4bf0152685e5f0937cbf26a03d422bbe075193cf24d285bbde3aa6d3",
+        "version": "0.15.19",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.19/xremap-linux-x86_64-full.zip",
+        "sha256": "b4bbef724cf4366408415b29516c723c2b470fe87250d03fc1bfd83a16d78651",
         "format": "zip",
         "commands": {
           "xremap": "xremap"
@@ -3534,9 +3534,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.15.18",
-        "url": "https://github.com/xremap/xremap/releases/download/v0.15.18/xremap-linux-aarch64-full.zip",
-        "sha256": "11ca3b03e9474b398838df57575920399cc980f284fc6f6c18ab437dff7ab428",
+        "version": "0.15.19",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.19/xremap-linux-aarch64-full.zip",
+        "sha256": "bdc0c0c9bf08ee3e7c87ece9a7092a00a232a088a799e28eff94a7d9ca56aaa3",
         "format": "zip",
         "commands": {
           "xremap": "xremap"

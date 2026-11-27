@@ -427,6 +427,23 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	if after := objects(); after != before {
 		t.Fatal("a push from a partial clone downloaded objects", before, after)
 	}
+	gitSettingsCommand(t, c.Home, other, "checkout", "-q", "-b", "solo")
+	if output, err := gitSettingsRun(c.Home, other, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "published solo"); err != nil {
+		t.Fatal(output, err)
+	}
+	gitSettingsCommand(t, c.Home, other, "-c", "core.hooksPath=.git/hooks", "push", "origin", "solo")
+	single := filepath.Join(c.Home, "single")
+	gitSettingsCommand(t, c.Home, c.Home, "clone", "--filter=blob:none", "--single-branch", "--branch", "solo", "file://"+url, single)
+	gitSettingsCommand(t, c.Home, single, "commit", "--allow-empty", "-m", "solo child")
+	writeConfigFixture(t, filepath.Join(other, "large.bin"), strings.Repeat("x", 1<<20))
+	gitSettingsCommand(t, c.Home, other, "add", "large.bin")
+	gitSettingsCommand(t, c.Home, other, "commit", "-m", "large")
+	gitSettingsCommand(t, c.Home, other, "push", "origin", "solo")
+	large := gitSettingsCommand(t, c.Home, other, "rev-parse", "HEAD:large.bin")
+	gitSettingsCommand(t, c.Home, single, "push", "origin", "HEAD:refs/heads/solo-child")
+	if strings.Contains(gitSettingsCommand(t, c.Home, single, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)"), large) {
+		t.Fatal("the retry of the guard downloaded file contents into a partial clone")
+	}
 	scratch := filepath.Join(c.Home, "scratch")
 	gitSettingsCommand(t, c.Home, c.Home, "init", scratch)
 	if output, err := gitSettingsRun(c.Home, scratch, personal, "commit", "--allow-empty", "-m", "local"); err != nil {

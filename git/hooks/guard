@@ -42,6 +42,14 @@ check_signature() {
   done
 }
 
+fetch_objects() {
+  if git config --get-regexp '^remote\..*\.promisor$' 2>/dev/null | grep -q ' true$'; then
+    git fetch -q --no-write-fetch-head --filter=blob:none "$@"
+  else
+    git fetch -q --no-write-fetch-head "$@"
+  fi
+}
+
 published_commits() {
   printf '%s\n' "$1" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)'
 }
@@ -118,7 +126,7 @@ case "$hook" in
         fi
       done)
       # shellcheck disable=SC2086
-      if [ -n "$missing" ] && git fetch -q --no-write-fetch-head "$2" $missing 2>/dev/null; then
+      if [ -n "$missing" ] && fetch_objects "$2" $missing 2>/dev/null; then
         (set -e; check_push) 2>"$report"
         status=$?
       fi

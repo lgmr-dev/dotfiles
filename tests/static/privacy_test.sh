@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 while IFS= read -r name; do unset "$name"; done < <(env | sed -n 's/^\(GIT_[A-Z_]*\)=.*/\1/p')
-export HOME="$work" GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 GIT_AUTHOR_NAME=T GIT_COMMITTER_NAME=T
+export HOME="$work" XDG_CONFIG_HOME="$work/.config" GIT_CONFIG_NOSYSTEM=1 GIT_TERMINAL_PROMPT=0 GIT_AUTHOR_NAME=T GIT_COMMITTER_NAME=T
 at='@'
 h=home
 u=Users
@@ -66,6 +66,9 @@ file_case stop "a NetEase mailbox" "alice${at}163.com"
 file_case stop "an AT&T mailbox in a mailmap" "Alice <alice${at}att.net>"
 file_case stop "a quoted Windows profile with a space" "\"C:\\$u\\Bob Smith\\x\""
 file_case stop "a Git Bash profile with a space" "\"/c/$u/Bob Smith/x\""
+as "$noreply" "" git commit -q --allow-empty -m "Ask alice${at}gm$(printf '\303\274')x.example-isp.de for details"
+expect stop "a personal address with a Unicode domain in a message" git push -q origin HEAD:refs/heads/unicode
+git reset -q --hard origin/main
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"

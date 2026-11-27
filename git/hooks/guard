@@ -4,7 +4,7 @@ export GIT_NO_REPLACE_OBJECTS=1 GIT_NO_LAZY_FETCH=1
 hook=$1
 shift
 public='^([^@[:space:]]+@users\.noreply\.(github|gitlab)\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
-email='[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}'
+email='[A-Za-z0-9._%+-]+@([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+(\.([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+)*\.([[:alpha:]]|[^[:print:][:cntrl:][:space:]]){2,}'
 ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
 not_address='@(v?[0-9]+\.[0-9]|[0-9]+x\.|[A-Za-z0-9_.-]+\.(service|socket|timer|target|mount|path|slice|scope|device|swap|automount)$)'
 zero=0000000000000000000000000000000000000000

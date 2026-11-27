@@ -308,6 +308,7 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 		{"personal author name", "fixture@example.invalid", []string{"-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "--author", "A " + personal + " <fixture@example.invalid>", "-m", "public"}},
 		{"personal Cc trailer", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nCc: A <" + personal + ">"}},
 		{"personal address in the body", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nAsk " + personal + " for details."}},
+		{"Unicode local part in the body", "fixture@example.invalid", []string{"commit", "--allow-empty", "-m", "public\n\nAsk jos\u00e9@personal-isp.de for details."}},
 	} {
 		if output, err := gitSettingsRun(c.Home, clone, step.address, step.args...); err != nil {
 			t.Fatal("a commit before the push failed", step.name, output, err)
@@ -444,6 +445,12 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	if strings.Contains(gitSettingsCommand(t, c.Home, single, "cat-file", "--batch-all-objects", "--batch-check=%(objectname)"), large) {
 		t.Fatal("the retry of the guard downloaded file contents into a partial clone")
 	}
+	sha256Remote, sha256Clone := filepath.Join(c.Home, "sha256.git"), filepath.Join(c.Home, "sha256")
+	gitSettingsCommand(t, c.Home, c.Home, "init", "--bare", "--object-format=sha256", "--initial-branch=main", sha256Remote)
+	gitSettingsCommand(t, c.Home, c.Home, "clone", sha256Remote, sha256Clone)
+	gitSettingsCommand(t, c.Home, sha256Clone, "commit", "--allow-empty", "-m", "sha256")
+	gitSettingsCommand(t, c.Home, sha256Clone, "push", "origin", "HEAD:refs/heads/main", "HEAD:refs/heads/gone")
+	gitSettingsCommand(t, c.Home, sha256Clone, "push", "origin", "--delete", "gone")
 	scratch := filepath.Join(c.Home, "scratch")
 	gitSettingsCommand(t, c.Home, c.Home, "init", scratch)
 	if output, err := gitSettingsRun(c.Home, scratch, personal, "commit", "--allow-empty", "-m", "local"); err != nil {

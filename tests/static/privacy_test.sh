@@ -69,6 +69,13 @@ file_case stop "a Git Bash profile with a space" "\"/c/$u/Bob Smith/x\""
 as "$noreply" "" git commit -q --allow-empty -m "Ask alice${at}gm$(printf '\303\274')x.example-isp.de for details"
 expect stop "a personal address with a Unicode domain in a message" git push -q origin HEAD:refs/heads/unicode
 git reset -q --hard origin/main
+file_case pass "the system folders and the Windows runner account" "/$u/Shared/tool C:\\$u\\Public\\Desktop C:\\$u\\runneradmin\\AppData"
+as "$noreply" "" git commit -q --allow-empty -m "Ask jos$(printf '\303\251')${at}personal-isp.de"
+expect stop "a personal address with a Unicode local part" git push -q origin HEAD:refs/heads/local-part
+git reset -q --hard origin/main
+as "$noreply" "" git commit -q --allow-empty -m "$(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235') and https://org${at}dev.azure.com/org/p/_git/r"
+expect pass "a bot address in curly quotes and an HTTPS clone URL with a user" env LC_ALL=C git push -q origin HEAD:refs/heads/quoted
+git reset -q --hard origin/main
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"
@@ -112,7 +119,7 @@ expect pass "a tag message with a header-like line" git push -q origin v1
 as "$noreply" "$personal" git tag -a v2 -m release
 expect stop "a personal tagger" git push -q origin v2
 
-for pair in public:public_address email:email ssh_remote:ssh_remote not_address:not_address; do
+for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user quotes:quotes not_address:not_address; do
   guard_value="$(sed -n "s/^${pair%%:*}=//p" "$REPO_ROOT/git/hooks/guard")"
   script_value="$(sed -n "s/^${pair##*:}=//p" "$REPO_ROOT/scripts/privacy.sh")"
   if [[ -z "$guard_value" || "$guard_value" != "$script_value" ]]; then
@@ -130,6 +137,14 @@ as "$noreply" "" git -C "$work/other" tag -a v9 -m release
 git -C "$work/other" -c core.hooksPath=/dev/null push -q origin topic v9
 as "$noreply" "" git commit -q --allow-empty -m "clean child"
 expect pass "a clean child of a stale published topic branch" git push -q origin HEAD:refs/heads/child
+
+git init -q --bare --object-format=sha256 -b main "$work/sha256.git"
+git clone -q "$work/sha256.git" "$work/sha256" 2>/dev/null
+cp -R scripts "$work/sha256/"
+git -C "$work/sha256" config core.hooksPath scripts/hooks
+as "$noreply" "" git -C "$work/sha256" commit -q --allow-empty -m sha256
+git -C "$work/sha256" -c core.hooksPath=/dev/null push -q origin HEAD:refs/heads/main HEAD:refs/heads/gone
+expect pass "a branch deletion in a SHA-256 repository" git -C "$work/sha256" push -q origin --delete gone
 
 if ((failures > 0)); then
   exit 1

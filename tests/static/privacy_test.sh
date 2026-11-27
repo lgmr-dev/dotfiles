@@ -119,7 +119,8 @@ as "$personal" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m "pu
 git -c core.hooksPath=/dev/null push -q origin topic
 git clone -q --branch topic "$work/remote.git" "$work/other" 2>/dev/null
 as "$noreply" "" git -C "$work/other" commit -q --allow-empty -m moved
-git -C "$work/other" -c core.hooksPath=/dev/null push -q origin topic
+as "$noreply" "" git -C "$work/other" tag -a v9 -m release
+git -C "$work/other" -c core.hooksPath=/dev/null push -q origin topic v9
 as "$noreply" "" git commit -q --allow-empty -m "clean child"
 expect pass "a clean child of a stale published topic branch" git push -q origin HEAD:refs/heads/child
 

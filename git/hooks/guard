@@ -1,5 +1,5 @@
 #!/bin/sh
-set -eu
+set -euf
 export GIT_NO_REPLACE_OBJECTS=1
 hook=$1
 shift
@@ -90,7 +90,7 @@ case "$hook" in
     ;;
   pre-push)
     input=$(cat)
-    remote=$(git ls-remote "$2" 'refs/heads/*' 'refs/tags/*')
+    remote=$(git ls-remote --refs "$2" 'refs/heads/*' 'refs/tags/*')
     report=$(mktemp)
     set +e
     (set -e; check_push) 2>"$report"

@@ -63,6 +63,7 @@ expect stop "a UTF-16 file under a fixed-string grep setting" as "$noreply" "" g
 git reset -q --hard origin/main
 file_case stop "a file URL with an encoded name" "file:///$h/%C3%A9lise/x"
 file_case stop "a NetEase mailbox" "alice${at}163.com"
+file_case stop "an AT&T mailbox in a mailmap" "Alice <alice${at}att.net>"
 file_case stop "a quoted Windows profile with a space" "\"C:\\$u\\Bob Smith\\x\""
 file_case stop "a Git Bash profile with a space" "\"/c/$u/Bob Smith/x\""
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"

@@ -1,6 +1,6 @@
 #!/bin/sh
 set -euf
-export GIT_NO_REPLACE_OBJECTS=1
+export GIT_NO_REPLACE_OBJECTS=1 GIT_NO_LAZY_FETCH=1
 hook=$1
 shift
 public='^([^@[:space:]]+@users\.noreply\.(github|gitlab)\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
@@ -30,7 +30,9 @@ check_text() {
 }
 
 check_signature() {
-  block=$(printf '%s\n' "$2" | sed -n -E '/-----BEGIN (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/,/-----END (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/p' | grep -v -e '^-----' -e '^=' -e ':' | tr -d ' ' || true)
+  armored=$(printf '%s\n' "$2" | sed -n -E '/-----BEGIN (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/,/-----END (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/p')
+  check_text "$1" "$(printf '%s\n' "$armored" | grep ':' || true)"
+  block=$(printf '%s\n' "$armored" | grep -v -e '^-----' -e '^=' -e ':' | tr -d ' ' || true)
   [ -n "$block" ] || return 0
   if ! printf '%s\n' "$block" | base64 --decode >/dev/null 2>&1; then
     refuse "$1 cannot be read"
@@ -132,7 +134,7 @@ case "$hook" in
 esac
 
 own=$(git rev-parse --git-common-dir)/hooks/$hook
-unset GIT_NO_REPLACE_OBJECTS
+unset GIT_NO_REPLACE_OBJECTS GIT_NO_LAZY_FETCH
 if [ -x "$own" ]; then
   if [ "$hook" != pre-push ]; then
     exec "$own" "$@"

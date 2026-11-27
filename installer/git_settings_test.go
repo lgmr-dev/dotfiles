@@ -406,6 +406,27 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 	gitSettingsCommand(t, c.Home, other, "push", "origin", "topic", "v9")
 	gitSettingsCommand(t, c.Home, clone, "commit", "--allow-empty", "-m", "topic child")
 	gitSettingsCommand(t, c.Home, clone, "push", "origin", "HEAD:refs/heads/topic-child")
+	gitSettingsCommand(t, c.Home, remote, "config", "uploadpack.allowFilter", "true")
+	url := filepath.ToSlash(remote)
+	if !strings.HasPrefix(url, "/") {
+		url = "/" + url
+	}
+	partial := filepath.Join(c.Home, "partial")
+	gitSettingsCommand(t, c.Home, c.Home, "clone", "--filter=blob:none", "file://"+url, partial)
+	for _, branch := range []string{"one", "two", "three"} {
+		gitSettingsCommand(t, c.Home, other, "push", "origin", "HEAD:refs/heads/"+branch)
+		gitSettingsCommand(t, c.Home, other, "commit", "--allow-empty", "-m", branch)
+	}
+	gitSettingsCommand(t, c.Home, other, "push", "origin", "HEAD:refs/heads/four")
+	objects := func() string {
+		return gitSettingsCommand(t, c.Home, partial, "count-objects", "-v")
+	}
+	gitSettingsCommand(t, c.Home, partial, "commit", "--allow-empty", "-m", "partial")
+	before := objects()
+	gitSettingsCommand(t, c.Home, partial, "push", "origin", "HEAD:refs/heads/partial")
+	if after := objects(); after != before {
+		t.Fatal("a push from a partial clone downloaded objects", before, after)
+	}
 	scratch := filepath.Join(c.Home, "scratch")
 	gitSettingsCommand(t, c.Home, c.Home, "init", scratch)
 	if output, err := gitSettingsRun(c.Home, scratch, personal, "commit", "--allow-empty", "-m", "local"); err != nil {

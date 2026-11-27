@@ -29,6 +29,17 @@ check_text() {
   done
 }
 
+check_signature() {
+  block=$(printf '%s\n' "$2" | sed -n -E '/-----BEGIN (SIGNED MESSAGE|PKCS7)-----/,/-----END (SIGNED MESSAGE|PKCS7)-----/p' | grep -v '^-----' | tr -d ' ' || true)
+  [ -n "$block" ] || return 0
+  if ! printf '%s\n' "$block" | base64 -d >/dev/null 2>&1; then
+    refuse "$1 cannot be read"
+  fi
+  for word in $(printf '%s\n' "$block" | base64 -d | LC_ALL=C tr -c '[:print:]' '\n' | grep -oE "$email" | sort -u || true); do
+    check_address "$1" "$word"
+  done
+}
+
 published_commits() {
   printf '%s\n' "$1" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)'
 }
@@ -48,6 +59,7 @@ check_ref() {
       fi
       check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
       check_text "tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tag //p; s/^tagger \(.*\) <.*/\1/p'; printf '%s\n' "$tag" | sed '1,/^$/d')"
+      check_signature "the signature of tag $local_sha" "$tag"
       ;;
     *) refuse "a pushed ref does not point to a commit" ;;
   esac
@@ -60,6 +72,7 @@ check_ref() {
     check_address "the author of commit $short" "$(git log -1 --no-show-signature --format=%ae "$commit")"
     check_address "the committer of commit $short" "$(git log -1 --no-show-signature --format=%ce "$commit")"
     check_text "commit $short" "$(git log -1 --no-show-signature --format='%an%n%cn%n%B' "$commit")"
+    check_signature "the signature of commit $short" "$(git cat-file commit "$commit" | awk '/^$/ { exit } /^gpgsig(-sha256)? / { sig = 1; sub(/^gpgsig(-sha256)? /, ""); print; next } /^ / { if (sig) { sub(/^ /, ""); print }; next } { sig = 0 }')"
     mergetag=$(git cat-file commit "$commit" | awk '/^$/ { exit } /^mergetag / { tag = 1; sub(/^mergetag /, ""); print; next } /^ / { if (tag) { sub(/^ /, ""); print }; next } { tag = 0 }')
     for tagger in $(printf '%s\n' "$mergetag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p'); do
       check_address "a merged tag of commit $short" "$tagger"

@@ -3,6 +3,8 @@ package installer
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 func gitSettingsFixture(t *testing.T) (Controller, string, string) {
@@ -343,6 +346,19 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 		refused("a second merged signed tag with a personal tagger", "-c", "log.showSignature=true", "push", "origin", "HEAD:refs/heads/merged")
 		gitSettingsCommand(t, c.Home, clone, "reset", "--hard", "origin/main")
 	}
+	certificate := base64.StdEncoding.EncodeToString([]byte("\x00subject emailAddress\x16" + personal + "\x00"))
+	now := fmt.Sprintf("%d +0000", time.Now().Unix())
+	signed := strings.Join([]string{
+		"tree " + gitSettingsCommand(t, c.Home, clone, "rev-parse", "HEAD^{tree}"),
+		"parent " + gitSettingsCommand(t, c.Home, clone, "rev-parse", "HEAD"),
+		"author Fixture <fixture@example.invalid> " + now,
+		"committer Fixture <fixture@example.invalid> " + now,
+		"gpgsig -----BEGIN SIGNED MESSAGE-----", " " + certificate, " -----END SIGNED MESSAGE-----", "", "signed", "",
+	}, "\n")
+	object := filepath.Join(c.Home, "signed-commit")
+	writeConfigFixture(t, object, signed)
+	commit := gitSettingsCommand(t, c.Home, clone, "hash-object", "-t", "commit", "-w", object)
+	refused("an S/MIME signature with a personal address", "push", "origin", commit+":refs/heads/smime")
 	gitSettingsCommand(t, c.Home, clone, "tag", "tree", "HEAD^{tree}")
 	refused("a tag of a tree", "push", "origin", "tree")
 	if output, err := gitSettingsRun(c.Home, clone, personal, "-c", "core.hooksPath=.git/hooks", "commit", "--allow-empty", "-m", "replaced"); err != nil {

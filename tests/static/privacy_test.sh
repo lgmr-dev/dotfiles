@@ -62,6 +62,8 @@ expect stop "a UTF-16 file with a home path" as "$noreply" "" git commit -q -m u
 expect stop "a UTF-16 file under a fixed-string grep setting" as "$noreply" "" git -c grep.patternType=fixed commit -q -m utf16
 git reset -q --hard origin/main
 file_case stop "a file URL with an encoded name" "file:///$h/%C3%A9lise/x"
+file_case stop "a NetEase mailbox" "alice${at}163.com"
+file_case stop "a quoted Windows profile with a space" "\"C:\\$u\\Bob Smith\\x\""
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"

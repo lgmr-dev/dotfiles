@@ -15,6 +15,7 @@ import (
 const (
 	gitSettingsResource     = "integration.git"
 	gitAttributionOffChoice = "sentinel-no-attribution"
+	gitPrivacyGuardChoice   = "git-privacy-guard"
 )
 
 // Git reads XDG settings before ~/.gitconfig, and includes expand in place.
@@ -23,6 +24,7 @@ const (
 func configureGitSettings(d *ProfileDriver, folders ConfigFolders, repository string, selected []string) error {
 	d.GitIssue = folders.GitIssue
 	d.GitAttributionOff = slices.Contains(selected, gitAttributionOffChoice)
+	d.GitPrivacyGuard = slices.Contains(selected, gitPrivacyGuardChoice)
 	// The checkout source is independent of Git's discovered target. Bind it
 	// first so a saved target remains removable when discovery later fails.
 	source := filepath.Join(repository, "git", "config")
@@ -38,7 +40,7 @@ func configureGitSettings(d *ProfileDriver, folders ConfigFolders, repository st
 	if err != nil {
 		return err
 	}
-	d.Targets[gitSettingsResource] = []ProfileTarget{{Path: bound, Script: gitIncludeScript(source, d.GitAttributionOff)}}
+	d.Targets[gitSettingsResource] = []ProfileTarget{{Path: bound, Script: gitIncludeScript(source, d.GitAttributionOff, d.GitPrivacyGuard)}}
 	blockGitCheckoutOverlap(d, bound)
 	return nil
 }
@@ -47,16 +49,39 @@ func canonicalGitPath(value string) bool {
 	return utf8.ValidString(value) && filepath.IsAbs(value) && filepath.Clean(value) == value && !strings.ContainsFunc(value, unicode.IsControl)
 }
 
-func gitIncludeScript(source string, attributionOff bool) string {
+func gitIncludeScript(source string, attributionOff, privacyGuard bool) string {
 	if source == "" {
 		return "" // No canonical source: removal remains possible, publication is blocked.
 	}
-	quoted := strings.NewReplacer("\\", "\\\\", "\"", "\\\"").Replace(filepath.ToSlash(source))
-	script := "[include]\n\tpath = \"" + quoted + "\"\n"
+	quote := strings.NewReplacer("\\", "\\\\", "\"", "\\\"").Replace
+	script := "[include]\n\tpath = \"" + quote(filepath.ToSlash(source)) + "\"\n"
 	if attributionOff {
 		script += "[sentinel]\n\tattribution = off\n"
 	}
+	if privacyGuard {
+		hooks := filepath.ToSlash(filepath.Join(filepath.Dir(source), "hooks"))
+		script += "[user]\n\tuseConfigOnly = true\n[core]\n\thooksPath = \"" + quote(hooks) + "\"\n"
+	}
 	return script
+}
+
+func gitPrivacyGuardReady(d *ProfileDriver) error {
+	if !d.GitPrivacyGuard {
+		return nil
+	}
+	for _, name := range []string{"guard", "pre-commit", "pre-push"} {
+		info, err := os.Stat(filepath.Join(filepath.Dir(d.GitDefaults), "hooks", name))
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() {
+			return errors.New(name + " is not a regular file")
+		}
+		if !d.Windows && info.Mode().Perm()&0o111 == 0 {
+			return errors.New(name + " is not executable")
+		}
+	}
+	return nil
 }
 
 func blockGitCheckoutOverlap(d *ProfileDriver, target string) {
@@ -100,7 +125,7 @@ func retainGitSettingsTarget(d *ProfileDriver, state State) error {
 		d.GitIssue = strings.TrimSpace(d.GitIssue + " " + discovery)
 		d.Issues = maps.Clone(d.Issues)
 		delete(d.Issues, gitSettingsResource)
-		targets = []ProfileTarget{{Path: saved, Script: gitIncludeScript(d.GitDefaults, d.GitAttributionOff)}}
+		targets = []ProfileTarget{{Path: saved, Script: gitIncludeScript(d.GitDefaults, d.GitAttributionOff, d.GitPrivacyGuard)}}
 	} else if len(targets) != 1 {
 		return errors.New("Git settings require exactly one target")
 	} else if moved = targets[0].Path != saved && !(d.Windows && strings.EqualFold(targets[0].Path, saved)); moved {

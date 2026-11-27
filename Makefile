@@ -2,7 +2,7 @@
 # current OS; sub-targets skip themselves with a clear message when the
 # tool they depend on isn't installed.
 
-.PHONY: ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-xcompose test-static validate-renovate lint release-check setup help
+.PHONY: hooks ci test-installer test-bootstrap test-required test test-nvim test-shell test-starship test-tmux test-ghostty test-aerospace test-xcompose test-static validate-renovate lint release-check setup help
 
 help:
 	@echo "setup: launch the installer menu"
@@ -10,6 +10,7 @@ help:
 	@echo "test: configuration/editor/shell checks; test-bootstrap: public launchers and release scripts"
 	@echo "test-installer: Go installer behavior and recovery tests"
 	@echo "release-check: validate the release manifest and its notes"
+	@echo "hooks: use the privacy hooks of scripts/hooks in this clone"
 
 setup:
 	@bash setup.sh
@@ -61,6 +62,10 @@ validate-renovate:
 
 lint:
 	@bash tests/shell/lint.sh
+	@scripts/privacy.sh index
+
+hooks:
+	@git config core.hooksPath scripts/hooks
 
 release-check:
 	@python3 scripts/release.py check

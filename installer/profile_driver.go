@@ -28,6 +28,7 @@ type ProfileDriver struct {
 	GitDefaults       string
 	GitIssue          string
 	GitAttributionOff bool
+	GitPrivacyGuard   bool
 	Issues            map[string]string
 }
 
@@ -257,6 +258,10 @@ func (d *ProfileDriver) inspect(id string) (Observation, error) {
 		if sourceErr != nil {
 			o.Healthy = false
 			o.ApplyBlocked = "Git defaults source is unavailable; restore the matching checkout: " + sourceErr.Error()
+		}
+		if err := gitPrivacyGuardReady(d); err != nil {
+			o.Healthy = false
+			o.ApplyBlocked = strings.TrimSpace(o.ApplyBlocked + " Git privacy guard hooks are unavailable; restore the matching checkout: " + err.Error())
 		}
 		if d.GitIssue != "" {
 			o.Healthy, o.ApplyBlocked = false, strings.TrimSpace(o.ApplyBlocked+" "+d.GitIssue)

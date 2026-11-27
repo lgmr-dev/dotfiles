@@ -96,6 +96,12 @@ jobs:
         run: |
           set -euo pipefail
           make lint
+      - name: Privacy of the pull request commits
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: scripts/privacy.sh commits "$BASE..$HEAD"
       - name: Establish trusted disposable completion directories
         run: |
           bash tests/native/linux_host_preparation_test.sh

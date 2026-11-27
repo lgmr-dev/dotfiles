@@ -1,0 +1,156 @@
+#!/bin/sh
+set -euf
+export GIT_NO_REPLACE_OBJECTS=1 GIT_NO_LAZY_FETCH=1
+hook=$1
+shift
+public='^([^@[:space:]]+@users\.noreply\.(github|gitlab)\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
+email='([[:alnum:]._%+-]|[^[:print:][:cntrl:][:space:]])+@([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+(\.([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+)*\.([[:alpha:]]|[^[:print:][:cntrl:][:space:]]){2,}'
+ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
+url_user='[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9._~%:+-]+@'
+quotes="$(printf '\342\200\234|\342\200\235|\342\200\230|\342\200\231|\302\253|\302\273|\342\200\271|\342\200\272')"
+not_address='@(v?[0-9]+\.[0-9]|[0-9]+x\.|[A-Za-z0-9_.-]+\.(service|socket|timer|target|mount|path|slice|scope|device|swap|automount)$)'
+
+refuse() {
+  echo "Git privacy guard: $1." >&2
+  echo "To allow other addresses in one repository, for example a work repository or a fork, run in it:" >&2
+  printf '  git config core.hooksPath "%s(git rev-parse --path-format=absolute --git-common-dir)/hooks"\n' '$' >&2
+  exit 1
+}
+
+check_address() {
+  if ! printf '%s\n' "$2" | LC_ALL=C sed -E 's/^[^ -~]+//; s/[^ -~]+$//' | tr '[:upper:]' '[:lower:]' | grep -qE "$public"; then
+    refuse "$1 holds an address that is not public. Use your GitHub noreply address"
+  fi
+}
+
+check_text() {
+  text=$(printf '%s\n' "$2" | sed -E -e "s#$ssh_remote##g" -e "s#$url_user##g" -e "s/$quotes/ /g")
+  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -viE "$not_address" || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
+    check_address "$1" "$word"
+  done
+}
+
+check_signature() {
+  armored=$(printf '%s\n' "$2" | sed -n -E '/-----BEGIN (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/,/-----END (SIGNED MESSAGE|PKCS7|PGP SIGNATURE)-----/p')
+  check_text "$1" "$(printf '%s\n' "$armored" | grep ':' || true)"
+  block=$(printf '%s\n' "$armored" | grep -v -e '^-----' -e '^=' -e ':' | tr -d ' ' || true)
+  [ -n "$block" ] || return 0
+  if ! printf '%s\n' "$block" | base64 --decode >/dev/null 2>&1; then
+    refuse "$1 cannot be read"
+  fi
+  for word in $(printf '%s\n' "$block" | base64 --decode | LC_ALL=C tr -c '[:print:]' '\n' | grep -oE "$email" | sort -u || true); do
+    check_address "$1" "$word"
+  done
+}
+
+fetch_objects() {
+  if git config --get-regexp '^remote\..*\.promisor$' 2>/dev/null | grep -q ' true$'; then
+    git fetch -q --no-write-fetch-head --filter=blob:none "$@"
+  else
+    git fetch -q --no-write-fetch-head "$@"
+  fi
+}
+
+published_commits() {
+  printf '%s\n' "$1" | cut -f1 | sed '/^$/d; s/$/^{commit}/' | git cat-file --batch-check='%(objectname)'
+}
+
+check_ref() {
+  local_sha=$1
+  remote_ref=$2
+  found=$3
+  check_text "a pushed ref name" "$remote_ref"
+  case "$(git cat-file -t "$local_sha")" in
+    commit) ;;
+    tag)
+      tag=$(git cat-file tag "$local_sha")
+      header=$(printf '%s\n' "$tag" | sed '/^$/q')
+      if [ "$(printf '%s\n' "$header" | sed -n 's/^type //p')" != commit ]; then
+        refuse "tag $local_sha does not point to a commit"
+      fi
+      check_address "the tagger of tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p')"
+      check_text "tag $local_sha" "$(printf '%s\n' "$header" | sed -n 's/^tag //p; s/^tagger \(.*\) <.*/\1/p'; printf '%s\n' "$tag" | sed '1,/^$/d')"
+      check_signature "the signature of tag $local_sha" "$tag"
+      ;;
+    *) refuse "a pushed ref does not point to a commit" ;;
+  esac
+  commits=$({
+    echo "$local_sha"
+    printf '%s\n' "$found" | sed -n '/ missing$/d; s/^\(.\)/^\1/p'
+  } | git rev-list --stdin)
+  for commit in $commits; do
+    short=$(git rev-parse --short "$commit")
+    check_address "the author of commit $short" "$(git log -1 --no-show-signature --format=%ae "$commit")"
+    check_address "the committer of commit $short" "$(git log -1 --no-show-signature --format=%ce "$commit")"
+    check_text "commit $short" "$(git log -1 --no-show-signature --format='%an%n%cn%n%B' "$commit")"
+    check_signature "the signature of commit $short" "$(git cat-file commit "$commit" | awk '/^$/ { exit } /^gpgsig(-sha256)? / { sig = 1; sub(/^gpgsig(-sha256)? /, ""); print; next } /^ / { if (sig) { sub(/^ /, ""); print }; next } { sig = 0 }')"
+    mergetag=$(git cat-file commit "$commit" | awk '/^$/ { exit } /^mergetag / { tag = 1; sub(/^mergetag /, ""); print; next } /^ / { if (tag) { sub(/^ /, ""); print }; next } { tag = 0 }')
+    for tagger in $(printf '%s\n' "$mergetag" | sed -n 's/^tagger .*<\(.*\)> .*/\1/p'); do
+      check_address "a merged tag of commit $short" "$tagger"
+    done
+    check_text "a merged tag of commit $short" "$mergetag"
+    check_signature "the signature of a merged tag of commit $short" "$mergetag"
+  done
+}
+
+check_push() {
+  found=$(published_commits "$remote")
+  printf '%s\n' "$input" | while read -r _ local_sha remote_ref _; do
+    if [ -n "$local_sha" ] && [ -n "$(printf '%s' "$local_sha" | tr -d 0)" ]; then
+      check_ref "$local_sha" "$remote_ref" "$found"
+    fi
+  done
+}
+
+input=
+case "$hook" in
+  pre-commit)
+    if [ -n "$(git remote)" ]; then
+      for ident in GIT_AUTHOR_IDENT GIT_COMMITTER_IDENT; do
+        value=$(git var "$ident")
+        check_address "$ident" "$(printf '%s\n' "$value" | sed -n 's/.*<\(.*\)>.*/\1/p')"
+        check_text "the name of $ident" "$(printf '%s\n' "$value" | sed -n 's/ <.*//p')"
+      done
+    fi
+    ;;
+  pre-push)
+    input=$(cat)
+    remote=$(git ls-remote --refs "$2" 'refs/heads/*' 'refs/tags/*')
+    report=$(mktemp)
+    set +e
+    (set -e; check_push) 2>"$report"
+    status=$?
+    if [ "$status" -ne 0 ]; then
+      missing=$(printf '%s\n' "$remote" | while read -r sha ref; do
+        if [ -n "$ref" ] && ! git cat-file -e "$sha^{commit}" 2>/dev/null; then
+          printf '%s\n' "$ref"
+        fi
+      done)
+      # shellcheck disable=SC2086
+      if [ -n "$missing" ] && fetch_objects "$2" $missing 2>/dev/null; then
+        (set -e; check_push) 2>"$report"
+        status=$?
+      fi
+    fi
+    set -e
+    if [ "$status" -ne 0 ]; then
+      cat "$report" >&2
+      rm -f "$report"
+      exit 1
+    fi
+    rm -f "$report"
+    ;;
+esac
+
+own=$(git rev-parse --git-common-dir)/hooks/$hook
+unset GIT_NO_REPLACE_OBJECTS GIT_NO_LAZY_FETCH
+if [ -x "$own" ]; then
+  if [ "$hook" != pre-push ]; then
+    exec "$own" "$@"
+  elif [ -z "$input" ]; then
+    exec "$own" "$@" </dev/null
+  fi
+  exec "$own" "$@" <<INPUT
+$input
+INPUT
+fi

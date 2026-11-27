@@ -121,7 +121,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 |---|---|
 | Editors | Neovim, VS Code |
 | Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd, Atuin, superfile |
-| Version control | Git, lazygit, GitHub CLI, gh-dash, GitLab CLI |
+| Version control | Git, Git privacy guard, lazygit, GitHub CLI, gh-dash, GitLab CLI |
 | Cloud | Azure CLI |
 | Containers | lazydocker |
 | Terminal apps | Ghostty, Windows Terminal |
@@ -160,6 +160,7 @@ required dependencies are still resolved automatically in the preview.
 | US International dead keys | — | ✓ | — |
 | Herdr | ✓ | ✓ | ✓ |
 | Git | ✓ | ✓ | ✓ |
+| Git privacy guard | ✓ | ✓ | ✓ |
 | lazygit | ✓ | ✓ | ✓ |
 | GitHub CLI | ✓ | ✓ | ✓ |
 | gh-dash | ✓ | ✓ | ✓ |
@@ -193,6 +194,40 @@ their own section outside the marked block, or in `~/.gitconfig`;
 and requires review. Removal preserves edited blocks and personal settings.
 As with other live configuration, editing the checkout's defaults takes effect
 immediately.
+
+**Git privacy guard** adds two values to the marked block: `user.useConfigOnly
+= true` and a global `core.hooksPath` to the `git/hooks` folder of the
+checkout. Git then never guesses a name or address from your account and host
+name. In a clone with a remote, the guard stops a commit when the author or
+committer is not public. Before a push, it checks each commit and tag that the
+remote does not have yet: the author, committer and tagger, their names, the
+whole message and the branch or tag name. Public addresses are GitHub and GitLab
+noreply addresses, the noreply addresses of GitHub, Anthropic and OpenAI, the GitHub
+web-flow committer and the reserved example domains.
+
+After its check, the guard runs the hook of the same name in `.git/hooks`.
+Git does not run `.git/hooks/reference-transaction`, `post-index-change`,
+`fsmonitor-watchman`, `push-to-checkout` or the `p4-*` hooks while the guard
+is on. The guard runs the other hooks of `githooks(5)` after its check, also
+the server hooks `pre-receive`, `update`, `proc-receive`, `post-receive` and
+`post-update`. A repository that sets `receive.procReceiveRefs` needs its own
+`proc-receive` hook. Check reports the guard as broken
+when `guard`, `pre-commit` or `pre-push` is missing from `git/hooks`. A
+repository that sets its own `core.hooksPath`, for example with `make hooks`,
+uses only its own hooks. To allow other addresses in one repository, for
+example a work repository or a fork with commits of other people, run the
+command that the guard prints. It sets `core.hooksPath` to the absolute path
+of the `hooks` folder of that repository, so linked worktrees keep their hooks.
+
+`git lfs install` cannot write its hooks while the guard is on. In a
+repository with Git LFS, run this command one time. The guard then runs the LFS
+hooks after its check.
+
+```sh
+git -c core.hooksPath="$(git rev-parse --path-format=absolute --git-common-dir)/hooks" lfs install --local
+```
+
+`pre-commit install` refuses to work while a `core.hooksPath` is set.
 
 **Lint and benchmark tools** is optional for contributors to this dotfiles
 repository. It supplies ShellCheck, jq, Hyperfine, Taplo, yamllint and
@@ -1160,6 +1195,13 @@ boundaries and the Go engine. Opted-in GitHub runners additionally exercise nati
 install/update/removal, fresh providers, configured applications and interruption
 recovery. A local unit pass is not proof of a fresh machine installation.
 Do not enable destructive native package fixtures on an everyday workstation.
+
+Run `make hooks` once in each clone. Before a commit, `scripts/privacy.sh`
+stops on a home folder path, a symbolic link or the address of a personal
+mailbox in a file. Before a push, it checks only the commits that the remote
+does not have. It stops on a personal address in an author, committer, trailer,
+tag or branch name, and on history with another root commit. CI runs the same
+check on the commits of each pull request.
 
 [CLAUDE.md](CLAUDE.md) is the coding guide. [Release maintenance](docs/RELEASING.md) defines
 publication evidence and review gates. The machine JSON entrypoint exists for

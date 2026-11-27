@@ -20,6 +20,8 @@ fail=0
 for f in "${sh_files[@]}"; do
     shellcheck -x --shell=bash "$f" || fail=1
 done
+shellcheck --shell=bash scripts/hooks/pre-commit scripts/hooks/pre-push || fail=1
+shellcheck --shell=sh git/hooks/* || fail=1
 [[ "$fail" -eq 0 ]] || exit 1
 
 # ShellCheck does not parse zsh glob qualifiers. Check the real language

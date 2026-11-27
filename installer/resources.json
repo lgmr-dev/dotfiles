@@ -189,6 +189,17 @@
       "scope": "user"
     },
     {
+      "id": "git-privacy-guard",
+      "name": "Git privacy guard",
+      "description": "Stops a commit or push with an address that is not public, such as a personal email; Git never guesses an identity",
+      "capability": true,
+      "category": "Version control",
+      "requires": [
+        "integration.git"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "lazygit",
       "name": "lazygit",
       "description": "Terminal Git interface",

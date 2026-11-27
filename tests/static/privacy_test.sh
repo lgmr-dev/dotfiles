@@ -76,6 +76,21 @@ git reset -q --hard origin/main
 as "$noreply" "" git commit -q --allow-empty -m "$(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235') and https://org${at}dev.azure.com/org/p/_git/r"
 expect pass "a bot address in curly quotes and an HTTPS clone URL with a user" env LC_ALL=C git push -q origin HEAD:refs/heads/quoted
 git reset -q --hard origin/main
+file_case stop "a personal mailbox with a Unicode local part" "jos$(printf '\303\251')${at}gmail.com"
+as "$noreply" "" git commit -q --allow-empty -m "See https://example.com?x=alice${at}personal-isp.de and https://github.com,bob${at}personal-isp.de"
+expect stop "a personal address after a URL query or a comma" git push -q origin HEAD:refs/heads/url-query
+git reset -q --hard origin/main
+as "$noreply" "" git commit -q --allow-empty -m "by $(printf '\342\200\224')noreply${at}anthropic.com$(printf '\343\200\202')"
+expect pass "a bot address between non-ASCII punctuation in the C locale" env LC_ALL=C git push -q origin HEAD:refs/heads/dash
+git reset -q --hard origin/main
+git init -q -b main "$work/module"
+printf '%s\n' "/$h/alice/notes" > "$work/module/README"
+git -C "$work/module" add README
+as "$noreply" "" git -C "$work/module" -c core.hooksPath=/dev/null commit -q -m module
+git -c protocol.file.allow=always submodule --quiet add "$work/module" module
+expect pass "a submodule whose own files hold a home path, with submodule.recurse on" as "$noreply" "" git -c submodule.recurse=true commit -q -m module
+git reset -q --hard origin/main 2>/dev/null
+rm -rf module .git/modules/module
 file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /home/dotfiles-migration"
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"

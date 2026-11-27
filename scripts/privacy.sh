@@ -11,9 +11,9 @@ synthetic_homes='^(user|bob|runner|runneradmin|dotfiles-migration)$'
 system_homes='^(shared|public|default)$'
 email='([[:alnum:]._%+-]|[^[:print:][:cntrl:][:space:]])+@([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+(\.([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+)*\.([[:alpha:]]|[^[:print:][:cntrl:][:space:]]){2,}'
 ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
-url_user='[Hh][Tt][Tt][Pp][Ss]?://[^/@[:space:]]+@'
+url_user='[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9._~%:+-]+@'
 quotes="$(printf '\342\200\234|\342\200\235|\342\200\230|\342\200\231|\302\253|\302\273|\342\200\271|\342\200\272')"
-personal_mail='[A-Za-z0-9._%+-]+@(gmail|googlemail|mail|hotmail|outlook|live|msn|passport|icloud|me|mac|yahoo|ymail|rocketmail|aol|aim|proton|protonmail|pm|tutanota|tuta|tutamail|keemail|fastmail|hey|posteo|mailbox|runbox|startmail|disroot|riseup|skiff|duck|zoho|att|sbcglobal|bellsouth|pacbell|prodigy|swbell|ameritech|flash|comcast|xfinity|verizon|cox|charter|spectrum|rr|twc|earthlink|juno|netzero|frontier|frontiernet|centurylink|windstream|optonline|optimum|suddenlink|mediacom|shaw|rogers|sympatico|bell|videotron|telus|cogeco|btinternet|btopenworld|sky|virginmedia|ntlworld|blueyonder|talktalk|tiscali|gmx|web|t-online|freenet|arcor|free|sfr|neuf|laposte|orange|wanadoo|libero|virgilio|alice|tin|tim|seznam|centrum|atlas|onet|wp|o2|interia|abv|yandex|ya|rambler|inbox|list|bk|naver|daum|hanmail|nate|163|126|yeah|qq|foxmail|sina|sohu|aliyun|rediffmail|uol|bol|terra|ig|bigpond|optusnet|iinet|tpg|xtra)(\.[A-Za-z]{2,3}){1,2}([^A-Za-z0-9-]|$)'
+personal_mail='([[:alnum:]._%+-]|[^[:print:][:cntrl:][:space:]])+@(gmail|googlemail|mail|hotmail|outlook|live|msn|passport|icloud|me|mac|yahoo|ymail|rocketmail|aol|aim|proton|protonmail|pm|tutanota|tuta|tutamail|keemail|fastmail|hey|posteo|mailbox|runbox|startmail|disroot|riseup|skiff|duck|zoho|att|sbcglobal|bellsouth|pacbell|prodigy|swbell|ameritech|flash|comcast|xfinity|verizon|cox|charter|spectrum|rr|twc|earthlink|juno|netzero|frontier|frontiernet|centurylink|windstream|optonline|optimum|suddenlink|mediacom|shaw|rogers|sympatico|bell|videotron|telus|cogeco|btinternet|btopenworld|sky|virginmedia|ntlworld|blueyonder|talktalk|tiscali|gmx|web|t-online|freenet|arcor|free|sfr|neuf|laposte|orange|wanadoo|libero|virgilio|alice|tin|tim|seznam|centrum|atlas|onet|wp|o2|interia|abv|yandex|ya|rambler|inbox|list|bk|naver|daum|hanmail|nate|163|126|yeah|qq|foxmail|sina|sohu|aliyun|rediffmail|uol|bol|terra|ig|bigpond|optusnet|iinet|tpg|xtra)(\.[A-Za-z]{2,3}){1,2}([^A-Za-z0-9-]|$)'
 public_address='^([^@[:space:]]+@users\.noreply\.(github|gitlab)\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
 not_address='@(v?[0-9]+\.[0-9]|[0-9]+x\.|[A-Za-z0-9_.-]+\.(service|socket|timer|target|mount|path|slice|scope|device|swap|automount)$)'
 spaced=users-path-with-a-space
@@ -47,7 +47,7 @@ check_signature() {
 }
 
 grep_tree() {
-  local rc=0 flags=(--no-color -a -h -o -E)
+  local rc=0 flags=(--no-color --no-recurse-submodules -a -h -o -E)
   [[ "${3:-}" == any-case ]] && flags+=(-i)
   if [[ "$1" == index ]]; then
     git grep --cached "${flags[@]}" -e "$2" || rc=$?
@@ -82,9 +82,9 @@ check_utf16() {
   [[ "$1" == index ]] || prefix="$1:"
   listing="$(mktemp)"
   if [[ "$1" == index ]]; then
-    LC_ALL=C git grep --no-color --cached -z -l -a -G -e $'^\xff\xfe' -e $'^\xfe\xff' > "$listing" || rc=$?
+    LC_ALL=C git grep --no-color --no-recurse-submodules --cached -z -l -a -G -e $'^\xff\xfe' -e $'^\xfe\xff' > "$listing" || rc=$?
   else
-    LC_ALL=C git grep --no-color -z -l -a -G -e $'^\xff\xfe' -e $'^\xfe\xff' "$1" > "$listing" || rc=$?
+    LC_ALL=C git grep --no-color --no-recurse-submodules -z -l -a -G -e $'^\xff\xfe' -e $'^\xfe\xff' "$1" > "$listing" || rc=$?
   fi
   if ((rc > 1)); then
     rm -f "$listing"
@@ -114,7 +114,7 @@ check_links() {
 
 check_address() {
   local address
-  address="$(tr '[:upper:]' '[:lower:]' <<<"$2")"
+  address="$(LC_ALL=C sed -E 's/^[^ -~]+//; s/[^ -~]+$//' <<<"$2" | tr '[:upper:]' '[:lower:]')"
   [[ "$address" =~ $public_address ]] || fail "$1: use a GitHub noreply address"
 }
 

@@ -1,2 +1,2 @@
 #!/bin/sh
-exec "$(dirname "$0")/guard" "$(basename "$0")" "$@"
+exec "${0%/*}/guard" "${0##*/}" "$@"

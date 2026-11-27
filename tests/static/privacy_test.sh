@@ -83,6 +83,9 @@ git reset -q --hard origin/main
 as "$noreply" "" git commit -q --allow-empty -m "by $(printf '\342\200\224')noreply${at}anthropic.com$(printf '\343\200\202')"
 expect pass "a bot address between non-ASCII punctuation in the C locale" env LC_ALL=C git push -q origin HEAD:refs/heads/dash
 git reset -q --hard origin/main
+as "$noreply" "" git commit -q --allow-empty -m "by noreply${at}anthropic.com$(printf '\342\200\224')see the notes"
+expect pass "a bot address before an em dash and more text in the C locale" env LC_ALL=C git push -q origin HEAD:refs/heads/em-dash
+git reset -q --hard origin/main
 git init -q -b main "$work/module"
 printf '%s\n' "/$h/alice/notes" > "$work/module/README"
 git -C "$work/module" add README
@@ -95,6 +98,7 @@ file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /h
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"
+file_case pass "a reserved-domain fixture under a mail provider name" "fixture${at}mail.eu.example.org"
 
 push_case() {
   local want="$1" label="$2" author="$3" message="$4" ref="${5:-refs/heads/case-$failures-$RANDOM}"
@@ -134,7 +138,7 @@ expect pass "a tag message with a header-like line" git push -q origin v1
 as "$noreply" "$personal" git tag -a v2 -m release
 expect stop "a personal tagger" git push -q origin v2
 
-for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user quotes:quotes not_address:not_address; do
+for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user punctuation:punctuation not_address:not_address; do
   guard_value="$(sed -n "s/^${pair%%:*}=//p" "$REPO_ROOT/git/hooks/guard")"
   script_value="$(sed -n "s/^${pair##*:}=//p" "$REPO_ROOT/scripts/privacy.sh")"
   if [[ -z "$guard_value" || "$guard_value" != "$script_value" ]]; then
@@ -142,6 +146,13 @@ for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url
     failures=$((failures + 1))
   fi
 done
+
+script_homes="$(sed -n "s/^synthetic_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")|$(sed -n "s/^system_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
+gitleaks_homes="$(sed -n 's/.*\[\/\\\\\](\([a-z|-]*\)).*/\1/p' "$REPO_ROOT/.gitleaks.toml")"
+if [[ "$script_homes" == "|" || "$script_homes" != "$gitleaks_homes" ]]; then
+  echo "FAIL: .gitleaks.toml and scripts/privacy.sh must allow the same home folders" >&2
+  failures=$((failures + 1))
+fi
 
 git checkout -q -b topic origin/main
 as "$personal" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m "published personal"

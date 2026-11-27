@@ -9,7 +9,12 @@ regex = '''((?i:https?)://(\[[0-9A-Fa-f:.]+\]|[^/\s"',;<>()|`\\{}\[\]]+)([^\s"',
 [[rules.allowlists]]
 description = "The synthetic home folders of tests, fixtures and CI runners"
 regexTarget = "match"
-regexes = ['''(?i)[/\\](user|bob|runner|runneradmin|dotfiles-migration|shared|public|default)\.*$''']
+regexes = ['''(?i)[/\\](user|bob|runner|runneradmin|dotfiles-migration)\.*$''']
+
+[[rules.allowlists]]
+description = "The shared and public system folders"
+regexTarget = "match"
+regexes = ['''(?i)[/\\]users[/\\]{1,2}(shared|public|default)\.*$''']
 
 [[rules.allowlists]]
 description = "A web URL with a home-like path"

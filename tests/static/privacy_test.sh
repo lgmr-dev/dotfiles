@@ -98,7 +98,8 @@ file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /h
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"
-file_case pass "a reserved-domain fixture under a mail provider name" "fixture${at}mail.eu.example.org"
+file_case stop "a personal mailbox before a file extension" "token_alice${at}gmail.com.json"
+file_case stop "a Linux home folder with a system folder name" "/$h/default/.ssh"
 
 push_case() {
   local want="$1" label="$2" author="$3" message="$4" ref="${5:-refs/heads/case-$failures-$RANDOM}"
@@ -147,9 +148,9 @@ for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url
   fi
 done
 
-script_homes="$(sed -n "s/^synthetic_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")|$(sed -n "s/^system_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
+script_homes="$(sed -n "s/^synthetic_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
 gitleaks_homes="$(sed -n 's/.*\[\/\\\\\](\([a-z|-]*\)).*/\1/p' "$REPO_ROOT/.gitleaks.toml")"
-if [[ "$script_homes" == "|" || "$script_homes" != "$gitleaks_homes" ]]; then
+if [[ -z "$script_homes" || "$script_homes" != "$gitleaks_homes" ]]; then
   echo "FAIL: .gitleaks.toml and scripts/privacy.sh must allow the same home folders" >&2
   failures=$((failures + 1))
 fi

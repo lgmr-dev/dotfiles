@@ -99,6 +99,9 @@ c_locale_case stop "a personal address after a bot address and an em dash" "by n
 c_locale_case stop "a personal domain that starts with a bot domain" "Ask noreply${at}anthropic.com$(printf '\303\274').personal-isp.de"
 c_locale_case pass "a bot address in curly quotes before an em dash and a file name" "Use $(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235\342\200\224')README.md has details"
 c_locale_case pass "example addresses with a non-ASCII last letter before non-ASCII text" "$(printf '\342\200\234')jos$(printf '\303\251')${at}example.com$(printf '\342\200\235') and jos$(printf '\303\251')${at}example.com$(printf '\343\201\247\343\201\231')"
+c_locale_case stop "a personal domain with an iteration mark" "Ask alice${at}$(printf '\350\251\246\343\200\205\351\250\223').jp"
+c_locale_case pass "a bot address after a Japanese or an English sentence and a full stop" "$(printf '\347\242\272\350\252\215\343\201\227\343\201\276\343\201\227\343\201\237\343\200\202')noreply${at}anthropic.com and Done$(printf '\343\200\202')noreply${at}anthropic.com"
+c_locale_case pass "a bot address before a full stop and more text" "by noreply${at}anthropic.com$(printf '\343\200\202\347\242\272\350\252\215')"
 c_locale_case stop "a personal address after a bot address and a non-ASCII letter" "noreply${at}github.com$(printf '\343\201\250')jos$(printf '\303\251')${at}personal-isp.de"
 for identity in "noreply${at}anthropic.com$(printf '\303\274').personal-isp.de" "$noreply $personal"; do
   as "$identity" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m identity

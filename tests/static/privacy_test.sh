@@ -132,6 +132,8 @@ push_case pass "a vendor co-author over old personal history" "$noreply" $'x\n\n
 push_case pass "a package tag in a message" "$noreply" "Update package@next and node@v20.1"
 push_case stop "a personal author" "$personal" x
 push_case stop "a pasted personal mailbox with an https prefix" "$noreply" "Contact https://alice${at}gmail.com"
+push_case stop "a pasted personal mailbox with an https prefix and a slash" "$noreply" "Contact https://alice${at}gmail.com/"
+push_case pass "HTTPS URLs with a user, a Unicode host or a port" "$noreply" "Clone https://dev${at}git.$(printf '\344\276\213\343\201\210').jp/team/repo.git or https://dev${at}git.example-corp.net:8443"
 push_case stop "a personal Signed-off-by trailer" "$noreply" $'x\n\nSigned-off-by: A <'"$personal"'>'
 push_case stop "a home path in a message" "$noreply" "see /$u/alice/notes"
 push_case pass "an SSH remote in a message" "$noreply" "Push to git${at}github.com:o/r.git"

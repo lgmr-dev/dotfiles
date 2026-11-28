@@ -93,6 +93,9 @@ c_locale_case stop "a personal address with an ideographic full stop in the doma
 c_locale_case stop "a personal address after a bot address and an em dash" "by noreply${at}anthropic.com$(printf '\342\200\224')alice${at}personal-isp.de"
 c_locale_case stop "a pasted personal mailbox with an https prefix and a slash in curly quotes" "Contact $(printf '\342\200\234')https://alice${at}gmail.com/$(printf '\342\200\235')"
 c_locale_case stop "a personal address at the start of the path of a URL with a user" "See https://dev${at}git.example-corp.net/a${at}personal-isp.de"
+c_locale_case stop "a co-author trailer with a Unicode domain suffix" "x
+
+Co-authored-by: A <noreply${at}anthropic.com$(printf '\343\200\202\344\270\255\345\233\275')>"
 c_locale_case stop "a personal domain that starts with a bot domain" "Ask noreply${at}anthropic.com$(printf '\303\274').personal-isp.de"
 c_locale_case pass "a bot address in curly quotes before an em dash and a file name" "Use $(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235\342\200\224')README.md has details"
 c_locale_case pass "example addresses with a non-ASCII last letter before non-ASCII text" "$(printf '\342\200\234')jos$(printf '\303\251')${at}example.com$(printf '\342\200\235') and jos$(printf '\303\251')${at}example.com$(printf '\343\201\247\343\201\231')"

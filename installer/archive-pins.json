@@ -3258,9 +3258,9 @@
     },
     "tool.pi": {
       "darwin/arm64": {
-        "version": "1.6.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-darwin-arm64.tar.gz",
-        "sha256": "6429287b7ae98d726ec577815d14fd680e7c587e89ecc5153b4a145dc4adba33",
+        "version": "1.6.1",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.1/pi-darwin-arm64.tar.gz",
+        "sha256": "d8fd8e24c2a5054ae383d83b26f6eb6f950edf613917e434a52394f44cd4d933",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3271,9 +3271,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "1.6.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-linux-x64.tar.gz",
-        "sha256": "ef77dbe4379b3bdeb425a1e1b862fa3c915c255000dfe4965c98eee96a5765d1",
+        "version": "1.6.1",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.1/pi-linux-x64.tar.gz",
+        "sha256": "3c7f00715eb512e165c0da8cad314d73c83b54d5bf7748be4adc618fc8357b68",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3285,9 +3285,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.6.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-linux-arm64.tar.gz",
-        "sha256": "5404547b9739be596d50ae7142c52535899e8e7dd37a7bace9be593e0355b468",
+        "version": "1.6.1",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.1/pi-linux-arm64.tar.gz",
+        "sha256": "afde641d6c5904d26960ddb4223bf563b0860cf1a0ebc443b85deff67d048753",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3299,9 +3299,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.6.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.0/pi-windows-x64.zip",
-        "sha256": "f5defb6c403ee698f5b3f8886db473e55b78aac670a8ce03620a47f5f0aec57c",
+        "version": "1.6.1",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.6.1/pi-windows-x64.zip",
+        "sha256": "dbb007c8c50782de1642382fed777c60252aab080f36eef7823324c574c1f3e4",
         "format": "zip",
         "commands": {
           "pi": "pi.exe"
@@ -3365,9 +3365,9 @@
     },
     "tool.openwhispr": {
       "darwin/arm64": {
-        "version": "1.12.1",
-        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.1/OpenWhispr-1.12.1-arm64-mac.zip",
-        "sha256": "e3b526f2ee73c8e00f27eb065ea5dcb99bccd88c7104266582f3ac7f11e3fee8",
+        "version": "1.12.2",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.2/OpenWhispr-1.12.2-arm64-mac.zip",
+        "sha256": "bb421db87110a886832eab167602e965c6e1f6915ff6f688fc8b21be7309cab4",
         "format": "zip",
         "commands": {},
         "bin_dirs": [],
@@ -3377,9 +3377,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.12.1",
-        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.1/OpenWhispr-1.12.1-linux-x64.tar.gz",
-        "sha256": "3f833aba6099f474403bfa6c5d097a2bcc9be8a8a19c99965a33a9da30fa192d",
+        "version": "1.12.2",
+        "url": "https://github.com/OpenWhispr/openwhispr/releases/download/v1.12.2/OpenWhispr-1.12.2-linux-x64.tar.gz",
+        "sha256": "22f20b472b2713200f00f4cba349e6af0f6cc94ab2461c7c943ff412f30f0e4d",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3548,9 +3548,9 @@
     },
     "tool.t3": {
       "darwin/arm64": {
-        "version": "0.1.11",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-darwin-arm64.tar.gz",
-        "sha256": "4bc22e16a2e48d868ad8c4b9d6c8e031be1c566ce31c28267955c2986a70e95f",
+        "version": "0.1.12",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.12/t3-0.1.12-darwin-arm64.tar.gz",
+        "sha256": "1b78c9754160623661c5942a7e22f5a62a64bf1f96ab397f50bbc7c6b6115ca4",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3565,9 +3565,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.1.11",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-linux-x64.tar.gz",
-        "sha256": "2b691c07f5bcb5adea4a863d5324aae7db21bd6d82280cec7787836dcaa013e1",
+        "version": "0.1.12",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.12/t3-0.1.12-linux-x64.tar.gz",
+        "sha256": "9ba3db46e3554fb9970fd5ede9e823c2f6d6f6763f40340bd4c8ef6b09501c54",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3583,9 +3583,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "0.1.11",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-linux-arm64.tar.gz",
-        "sha256": "7d90a5af032fe0988a616403e0f51a6cb68eff7ed7a84bc40999cc3997dffd71",
+        "version": "0.1.12",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.12/t3-0.1.12-linux-arm64.tar.gz",
+        "sha256": "29cfbab19117aa436f1700382afb9cfe5d7ef47609cabba9356271a0bca5ad98",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3601,9 +3601,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.1.11",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.11/t3-0.1.11-win32-x64.zip",
-        "sha256": "02c92be05c4007339119c39cfc7db06335ee17563dd17c4ada72bcc43cba9d34",
+        "version": "0.1.12",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.12/t3-0.1.12-win32-x64.zip",
+        "sha256": "78538f991f22dad437fb52b6ec2064d6473fb6940266b784f68a2431f55d6106",
         "format": "zip",
         "strip_components": 1,
         "commands": {

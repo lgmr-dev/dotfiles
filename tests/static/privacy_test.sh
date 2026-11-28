@@ -97,6 +97,9 @@ c_locale_case pass "a bot address in full-width parentheses after a word" "by$(p
 c_locale_case stop "a personal address with an ideographic full stop in the domain" "Ask alice${at}personal-isp$(printf '\343\200\202')co.uk"
 c_locale_case stop "a personal address after a bot address and an em dash" "by noreply${at}anthropic.com$(printf '\342\200\224')alice${at}personal-isp.de"
 c_locale_case stop "a personal domain that starts with a bot domain" "Ask noreply${at}anthropic.com$(printf '\303\274').personal-isp.de"
+c_locale_case pass "a bot address in curly quotes before an em dash and a file name" "Use $(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235\342\200\224')README.md has details"
+c_locale_case pass "example addresses with a non-ASCII last letter before non-ASCII text" "$(printf '\342\200\234')jos$(printf '\303\251')${at}example.com$(printf '\342\200\235') and jos$(printf '\303\251')${at}example.com$(printf '\343\201\247\343\201\231')"
+c_locale_case stop "a personal address after a bot address and a non-ASCII letter" "noreply${at}github.com$(printf '\343\201\250')jos$(printf '\303\251')${at}personal-isp.de"
 for identity in "noreply${at}anthropic.com$(printf '\303\274').personal-isp.de" "$noreply $personal"; do
   as "$identity" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m identity
   expect stop "a personal author address that holds a public address, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q --dry-run origin HEAD:refs/heads/identity
@@ -107,7 +110,7 @@ git init -q -b main "$work/module"
 printf '%s\n' "/$h/alice/notes" > "$work/module/README"
 git -C "$work/module" add README
 as "$noreply" "" git -C "$work/module" -c core.hooksPath=/dev/null commit -q -m module
-git -c protocol.file.allow=always submodule --quiet add "$work/module" module
+git -c protocol.file.allow=always submodule --quiet add ../module module
 expect pass "a submodule whose own files hold a home path, with submodule.recurse on" as "$noreply" "" git -c submodule.recurse=true commit -q -m module
 git reset -q --hard origin/main 2>/dev/null
 rm -rf module .git/modules/module
@@ -156,7 +159,7 @@ expect pass "a tag message with a header-like line" git push -q origin v1
 as "$noreply" "$personal" git tag -a v2 -m release
 expect stop "a personal tagger" git push -q origin v2
 
-for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user not_address:not_address; do
+for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user separators:separators dots:dots not_address:not_address; do
   guard_value="$(sed -n "s/^${pair%%:*}=//p" "$REPO_ROOT/git/hooks/guard")"
   script_value="$(sed -n "s/^${pair##*:}=//p" "$REPO_ROOT/scripts/privacy.sh")"
   if [[ -z "$guard_value" || "$guard_value" != "$script_value" ]]; then
@@ -167,7 +170,9 @@ done
 
 script_homes="$(sed -n "s/^synthetic_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
 gitleaks_homes="$(sed -n 's/.*\[\/\\\\\](\([a-z|-]*\)).*/\1/p' "$REPO_ROOT/.gitleaks.toml")"
-if [[ -z "$script_homes" || "$script_homes" != "$gitleaks_homes" ]]; then
+script_system="$(sed -n "s/^system_homes=.*users.*(\([a-z|]*\)).*/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
+gitleaks_system="$(sed -n "s/.*users\[.*(\([a-z|]*\)).*/\1/p" "$REPO_ROOT/.gitleaks.toml")"
+if [[ -z "$script_homes" || "$script_homes" != "$gitleaks_homes" || -z "$script_system" || "$script_system" != "$gitleaks_system" ]]; then
   echo "FAIL: .gitleaks.toml and scripts/privacy.sh must allow the same home folders" >&2
   failures=$((failures + 1))
 fi

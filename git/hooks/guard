@@ -6,7 +6,7 @@ shift
 public='^([^@[:space:]]+@users\.noreply\.(github|gitlab)\.com|(noreply|support|web-flow)@github\.com|noreply@(anthropic|openai)\.com|[^@[:space:]]+@([a-z0-9-]+\.)*example\.(com|net|org)|[^@[:space:]]+@([a-z0-9-]+\.)*(example|invalid|test|localhost))$'
 email='([[:alnum:]._%+-]|[^[:print:][:cntrl:][:space:]])+@([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+(\.([[:alnum:]-]|[^[:print:][:cntrl:][:space:]])+)*\.([[:alpha:]]|[^[:print:][:cntrl:][:space:]]){2,}'
 ssh_remote='(^|[^A-Za-z0-9._%+-])git@[A-Za-z0-9.-]+(:|/)[A-Za-z0-9._~/-]+'
-url_user='[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9._~%:+-]+@'
+url_user='([Hh][Tt][Tt][Pp][Ss]?://)[A-Za-z0-9._~%:+-]+@(([[:alnum:].-]|[^[:print:][:cntrl:][:space:]])+(:[0-9]+|/+[+]?[[:alnum:]_~%-]))'
 quotes="$(printf '\342\200\234|\342\200\235|\342\200\230|\342\200\231|\302\253|\302\273|\342\200\271|\342\200\272')"
 not_address='@(v?[0-9]+\.[0-9]|[0-9]+x\.|[A-Za-z0-9_.-]+\.(service|socket|timer|target|mount|path|slice|scope|device|swap|automount)$)'
 
@@ -18,14 +18,14 @@ refuse() {
 }
 
 check_address() {
-  if ! printf '%s\n' "$2" | LC_ALL=C sed -E 's/^[^ -~]+//; s/[^ -~]+$//' | tr '[:upper:]' '[:lower:]' | grep -qE "$public"; then
+  if ! printf '%s\n' "$2" | tr '[:upper:]' '[:lower:]' | grep -qE "$public"; then
     refuse "$1 holds an address that is not public. Use your GitHub noreply address"
   fi
 }
 
 check_text() {
-  text=$(printf '%s\n' "$2" | sed -E -e "s#$ssh_remote##g" -e "s#$url_user##g" -e "s/$quotes/ /g")
-  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -viE "$not_address" || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
+  text=$(printf '%s\n' "$2" | sed -E -e "s#$ssh_remote##g" -e "s#$url_user#\\1\\2#g" -e "s/$quotes/ /g")
+  for word in $(printf '%s\n' "$text" | grep -oE "$email" | grep -viE "$not_address" | LC_ALL=C sed -E 's/^[^ -~]+//; s/[^ -~]+$//' || true) $(printf '%s\n' "$text" | grep -E '^[A-Za-z-]*-[Bb][Yy]:' | grep -oE '<[^<>]*@[^<>]*>' | tr -d '<>' || true); do
     check_address "$1" "$word"
   done
 }

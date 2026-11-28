@@ -276,6 +276,17 @@ func TestGitPrivacyGuardStopsPersonalAddressesAndRunsOwnHooks(t *testing.T) {
 		if err := os.Rename(hook+".moved", hook); err != nil {
 			t.Fatal(err)
 		}
+		if runtime.GOOS != "windows" {
+			if err := os.Chmod(hook, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if ready() {
+				t.Fatal("check accepted a hook that is not executable", name)
+			}
+			if err := os.Chmod(hook, 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
 	remote, clone := filepath.Join(c.Home, "remote.git"), filepath.Join(c.Home, "clone")
 	gitSettingsCommand(t, c.Home, c.Home, "init", "--bare", "--initial-branch=main", remote)

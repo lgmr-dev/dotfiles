@@ -83,11 +83,40 @@ git reset -q --hard origin/main
 as "$noreply" "" git commit -q --allow-empty -m "by $(printf '\342\200\224')noreply${at}anthropic.com$(printf '\343\200\202')"
 expect pass "a bot address between non-ASCII punctuation in the C locale" env LC_ALL=C git push -q origin HEAD:refs/heads/dash
 git reset -q --hard origin/main
+c_locale_case() {
+  as "$noreply" "" git commit -q --allow-empty -m "$3"
+  expect "$1" "$2 in the C locale, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q --dry-run origin "HEAD:refs/heads/g-$failures-$RANDOM"
+  expect "$1" "$2 in the C locale" env LC_ALL=C git push -q origin "HEAD:refs/heads/c-$failures-$RANDOM"
+  git reset -q --hard origin/main
+}
+c_locale_case stop "a personal address with an ideographic full stop in the domain" "Ask alice${at}personal-isp$(printf '\343\200\202')co.uk"
+c_locale_case stop "a personal address after a bot address and an em dash" "by noreply${at}anthropic.com$(printf '\342\200\224')alice${at}personal-isp.de"
+c_locale_case stop "a pasted personal mailbox with an https prefix and a slash in curly quotes" "Contact $(printf '\342\200\234')https://alice${at}gmail.com/$(printf '\342\200\235')"
+c_locale_case stop "a personal address at the start of the path of a URL with a user" "See https://dev${at}git.example-corp.net/a${at}personal-isp.de"
+c_locale_case stop "a co-author trailer with a Unicode domain suffix" "x
+
+Co-authored-by: A <noreply${at}anthropic.com$(printf '\343\200\202\344\270\255\345\233\275')>"
+c_locale_case stop "a personal domain that starts with a bot domain" "Ask noreply${at}anthropic.com$(printf '\303\274').personal-isp.de"
+c_locale_case pass "a bot address in curly quotes before an em dash and a file name" "Use $(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235\342\200\224')README.md has details"
+c_locale_case pass "example addresses with a non-ASCII last letter before non-ASCII text" "$(printf '\342\200\234')jos$(printf '\303\251')${at}example.com$(printf '\342\200\235') and jos$(printf '\303\251')${at}example.com$(printf '\343\201\247\343\201\231')"
+c_locale_case stop "a personal domain with an iteration mark" "Ask alice${at}$(printf '\350\251\246\343\200\205\351\250\223').jp"
+c_locale_case pass "a bot address after a Japanese sentence and a full stop" "$(printf '\347\242\272\350\252\215\343\201\227\343\201\276\343\201\227\343\201\237\343\200\202')noreply${at}anthropic.com"
+c_locale_case stop "a personal domain with a Catalan middle dot" "Ask alice${at}co$(printf '\302\267')legi.cat"
+c_locale_case stop "a personal domain with a Unicode label after an ideographic full stop" "Ask alice${at}dept$(printf '\343\200\202\344\276\213\343\201\210').jp"
+c_locale_case pass "a bot address before a full stop and more text" "by noreply${at}anthropic.com$(printf '\343\200\202\347\242\272\350\252\215') and noreply${at}anthropic.com$(printf '\343\202\222\344\275\277\343\201\206\343\200\202\346\254\241\343\201\253')"
+c_locale_case pass "an @mention before a full stop and more text" "$(printf '\346\213\205\345\275\223')${at}tanaka$(printf '\343\201\225\343\202\223\343\200\202\343\202\210\343\202\215\343\201\227\343\201\217')"
+c_locale_case stop "a personal address after a bot address and a non-ASCII letter" "noreply${at}github.com$(printf '\343\201\250')jos$(printf '\303\251')${at}personal-isp.de"
+for identity in "noreply${at}anthropic.com$(printf '\303\274').personal-isp.de" "$noreply $personal" "noreply${at}anthropic.com$(printf '\343\200\202\344\270\255\345\233\275')"; do
+  as "$identity" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m identity
+  expect stop "a personal author address that holds a public address, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q --dry-run origin HEAD:refs/heads/identity
+  expect stop "a personal author address that holds a public address" env LC_ALL=C git push -q origin HEAD:refs/heads/identity
+  git reset -q --hard origin/main
+done
 git init -q -b main "$work/module"
 printf '%s\n' "/$h/alice/notes" > "$work/module/README"
 git -C "$work/module" add README
 as "$noreply" "" git -C "$work/module" -c core.hooksPath=/dev/null commit -q -m module
-git -c protocol.file.allow=always submodule --quiet add "$work/module" module
+git -c protocol.file.allow=always submodule --quiet add ../module module
 expect pass "a submodule whose own files hold a home path, with submodule.recurse on" as "$noreply" "" git -c submodule.recurse=true commit -q -m module
 git reset -q --hard origin/main 2>/dev/null
 rm -rf module .git/modules/module
@@ -95,6 +124,8 @@ file_case pass "the synthetic test homes" "/home/user /Users/bob /home/runner /h
 file_case pass "a web URL with a home-like path" "https://github.com/o/r/blob/main/portable/root/README"
 file_case pass "a web URL with parentheses in its path" "https://github.com/o/r/blob/main/app/(auth)/home/page.tsx"
 file_case pass "an ASP.NET Home folder" "Views/Home/Index.cshtml"
+file_case stop "a personal mailbox before a file extension" "token_alice${at}gmail.com.json"
+file_case stop "a Linux home folder with a system folder name" "/$h/default/.ssh"
 
 push_case() {
   local want="$1" label="$2" author="$3" message="$4" ref="${5:-refs/heads/case-$failures-$RANDOM}"
@@ -105,6 +136,13 @@ push_case() {
 push_case pass "a vendor co-author over old personal history" "$noreply" $'x\n\nCo-Authored-By: Bot <noreply@anthropic.com>'
 push_case pass "a package tag in a message" "$noreply" "Update package@next and node@v20.1"
 push_case stop "a personal author" "$personal" x
+push_case stop "a pasted personal mailbox with an https prefix" "$noreply" "Contact https://alice${at}gmail.com"
+push_case stop "a pasted personal mailbox with an https prefix and a slash" "$noreply" "Contact https://alice${at}gmail.com/"
+push_case stop "a pasted personal mailbox with an https prefix in a Markdown autolink" "$noreply" "Contact <https://alice${at}gmail.com/>"
+push_case stop "a personal address at the start of the path of a URL with a user" "$noreply" "See https://dev${at}git.example-corp.net/a${at}personal-isp.de"
+push_case pass "an HTTPS URL with a user and a path that starts with a plus" "$noreply" "Clone https://dev${at}git.example-corp.net/+team/repo.git"
+push_case pass "an HTTPS URL with a user and a path that starts with two slashes" "$noreply" "Clone https://dev${at}git.example-corp.net//team/repo.git"
+push_case pass "HTTPS URLs with a user, a Unicode host or a port" "$noreply" "Clone https://dev${at}git.$(printf '\344\276\213\343\201\210').jp/team/repo.git or https://dev${at}git.example-corp.net:8443"
 push_case stop "a personal Signed-off-by trailer" "$noreply" $'x\n\nSigned-off-by: A <'"$personal"'>'
 push_case stop "a home path in a message" "$noreply" "see /$u/alice/notes"
 push_case pass "an SSH remote in a message" "$noreply" "Push to git${at}github.com:o/r.git"
@@ -142,6 +180,15 @@ for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url
     failures=$((failures + 1))
   fi
 done
+
+script_homes="$(sed -n "s/^synthetic_homes='^(\(.*\))\$'$/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
+gitleaks_homes="$(sed -n 's/.*\[\/\\\\\](\([a-z|-]*\)).*/\1/p' "$REPO_ROOT/.gitleaks.toml")"
+script_system="$(sed -n "s/^system_homes=.*users.*(\([a-z|]*\)).*/\1/p" "$REPO_ROOT/scripts/privacy.sh")"
+gitleaks_system="$(sed -n "s/.*users\[.*(\([a-z|]*\)).*/\1/p" "$REPO_ROOT/.gitleaks.toml")"
+if [[ -z "$script_homes" || "$script_homes" != "$gitleaks_homes" || -z "$script_system" || "$script_system" != "$gitleaks_system" ]]; then
+  echo "FAIL: .gitleaks.toml and scripts/privacy.sh must allow the same home folders" >&2
+  failures=$((failures + 1))
+fi
 
 git checkout -q -b topic origin/main
 as "$personal" "" git -c core.hooksPath=/dev/null commit -q --allow-empty -m "published personal"

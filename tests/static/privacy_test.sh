@@ -131,6 +131,7 @@ push_case() {
 push_case pass "a vendor co-author over old personal history" "$noreply" $'x\n\nCo-Authored-By: Bot <noreply@anthropic.com>'
 push_case pass "a package tag in a message" "$noreply" "Update package@next and node@v20.1"
 push_case stop "a personal author" "$personal" x
+push_case stop "a pasted personal mailbox with an https prefix" "$noreply" "Contact https://alice${at}gmail.com"
 push_case stop "a personal Signed-off-by trailer" "$noreply" $'x\n\nSigned-off-by: A <'"$personal"'>'
 push_case stop "a home path in a message" "$noreply" "see /$u/alice/notes"
 push_case pass "an SSH remote in a message" "$noreply" "Push to git${at}github.com:o/r.git"

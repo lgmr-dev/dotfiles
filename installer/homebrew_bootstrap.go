@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-const homebrewBootstrapCommit = "870ddff5dbe61d293a8b4a763090d125e59048a1"
-const homebrewBootstrapSHA256 = "8fd2f1a5287a7c2e3d7362924c677edcc04c5a0e16448c77132d056bc88cf1ed"
+const homebrewBootstrapCommit = "e09ddecb4d4f4a3e776c00c62e010276133d1eed"
+const homebrewBootstrapSHA256 = "34090c61925f5d5c4caca7f1f7089efac33056b1603b4d62b4671d8d22f28fb3"
 const homebrewBootstrapURL = "https://raw.githubusercontent.com/Homebrew/install/" + homebrewBootstrapCommit + "/install.sh"
 
 type homebrewBootstrapRecipe struct {

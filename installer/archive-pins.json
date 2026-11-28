@@ -633,9 +633,9 @@
     },
     "tool.glab": {
       "darwin/arm64": {
-        "version": "1.131.0",
-        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_darwin_arm64.tar.gz",
-        "sha256": "905271694af2dd68cc254d9a2f3dae80036e5c752a82ea16dec5220f4bff1de7",
+        "version": "1.132.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.132.0/downloads/glab_1.132.0_darwin_arm64.tar.gz",
+        "sha256": "1b147997356ec2301fe4d08ce97c945d0c0a3de77fec99806d13681401c00cc2",
         "format": "tar.gz",
         "commands": {
           "glab": "bin/glab"
@@ -645,9 +645,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.131.0",
-        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_linux_amd64.tar.gz",
-        "sha256": "580dbca43835b47267e512476a442f6b2e8785a82b26ccacee22bd7010662b2d",
+        "version": "1.132.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.132.0/downloads/glab_1.132.0_linux_amd64.tar.gz",
+        "sha256": "24d654844cae9f8f24193219ad481a4ebf01c1dc7340ea4107ee2bedd93f9e53",
         "format": "tar.gz",
         "commands": {
           "glab": "bin/glab"
@@ -657,9 +657,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "1.131.0",
-        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_linux_arm64.tar.gz",
-        "sha256": "7c4befd271203745b674caae2a69590ea5f9c6e5dee78bd3b40ba0e2a7c74749",
+        "version": "1.132.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.132.0/downloads/glab_1.132.0_linux_arm64.tar.gz",
+        "sha256": "f4927afddb294ca922212a9d9dc398b729f1e567f7a81a545c179dd7d38da68e",
         "format": "tar.gz",
         "commands": {
           "glab": "bin/glab"
@@ -669,9 +669,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "1.131.0",
-        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.131.0/downloads/glab_1.131.0_windows_amd64.zip",
-        "sha256": "225bfd870f7e8bcb3cc7ebaedc18d161d3470ddd4565cebe41d08604fe197d15",
+        "version": "1.132.0",
+        "url": "https://gitlab.com/gitlab-org/cli/-/releases/v1.132.0/downloads/glab_1.132.0_windows_amd64.zip",
+        "sha256": "aab0fa7adfd30c95452aeca06fa488690bb2d5c62f34bd996adc0af879c2238e",
         "format": "zip",
         "commands": {
           "glab": "bin/glab.exe"
@@ -699,8 +699,8 @@
         "azure_cli": {
           "python": {
             "version": "3.14.10",
-            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
-            "sha256": "f15ec3d15460dd66c2eb88639b152cd9040e7d1ece11e38bf89e8f53f0171e02",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.14.10%2B20261123-aarch64-apple-darwin-install_only_stripped.tar.gz",
+            "sha256": "f4b4683e628b86490baccd466d9fb9d4f1e73d57c96690634b6a1c0e91f3c5f7",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -729,8 +729,8 @@
         "azure_cli": {
           "python": {
             "version": "3.14.10",
-            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
-            "sha256": "c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.14.10%2B20261123-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "92102b15f5149d124b5b4b2f00f1ff2f827cf1a99dc1a22447ad52861bd80ace",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -759,8 +759,8 @@
         "azure_cli": {
           "python": {
             "version": "3.14.10",
-            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
-            "sha256": "38fd50f07170adc29d481913d1c30b17ecb538fbe290315fe1f83d84fdd5b694",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.14.10%2B20261123-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "f1641401210144ca2eeb2774ee531f8bf903fd7f05d198b7feed62b40cbf4ba8",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -1414,8 +1414,8 @@
     "tool.python": {
       "darwin/arm64": {
         "version": "3.13.18",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
-        "sha256": "7a2384641584ab9984221fcb0fc9265df465922af71be71410529e2a9c3f0540",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.13.18%2B20261123-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "1ee404a045f3de0e4ed59476fc9ec8c24ddece1e2a4c549a192a04b04b03b8c1",
         "format": "tar.gz",
         "commands": {
           "python3": "bin/python3"
@@ -1431,8 +1431,8 @@
       },
       "linux/amd64": {
         "version": "3.13.18",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
-        "sha256": "f2d2199eb25880e07863b391cf7124e7ffa1338b0d65600dfcec117c4223a7fb",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.13.18%2B20261123-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "65d5c786e3cbd67533c346537ad0b8826ef158287b3cebaa34b30558cc330f59",
         "format": "tar.gz",
         "commands": {
           "python3": "bin/python3"
@@ -1449,8 +1449,8 @@
       },
       "linux/arm64": {
         "version": "3.13.18",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
-        "sha256": "55c00325f7c1fddf325dfc621aabdfbbac4dc54adda224af88ec411dc12db239",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.13.18%2B20261123-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "9c9da4fc81fcdda1683ec8f97674bae46e3d246243ce8d781973817e13e2ec12",
         "format": "tar.gz",
         "commands": {
           "python3": "bin/python3"
@@ -1467,8 +1467,8 @@
       },
       "windows/amd64": {
         "version": "3.13.18",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
-        "sha256": "2e0fed09d48989f64c9305da9ff2d37a41c0d13ab2aa6283405b2b620dfbf805",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261123/cpython-3.13.18%2B20261123-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "96a8324c30e163daa32fe7a865a1fbb159f4a91033aaffb0066e2c21c2330a7f",
         "format": "tar.gz",
         "commands": {
           "python": "python.exe"

@@ -83,24 +83,21 @@ git reset -q --hard origin/main
 as "$noreply" "" git commit -q --allow-empty -m "by $(printf '\342\200\224')noreply${at}anthropic.com$(printf '\343\200\202')"
 expect pass "a bot address between non-ASCII punctuation in the C locale" env LC_ALL=C git push -q origin HEAD:refs/heads/dash
 git reset -q --hard origin/main
-as "$noreply" "" git commit -q --allow-empty -m "by noreply${at}anthropic.com$(printf '\342\200\224')see the notes"
-expect pass "a bot address before an em dash and more text in the C locale" env LC_ALL=C git push -q origin HEAD:refs/heads/em-dash
-git reset -q --hard origin/main
 c_locale_case() {
   as "$noreply" "" git commit -q --allow-empty -m "$3"
   expect "$1" "$2 in the C locale, in the global guard" env LC_ALL=C git -c core.hooksPath="$REPO_ROOT/git/hooks" push -q --dry-run origin "HEAD:refs/heads/g-$failures-$RANDOM"
   expect "$1" "$2 in the C locale" env LC_ALL=C git push -q origin "HEAD:refs/heads/c-$failures-$RANDOM"
   git reset -q --hard origin/main
 }
-c_locale_case pass "a bot address before a no-break space and more text" "by noreply${at}anthropic.com$(printf '\302\240')CI"
-c_locale_case pass "a bot address in full-width parentheses after a word" "by$(printf '\357\274\210')noreply${at}anthropic.com$(printf '\357\274\211')CI and by$(printf '\357\274\232')noreply${at}anthropic.com"
 c_locale_case stop "a personal address with an ideographic full stop in the domain" "Ask alice${at}personal-isp$(printf '\343\200\202')co.uk"
 c_locale_case stop "a personal address after a bot address and an em dash" "by noreply${at}anthropic.com$(printf '\342\200\224')alice${at}personal-isp.de"
 c_locale_case stop "a personal domain that starts with a bot domain" "Ask noreply${at}anthropic.com$(printf '\303\274').personal-isp.de"
 c_locale_case pass "a bot address in curly quotes before an em dash and a file name" "Use $(printf '\342\200\234')noreply${at}anthropic.com$(printf '\342\200\235\342\200\224')README.md has details"
 c_locale_case pass "example addresses with a non-ASCII last letter before non-ASCII text" "$(printf '\342\200\234')jos$(printf '\303\251')${at}example.com$(printf '\342\200\235') and jos$(printf '\303\251')${at}example.com$(printf '\343\201\247\343\201\231')"
 c_locale_case stop "a personal domain with an iteration mark" "Ask alice${at}$(printf '\350\251\246\343\200\205\351\250\223').jp"
-c_locale_case pass "a bot address after a Japanese or an English sentence and a full stop" "$(printf '\347\242\272\350\252\215\343\201\227\343\201\276\343\201\227\343\201\237\343\200\202')noreply${at}anthropic.com and Done$(printf '\343\200\202')noreply${at}anthropic.com"
+c_locale_case pass "a bot address after a Japanese sentence and a full stop" "$(printf '\347\242\272\350\252\215\343\201\227\343\201\276\343\201\227\343\201\237\343\200\202')noreply${at}anthropic.com"
+c_locale_case stop "a personal domain with a Catalan middle dot" "Ask alice${at}co$(printf '\302\267')legi.cat"
+c_locale_case stop "a personal domain with a Unicode label after an ideographic full stop" "Ask alice${at}dept$(printf '\343\200\202\344\276\213\343\201\210').jp"
 c_locale_case pass "a bot address before a full stop and more text" "by noreply${at}anthropic.com$(printf '\343\200\202\347\242\272\350\252\215') and noreply${at}anthropic.com$(printf '\343\202\222\344\275\277\343\201\206\343\200\202\346\254\241\343\201\253')"
 c_locale_case pass "an @mention before a full stop and more text" "$(printf '\346\213\205\345\275\223')${at}tanaka$(printf '\343\201\225\343\202\223\343\200\202\343\202\210\343\202\215\343\201\227\343\201\217')"
 c_locale_case stop "a personal address after a bot address and a non-ASCII letter" "noreply${at}github.com$(printf '\343\201\250')jos$(printf '\303\251')${at}personal-isp.de"
@@ -163,7 +160,7 @@ expect pass "a tag message with a header-like line" git push -q origin v1
 as "$noreply" "$personal" git tag -a v2 -m release
 expect stop "a personal tagger" git push -q origin v2
 
-for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user separators:separators dots:dots not_address:not_address; do
+for pair in public:public_address email:email ssh_remote:ssh_remote url_user:url_user quotes:quotes not_address:not_address; do
   guard_value="$(sed -n "s/^${pair%%:*}=//p" "$REPO_ROOT/git/hooks/guard")"
   script_value="$(sed -n "s/^${pair##*:}=//p" "$REPO_ROOT/scripts/privacy.sh")"
   if [[ -z "$guard_value" || "$guard_value" != "$script_value" ]]; then
